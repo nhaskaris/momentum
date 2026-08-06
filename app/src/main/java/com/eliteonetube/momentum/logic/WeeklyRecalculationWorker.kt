@@ -23,12 +23,22 @@ class WeeklyRecalculationWorker(
                 WeightDatabase.MIGRATION_12_13,
                 WeightDatabase.MIGRATION_13_14,
                 WeightDatabase.MIGRATION_14_15,
-                WeightDatabase.MIGRATION_15_16
+                WeightDatabase.MIGRATION_15_16,
+                WeightDatabase.MIGRATION_16_17
             ).fallbackToDestructiveMigration().build()
 
             val dao = database.weightDao()
             val profile = dao.getUserProfile().first() ?: return Result.success()
             val entries = dao.getLastTwoWeeks().first()
+
+            var effectiveAverageSteps = profile.averageDailySteps
+            if (profile.useHealthConnect) {
+                val healthConnectManager = HealthConnectManager(applicationContext)
+                val hcSteps = healthConnectManager.fetchAverageStepsLast7Days()
+                if (hcSteps != null) {
+                    effectiveAverageSteps = hcSteps
+                }
+            }
 
             // Recalculate maintenance off this week's average weight, not a single reading —
             // smooths out day-to-day noise the same way the trend comparison does.
@@ -44,7 +54,7 @@ class WeeklyRecalculationWorker(
                     heightCm = profile.height,
                     age = profile.age,
                     isMale = profile.isMale,
-                    averageDailySteps = profile.averageDailySteps,
+                    averageDailySteps = effectiveAverageSteps,
                     bodyFatPercentage = profile.bodyFatPercentage
                 )
             } else {

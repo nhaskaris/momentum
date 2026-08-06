@@ -18,7 +18,8 @@ import com.eliteonetube.momentum.data.WorkoutTemplate
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
-import com.eliteonetube.momentum.ui.NutritionScreen
+import com.eliteonetube.momentum.ui.theme.onboarding.IntroScreen
+import com.eliteonetube.momentum.ui.theme.onboarding.OnboardingScreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -47,7 +48,7 @@ fun HomeScreen(
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> },
-    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?) -> Unit
+    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit
 ) {
     if (savedProfile == null) {
         var showIntro by remember { mutableStateOf(true) }

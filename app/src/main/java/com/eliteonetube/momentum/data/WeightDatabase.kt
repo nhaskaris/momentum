@@ -56,7 +56,8 @@ data class UserProfile(
     val pendingCalorieTarget: Int? = null,
     val pendingAdjustmentReason: String? = null,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
-    val bodyFatPercentage: Double? = null
+    val bodyFatPercentage: Double? = null,
+    val useHealthConnect: Boolean = false
 )
 
 @Entity(tableName = "exercise_table")
@@ -289,7 +290,7 @@ interface WorkoutDao {
         WorkoutSession::class,
         LoggedSet::class
     ],
-    version = 16
+    version = 17
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -322,6 +323,12 @@ abstract class WeightDatabase : RoomDatabase() {
         val MIGRATION_15_16 = object : Migration(15, 16) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN bodyFatPercentage REAL")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN useHealthConnect INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

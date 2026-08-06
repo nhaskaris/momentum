@@ -1,4 +1,4 @@
-package com.eliteonetube.momentum.ui
+package com.eliteonetube.momentum.ui.theme.onboarding
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -6,7 +6,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,11 +15,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.eliteonetube.momentum.ui.screenSafePadding
 import kotlinx.coroutines.launch
 
 private data class IntroPage(val title: String, val body: String)
 
 private val introPages = listOf(
+    IntroPage(
+        title = "Momentum",
+        body = "Your personal fitness coach, built with privacy in mind. Everything is stored locally on your device — no cloud, no tracking, just your data and your progress."
+    ),
     IntroPage(
         title = "Cut",
         body = "Eat in a calorie deficit to lose fat while holding onto muscle. Momentum watches your weekly trend and trims calories only when your loss actually stalls."
@@ -127,7 +132,7 @@ fun IntroScreen(onFinished: () -> Unit) {
             Text(if (isLastPage) "Get Started" else "Next")
             if (!isLastPage) {
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
             }
         }
     }

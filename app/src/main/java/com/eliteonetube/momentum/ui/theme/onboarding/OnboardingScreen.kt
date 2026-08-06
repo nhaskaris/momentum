@@ -1,15 +1,20 @@
-package com.eliteonetube.momentum.ui
+package com.eliteonetube.momentum.ui.theme.onboarding
 
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -17,7 +22,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Goal
 import com.eliteonetube.momentum.data.UnitSystem
+import com.eliteonetube.momentum.logic.HealthConnectManager
 import com.eliteonetube.momentum.logic.Units
+import com.eliteonetube.momentum.ui.screenSafePadding
+import androidx.health.connect.client.PermissionController
 import kotlinx.coroutines.launch
 
 private data class GoalInfo(val goal: Goal, val label: String, val description: String)
@@ -30,8 +38,12 @@ private val goalInfoList = listOf(
 )
 
 @Composable
-fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?) -> Unit) {
+fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit) {
     var unitSystem by remember { mutableStateOf(UnitSystem.METRIC) }
+
+    val context = LocalContext.current
+    val healthConnectManager = remember { HealthConnectManager(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var weightInput by remember { mutableStateOf("") }
     var heightCmInput by remember { mutableStateOf("") }
@@ -41,9 +53,20 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
     var bodyFatInput by remember { mutableStateOf("") }
     var isMale by remember { mutableStateOf(true) }
     var stepsInput by remember { mutableStateOf("") }
+    var useHealthConnect by remember { mutableStateOf(false) }
     var selectedGoal by remember { mutableStateOf<Goal?>(null) }
     var knowsCalories by remember { mutableStateOf(false) }
     var customCaloriesInput by remember { mutableStateOf("") }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        // Check if our requested permissions are in the granted set
+        val allGranted = healthConnectManager.permissions.all { it in granted }
+        if (allGranted) {
+            useHealthConnect = true
+        }
+    }
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val doneKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
@@ -84,7 +107,25 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
     val step3Valid = !knowsCalories || parsedCustomCalories != null
 
     val pagerState = rememberPagerState(pageCount = { 4 })
-    val coroutineScope = rememberCoroutineScope()
+
+    // Auto-check permissions when we reach the Activity step or when app resumes
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage == 1) {
+            if (healthConnectManager.hasAllPermissions()) {
+                useHealthConnect = true
+            }
+        }
+    }
+
+    // Trigger step fetch when useHealthConnect becomes true
+    LaunchedEffect(useHealthConnect) {
+        if (useHealthConnect) {
+            val avgSteps = healthConnectManager.fetchAverageStepsLast7Days()
+            if (avgSteps != null) {
+                stepsInput = avgSteps.toString()
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -243,6 +284,43 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                         keyboardActions = doneKeyboardActions,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    val sdkAvailable = healthConnectManager.isAvailable()
+                    if (sdkAvailable) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.HealthAndSafety, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    @Suppress("DEPRECATION")
+                                    Text("Connect Health Connect", fontWeight = FontWeight.Bold)
+                                }
+                                Text(
+                                    text = "Automatically import your average steps from Health Connect for more accurate calculations.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                                Button(
+                                    onClick = {
+                                        try {
+                                            permissionLauncher.launch(healthConnectManager.permissions)
+                                        } catch (e: Exception) {
+                                            Log.e("HealthConnect", "Failed to launch permission request", e)
+                                        }
+                                    },
+                                    modifier = Modifier.align(Alignment.End),
+                                    enabled = !useHealthConnect
+                                ) {
+                                    @Suppress("DEPRECATION")
+                                    Text(if (useHealthConnect) "Connected" else "Connect Now")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 2 -> Column(
@@ -303,6 +381,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
+                                    @Suppress("DEPRECATION")
                                     Text("Already tracking calories?", style = MaterialTheme.typography.bodyMedium)
                                     Text(
                                         "Skip the estimate and start from what you already eat",
@@ -370,7 +449,8 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                             selectedGoal!!,
                             if (knowsCalories) parsedCustomCalories else null,
                             unitSystem,
-                            parsedBodyFat
+                            parsedBodyFat,
+                            useHealthConnect
                         )
                     } else {
                         coroutineScope.launch {

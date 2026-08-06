@@ -7,10 +7,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -20,6 +22,7 @@ import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.CoachAlgorithm
+import com.eliteonetube.momentum.logic.HealthConnectManager
 import com.eliteonetube.momentum.logic.Units
 
 private data class GoalOption(val goal: Goal, val label: String, val description: String)
@@ -114,6 +117,12 @@ fun ProfileScreen(
                 ProfileStatRow(label = "Biological Sex", value = if (profile.isMale) "Male" else "Female")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 ProfileStatRow(label = "Average Daily Steps", value = "${profile.averageDailySteps} steps")
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                ProfileStatRow(
+                    label = "Health Connect",
+                    value = if (profile.useHealthConnect) "Connected" else "Disconnected"
+                )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 ProfileStatRow(
                     label = "Units",
@@ -229,6 +238,10 @@ private fun EditProfileForm(
     onSave: (UserProfile) -> Unit
 ) {
     var unitSystem by remember { mutableStateOf(profile.unitSystem) }
+
+    val context = LocalContext.current
+    val healthConnectManager = remember { HealthConnectManager(context) }
+    var useHealthConnect by remember { mutableStateOf(profile.useHealthConnect) }
 
     // Height input state depends on unit system — cm as a single field, or feet+inches as two
     val initialFeetInches = remember { Units.cmToFeetInches(profile.height) }
@@ -369,8 +382,31 @@ private fun EditProfileForm(
             isError = stepsError,
             supportingText = { if (stepsError) Text("Enter a whole number") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
         )
+
+        if (healthConnectManager.isAvailable()) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.HealthAndSafety, contentDescription = null)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Use Health Connect", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Switch(
+                        checked = useHealthConnect,
+                        onCheckedChange = { useHealthConnect = it }
+                    )
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -388,7 +424,8 @@ private fun EditProfileForm(
                             isMale = isMale,
                             averageDailySteps = parsedSteps!!,
                             unitSystem = unitSystem,
-                            bodyFatPercentage = parsedBodyFat
+                            bodyFatPercentage = parsedBodyFat,
+                            useHealthConnect = useHealthConnect
                         )
                     )
                 },

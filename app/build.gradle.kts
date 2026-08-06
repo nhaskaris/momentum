@@ -58,6 +58,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha12")
 
     val room_version = "3.0.0"
     implementation("androidx.room3:room3-runtime:$room_version")

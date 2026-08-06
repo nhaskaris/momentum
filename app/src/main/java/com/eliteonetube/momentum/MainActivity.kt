@@ -14,6 +14,7 @@ import com.eliteonetube.momentum.data.Exercise
 import com.eliteonetube.momentum.data.Goal
 import com.eliteonetube.momentum.data.LoggedSet
 import com.eliteonetube.momentum.data.TemplateExercise
+import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightDatabase
 import com.eliteonetube.momentum.data.WeightEntry
@@ -45,7 +46,8 @@ class MainActivity : ComponentActivity() {
             WeightDatabase.MIGRATION_12_13,
             WeightDatabase.MIGRATION_13_14,
             WeightDatabase.MIGRATION_14_15,
-            WeightDatabase.MIGRATION_15_16
+            WeightDatabase.MIGRATION_15_16,
+            WeightDatabase.MIGRATION_16_17
         ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
@@ -300,7 +302,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
-                            onOnboardingCompleted = { w, h, a, male, stepCount, goal, customCalories, unitSystem, bf ->
+                            onOnboardingCompleted = { w: Double, h: Double, a: Int, male: Boolean, stepCount: Int, goal: Goal, customCalories: Int?, unitSystem: UnitSystem, bf: Double?, useHC: Boolean ->
                                 val maintenance = algorithm.calculateInitialMaintenance(w, h, a, male, stepCount, bf)
                                 val initialTarget = customCalories ?: when (goal) {
                                     Goal.CUT -> maintenance - 500
@@ -320,7 +322,8 @@ class MainActivity : ComponentActivity() {
                                             goal = goal,
                                             currentCalorieTarget = initialTarget,
                                             unitSystem = unitSystem,
-                                            bodyFatPercentage = bf
+                                            bodyFatPercentage = bf,
+                                            useHealthConnect = useHC
                                         )
                                     )
                                     weightDao.insertWeight(
