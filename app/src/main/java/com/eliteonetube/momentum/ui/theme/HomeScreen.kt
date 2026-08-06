@@ -18,6 +18,7 @@ import com.eliteonetube.momentum.data.WorkoutTemplate
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
+import com.eliteonetube.momentum.ui.NutritionScreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -103,6 +104,11 @@ fun HomeScreen(
                     onWeightSubmitted = onWeightSubmitted,
                     onAdjustmentAccepted = onAdjustmentAccepted,
                     onAdjustmentDismissed = onAdjustmentDismissed
+                )
+                AppTab.NUTRITION -> NutritionScreen(
+                    calorieTarget = currentCalorieTarget,
+                    profile = savedProfile,
+                    recentWeights = recentWeights
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(
                     recentSessions = recentSessions,

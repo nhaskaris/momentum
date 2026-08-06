@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,6 +14,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     DASHBOARD("Dashboard", Icons.Default.Home),
+    NUTRITION("Nutrition", Icons.Default.Restaurant),
     WORKOUTS("Workouts", Icons.Default.FitnessCenter),
     PROFILE("Profile", Icons.Default.AccountCircle)
 
