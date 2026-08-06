@@ -219,21 +219,36 @@ class MainActivity : ComponentActivity() {
                                     weightDao.deleteWeight(date)
                                 }
                             },
-                            onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long? ->
+                            onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, existingSessionId: Long? ->
                                 coroutineScope.launch {
                                     val totalVolume = sets.sumOf { it.weightKg * it.reps }
                                     val exerciseCount = sets.map { it.exerciseId }.distinct().size
                                     val setCount = sets.size
 
-                                    val sessionId = workoutDao.insertSession(
-                                        WorkoutSession(
-                                            date = date,
-                                            templateId = templateId,
-                                            totalVolumeKg = totalVolume,
-                                            exerciseCount = exerciseCount,
-                                            setCount = setCount
+                                    val sessionId = if (existingSessionId != null) {
+                                        workoutDao.updateSession(
+                                            WorkoutSession(
+                                                id = existingSessionId,
+                                                date = date,
+                                                templateId = templateId,
+                                                totalVolumeKg = totalVolume,
+                                                exerciseCount = exerciseCount,
+                                                setCount = setCount
+                                            )
                                         )
-                                    )
+                                        workoutDao.deleteSetsBySessionId(existingSessionId)
+                                        existingSessionId
+                                    } else {
+                                        workoutDao.insertSession(
+                                            WorkoutSession(
+                                                date = date,
+                                                templateId = templateId,
+                                                totalVolumeKg = totalVolume,
+                                                exerciseCount = exerciseCount,
+                                                setCount = setCount
+                                            )
+                                        )
+                                    }
                                     sets.forEach { pendingSet ->
                                         workoutDao.insertSet(
                                             LoggedSet(

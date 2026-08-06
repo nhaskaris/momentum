@@ -9,6 +9,7 @@ import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
 import androidx.room3.PrimaryKey
 import androidx.room3.Query
+import androidx.room3.Update
 import androidx.room3.RoomDatabase
 import androidx.room3.migration.Migration
 import androidx.sqlite.SQLiteConnection
@@ -197,6 +198,12 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workout_session_table WHERE id = :sessionId")
     suspend fun deleteSession(sessionId: Long)
+
+    @Query("DELETE FROM logged_set_table WHERE sessionId = :sessionId")
+    suspend fun deleteSetsBySessionId(sessionId: Long)
+
+    @Update
+    suspend fun updateSession(session: WorkoutSession)
 
     @Insert
     suspend fun insertSet(set: LoggedSet)

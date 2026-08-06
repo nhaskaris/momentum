@@ -42,7 +42,7 @@ fun WorkoutsScreen(
     unitSystem: UnitSystem,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
-    onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?) -> Unit,
+    onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, exercises: List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
@@ -51,6 +51,7 @@ fun WorkoutsScreen(
 ) {
     var isLoggingSession by remember { mutableStateOf(false) }
     var activeTemplateId by remember { mutableStateOf<Long?>(null) }
+    var editingSessionId by remember { mutableStateOf<Long?>(null) }
     var selectedSession by remember { mutableStateOf<WorkoutSession?>(null) }
     var sessionPendingDelete by remember { mutableStateOf<WorkoutSession?>(null) }
     var showCreateTemplateDialog by remember { mutableStateOf(false) }
@@ -76,13 +77,15 @@ fun WorkoutsScreen(
             onCancel = {
                 isLoggingSession = false
                 activeTemplateId = null
+                editingSessionId = null
                 initialSessionExercises = emptyList()
                 initialPendingSets = emptyList()
             },
             onFinish = { sets ->
-                onSessionSaved(LocalDate.now().toString(), sets, activeTemplateId)
+                onSessionSaved(LocalDate.now().toString(), sets, activeTemplateId, editingSessionId)
                 isLoggingSession = false
                 activeTemplateId = null
+                editingSessionId = null
                 initialSessionExercises = emptyList()
                 initialPendingSets = emptyList()
             }
@@ -97,6 +100,27 @@ fun WorkoutsScreen(
             unitSystem = unitSystem,
             getSetsForSession = getSetsForSession,
             onDismiss = { selectedSession = null },
+            onEdit = {
+                coroutineScope.launch {
+                    val sets = getSetsForSession(session.id)
+                    val exerciseMap = allExercises.associateBy { it.id }
+
+                    editingSessionId = session.id
+                    activeTemplateId = session.templateId
+                    initialSessionExercises = sets.mapNotNull { exerciseMap[it.exerciseId] }.distinctBy { it.id }
+                    initialPendingSets = sets.map { set ->
+                        PendingSet(
+                            exerciseId = set.exerciseId,
+                            setNumber = set.setNumber,
+                            weightKg = set.weightKg,
+                            reps = set.reps,
+                            notes = set.notes
+                        )
+                    }
+                    selectedSession = null
+                    isLoggingSession = true
+                }
+            },
             onSaveAsRoutine = { routineName ->
                 coroutineScope.launch {
                     val sets = getSetsForSession(session.id)
@@ -183,6 +207,7 @@ fun WorkoutsScreen(
             FilledIconButton(
                 onClick = {
                     activeTemplateId = null
+                    editingSessionId = null
                     initialSessionExercises = emptyList()
                     initialPendingSets = emptyList()
                     isLoggingSession = true

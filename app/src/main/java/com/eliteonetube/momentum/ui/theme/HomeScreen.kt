@@ -41,7 +41,7 @@ fun HomeScreen(
     onAdjustmentDismissed: () -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
-    onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?) -> Unit,
+    onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
@@ -111,9 +111,9 @@ fun HomeScreen(
                     unitSystem = savedProfile.unitSystem,
                     getSetsForSession = getSetsForSession,
                     getExercisesForTemplate = getExercisesForTemplate,
-                    onSessionSaved = { date, sets, templateId ->
+                    onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long? ->
                         isSessionActive = false
-                        onSessionSaved(date, sets, templateId)
+                        onSessionSaved(date, sets, templateId, sessionId)
                     },
                     onSessionDeleted = onSessionDeleted,
                     onTemplateCreated = onTemplateCreated,
