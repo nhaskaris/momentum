@@ -121,6 +121,12 @@ fun ProfileScreen(
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+                ProfileStatRow(
+                    label = "Body Fat",
+                    value = if (profile.bodyFatPercentage != null) "${profile.bodyFatPercentage}%" else "Not provided"
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
                 ProfileStatRow(label = "Goal", value = profile.goal.name.lowercase().replaceFirstChar { it.uppercase() })
                 TextButton(
                     onClick = { showChangeGoalDialog = true },
@@ -231,12 +237,15 @@ private fun EditProfileForm(
     var heightInchesInput by remember { mutableStateOf(initialFeetInches.second.toString()) }
 
     var age by remember { mutableStateOf(profile.age.toString()) }
+    var bodyFatInput by remember { mutableStateOf(profile.bodyFatPercentage?.toString() ?: "") }
     var isMale by remember { mutableStateOf(profile.isMale) }
     var stepsInput by remember { mutableStateOf(profile.averageDailySteps.toString()) }
 
     val parsedAge = age.toIntOrNull()
+    val parsedBodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()
     val parsedSteps = stepsInput.toIntOrNull()
     val ageError = age.isNotBlank() && parsedAge == null
+    val bfError = bodyFatInput.isNotBlank() && parsedBodyFat == null
     val stepsError = stepsInput.isNotBlank() && parsedSteps == null
 
     val parsedHeightCm: Double? = if (unitSystem == UnitSystem.IMPERIAL) {
@@ -332,6 +341,16 @@ private fun EditProfileForm(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
         )
 
+        OutlinedTextField(
+            value = bodyFatInput,
+            onValueChange = { bodyFatInput = it },
+            label = { Text("Body Fat % (Optional)") },
+            isError = bfError,
+            supportingText = { if (bfError) Text("Enter a valid number") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -368,7 +387,8 @@ private fun EditProfileForm(
                             age = parsedAge!!,
                             isMale = isMale,
                             averageDailySteps = parsedSteps!!,
-                            unitSystem = unitSystem
+                            unitSystem = unitSystem,
+                            bodyFatPercentage = parsedBodyFat
                         )
                     )
                 },

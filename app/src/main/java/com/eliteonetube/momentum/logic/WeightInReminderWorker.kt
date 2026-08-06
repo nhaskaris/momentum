@@ -18,8 +18,12 @@ class WeighInReminderWorker(
             val database = Room.databaseBuilder<WeightDatabase>(
                 context = applicationContext,
                 name = "weight_tracker_db",
-            ).addMigrations(WeightDatabase.MIGRATION_12_13, WeightDatabase.MIGRATION_13_14)
-             .fallbackToDestructiveMigration().build()
+            ).addMigrations(
+                WeightDatabase.MIGRATION_12_13,
+                WeightDatabase.MIGRATION_13_14,
+                WeightDatabase.MIGRATION_14_15,
+                WeightDatabase.MIGRATION_15_16
+            ).fallbackToDestructiveMigration().build()
 
             val dao = database.weightDao()
             val profile = dao.getUserProfile().first() ?: return Result.success()

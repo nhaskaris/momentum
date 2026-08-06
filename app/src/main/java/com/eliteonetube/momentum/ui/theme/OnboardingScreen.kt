@@ -30,7 +30,7 @@ private val goalInfoList = listOf(
 )
 
 @Composable
-fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem) -> Unit) {
+fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?) -> Unit) {
     var unitSystem by remember { mutableStateOf(UnitSystem.METRIC) }
 
     var weightInput by remember { mutableStateOf("") }
@@ -38,6 +38,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
     var heightFeetInput by remember { mutableStateOf("") }
     var heightInchesInput by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
+    var bodyFatInput by remember { mutableStateOf("") }
     var isMale by remember { mutableStateOf(true) }
     var stepsInput by remember { mutableStateOf("") }
     var selectedGoal by remember { mutableStateOf<Goal?>(null) }
@@ -62,6 +63,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
     }
 
     val parsedAge = age.toIntOrNull()
+    val parsedBodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()
     val parsedSteps = stepsInput.toIntOrNull()
     val parsedCustomCalories = customCaloriesInput.toIntOrNull()
 
@@ -72,6 +74,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
         heightCmInput.isNotBlank() && parsedHeightCm == null
     }
     val ageError = age.isNotBlank() && parsedAge == null
+    val bfError = bodyFatInput.isNotBlank() && parsedBodyFat == null
     val stepsError = stepsInput.isNotBlank() && parsedSteps == null
     val customCaloriesError = knowsCalories && customCaloriesInput.isNotBlank() && parsedCustomCalories == null
 
@@ -181,16 +184,31 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                         )
                     }
 
-                    OutlinedTextField(
-                        value = age,
-                        onValueChange = { age = it },
-                        label = { Text("Age") },
-                        isError = ageError,
-                        supportingText = { if (ageError) Text("Enter a whole number") },
-                        keyboardOptions = doneKeyboardOptions,
-                        keyboardActions = doneKeyboardActions,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = age,
+                            onValueChange = { age = it },
+                            label = { Text("Age") },
+                            isError = ageError,
+                            supportingText = { if (ageError) Text("Enter a whole number") },
+                            keyboardOptions = doneKeyboardOptions,
+                            keyboardActions = doneKeyboardActions,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = bodyFatInput,
+                            onValueChange = { bodyFatInput = it },
+                            label = { Text("Body Fat % (Optional)") },
+                            isError = bfError,
+                            supportingText = { if (bfError) Text("Valid number") },
+                            keyboardOptions = doneKeyboardOptions,
+                            keyboardActions = doneKeyboardActions,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -351,7 +369,8 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                             parsedSteps!!,
                             selectedGoal!!,
                             if (knowsCalories) parsedCustomCalories else null,
-                            unitSystem
+                            unitSystem,
+                            parsedBodyFat
                         )
                     } else {
                         coroutineScope.launch {

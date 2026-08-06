@@ -55,7 +55,8 @@ data class UserProfile(
     val currentCalorieTarget: Int,
     val pendingCalorieTarget: Int? = null,
     val pendingAdjustmentReason: String? = null,
-    val unitSystem: UnitSystem = UnitSystem.METRIC
+    val unitSystem: UnitSystem = UnitSystem.METRIC,
+    val bodyFatPercentage: Double? = null
 )
 
 @Entity(tableName = "exercise_table")
@@ -288,7 +289,7 @@ interface WorkoutDao {
         WorkoutSession::class,
         LoggedSet::class
     ],
-    version = 15
+    version = 16
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -315,6 +316,12 @@ abstract class WeightDatabase : RoomDatabase() {
                 connection.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_workout_session_table_date ON workout_session_table(date)"
                 )
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN bodyFatPercentage REAL")
             }
         }
     }

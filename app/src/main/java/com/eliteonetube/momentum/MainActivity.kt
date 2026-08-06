@@ -41,8 +41,12 @@ class MainActivity : ComponentActivity() {
         val database = Room.databaseBuilder<WeightDatabase>(
             context = applicationContext,
             name = "weight_tracker_db",
-        ).addMigrations(WeightDatabase.MIGRATION_12_13, WeightDatabase.MIGRATION_13_14)
-         .fallbackToDestructiveMigration().build()
+        ).addMigrations(
+            WeightDatabase.MIGRATION_12_13,
+            WeightDatabase.MIGRATION_13_14,
+            WeightDatabase.MIGRATION_14_15,
+            WeightDatabase.MIGRATION_15_16
+        ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
         val workoutDao = database.workoutDao()
@@ -122,9 +126,18 @@ class MainActivity : ComponentActivity() {
                                         heightCm = updatedProfile.height,
                                         age = updatedProfile.age,
                                         isMale = updatedProfile.isMale,
-                                        averageDailySteps = updatedProfile.averageDailySteps
+                                        averageDailySteps = updatedProfile.averageDailySteps,
+                                        bodyFatPercentage = updatedProfile.bodyFatPercentage
                                     )
-                                    weightDao.saveProfile(updatedProfile.copy(estimatedMaintenanceCalories = recalculated))
+                                    
+                                    // If user is on a maintenance goal, we should update their current target 
+                                    // to match the new maintenance estimate immediately.
+                                    var finalProfile = updatedProfile.copy(estimatedMaintenanceCalories = recalculated)
+                                    if (finalProfile.goal == Goal.MAINTAIN) {
+                                        finalProfile = finalProfile.copy(currentCalorieTarget = recalculated)
+                                    }
+                                    
+                                    weightDao.saveProfile(finalProfile)
                                 }
                             },
                             onGoalChanged = { newGoal ->
@@ -287,8 +300,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
-                            onOnboardingCompleted = { w, h, a, male, stepCount, goal, customCalories, unitSystem ->
-                                val maintenance = algorithm.calculateInitialMaintenance(w, h, a, male, stepCount)
+                            onOnboardingCompleted = { w, h, a, male, stepCount, goal, customCalories, unitSystem, bf ->
+                                val maintenance = algorithm.calculateInitialMaintenance(w, h, a, male, stepCount, bf)
                                 val initialTarget = customCalories ?: when (goal) {
                                     Goal.CUT -> maintenance - 500
                                     Goal.BULK -> maintenance + 300
@@ -306,7 +319,8 @@ class MainActivity : ComponentActivity() {
                                             estimatedMaintenanceCalories = maintenance,
                                             goal = goal,
                                             currentCalorieTarget = initialTarget,
-                                            unitSystem = unitSystem
+                                            unitSystem = unitSystem,
+                                            bodyFatPercentage = bf
                                         )
                                     )
                                     weightDao.insertWeight(

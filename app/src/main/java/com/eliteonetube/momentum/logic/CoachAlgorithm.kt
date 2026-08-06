@@ -22,10 +22,19 @@ class CoachAlgorithm {
         heightCm: Double,
         age: Int,
         isMale: Boolean,
-        averageDailySteps: Int
+        averageDailySteps: Int,
+        bodyFatPercentage: Double? = null
     ): Int {
-        val genderBonus = if (isMale) 5 else -161
-        val bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) + genderBonus
+        val bmr = if (bodyFatPercentage != null && bodyFatPercentage > 0) {
+            // Katch-McArdle Formula
+            val lbm = weightKg * (100 - bodyFatPercentage) / 100.0
+            370 + (21.6 * lbm)
+        } else {
+            // Mifflin-St Jeor Equation
+            val genderBonus = if (isMale) 5 else -161
+            (10 * weightKg) + (6.25 * heightCm) - (5 * age) + genderBonus
+        }
+
         val sedentaryMaintenance = bmr * 1.2
         val stepCaloriesBurned = (averageDailySteps / 1000.0) * 35.0
         return (sedentaryMaintenance + stepCaloriesBurned).roundToInt()

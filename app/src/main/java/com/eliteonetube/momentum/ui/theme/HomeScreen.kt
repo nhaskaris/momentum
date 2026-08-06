@@ -46,7 +46,7 @@ fun HomeScreen(
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> },
-    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem) -> Unit
+    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?) -> Unit
 ) {
     if (savedProfile == null) {
         var showIntro by remember { mutableStateOf(true) }
