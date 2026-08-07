@@ -22,6 +22,8 @@ enum class Goal { CUT, BULK, MAINTAIN, REVERSE }
 
 enum class UnitSystem { METRIC, IMPERIAL }
 
+enum class AppTheme { LIGHT, DARK, SYSTEM }
+
 class Converters {
     @TypeConverter
     fun fromGoal(goal: Goal): String = goal.name
@@ -34,6 +36,12 @@ class Converters {
 
     @TypeConverter
     fun toUnitSystem(value: String): UnitSystem = UnitSystem.valueOf(value)
+
+    @TypeConverter
+    fun fromAppTheme(theme: AppTheme): String = theme.name
+
+    @TypeConverter
+    fun toAppTheme(value: String): AppTheme = AppTheme.valueOf(value)
 }
 
 @Entity(tableName = "weight_table")
@@ -57,7 +65,23 @@ data class UserProfile(
     val pendingAdjustmentReason: String? = null,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val bodyFatPercentage: Double? = null,
-    val useHealthConnect: Boolean = false
+    val useHealthConnect: Boolean = false,
+    val lastCheckInDate: String? = null,
+    val checkInDue: Boolean = false,
+    val theme: AppTheme = AppTheme.SYSTEM
+)
+
+@Entity(tableName = "check_in_table")
+data class CheckIn(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val weight: Double,
+    val frontPhotoPath: String? = null,
+    val backPhotoPath: String? = null,
+    val sidePhotoPath: String? = null,
+    val calorieTargetBefore: Int,
+    val calorieTargetAfter: Int,
+    val adjustmentReason: String
 )
 
 @Entity(tableName = "exercise_table")
@@ -176,6 +200,12 @@ interface WeightDao {
 
     @Query("SELECT date FROM weight_table ORDER BY date ASC")
     fun getAllWeightDates(): Flow<List<String>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCheckIn(checkIn: CheckIn)
+
+    @Query("SELECT * FROM check_in_table ORDER BY date DESC")
+    fun getAllCheckIns(): Flow<List<CheckIn>>
 }
 
 @Dao
@@ -288,9 +318,10 @@ interface WorkoutDao {
         WorkoutTemplate::class,
         TemplateExercise::class,
         WorkoutSession::class,
-        LoggedSet::class
+        LoggedSet::class,
+        CheckIn::class
     ],
-    version = 17
+    version = 19
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -329,6 +360,34 @@ abstract class WeightDatabase : RoomDatabase() {
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN useHealthConnect INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN lastCheckInDate TEXT")
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN checkInDue INTEGER NOT NULL DEFAULT 0")
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS check_in_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        date TEXT NOT NULL,
+                        weight REAL NOT NULL,
+                        frontPhotoPath TEXT,
+                        backPhotoPath TEXT,
+                        sidePhotoPath TEXT,
+                        calorieTargetBefore INTEGER NOT NULL,
+                        calorieTargetAfter INTEGER NOT NULL,
+                        adjustmentReason TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN theme TEXT NOT NULL DEFAULT 'SYSTEM'")
             }
         }
     }

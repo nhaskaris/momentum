@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +23,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.eliteonetube.momentum.data.AppTheme
+import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Goal
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
@@ -43,9 +46,11 @@ private val goalOptions = listOf(
 fun ProfileScreen(
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
+    allCheckIns: List<CheckIn> = emptyList(),
     onWeightClick: () -> Unit,
     onProfileUpdated: (UserProfile) -> Unit,
-    onGoalChanged: (Goal) -> Unit
+    onGoalChanged: (Goal) -> Unit,
+    onViewGallery: () -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var showChangeGoalDialog by remember { mutableStateOf(false) }
@@ -216,12 +221,47 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                }
+            }
+        }
+
+        // 5. Progress Gallery Block
+        if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
+            ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Track your visual transformation over time.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onViewGallery,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Compare, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View & Compare Photos")
+                    }
+                }
+            }
+        }
+
+        // 6. App Settings Block
+        ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Theme", style = MaterialTheme.typography.labelSmall)
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AppTheme.entries.forEachIndexed { index, theme ->
+                        SegmentedButton(
+                            selected = profile.theme == theme,
+                            onClick = { onProfileUpdated(profile.copy(theme = theme)) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = AppTheme.entries.size)
+                        ) {
+                            Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
+                        }
+                    }
                 }
             }
         }

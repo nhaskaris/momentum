@@ -31,6 +31,7 @@ fun MainDashboard(
     onWeightSubmitted: (Double) -> Unit,
     onAdjustmentDismissed: () -> Unit,
     onAdjustmentAccepted: () -> Unit,
+    onStartCheckIn: () -> Unit
 ) {
     val today = remember { LocalDate.now().toString() }
     val todayEntry = recentWeights.firstOrNull { it.date == today }
@@ -53,7 +54,23 @@ fun MainDashboard(
             .padding(top = 24.dp, bottom = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (profile.pendingAdjustmentReason != null) {
+        if (profile.checkInDue) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Time for your weekly check-in!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Log your weight and photos to see what's new for the next week.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = onStartCheckIn) {
+                        Text("Start Check-in")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        } else if (profile.pendingAdjustmentReason != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)

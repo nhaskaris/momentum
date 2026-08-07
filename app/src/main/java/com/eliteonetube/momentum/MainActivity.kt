@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.room3.Room
+import com.eliteonetube.momentum.data.AppTheme
+import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Exercise
 import com.eliteonetube.momentum.data.Goal
 import com.eliteonetube.momentum.data.LoggedSet
@@ -26,7 +28,7 @@ import com.eliteonetube.momentum.logic.StreakCalculator
 import com.eliteonetube.momentum.logic.WorkScheduler
 import com.eliteonetube.momentum.ui.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
-import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
+import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -47,7 +49,9 @@ class MainActivity : ComponentActivity() {
             WeightDatabase.MIGRATION_13_14,
             WeightDatabase.MIGRATION_14_15,
             WeightDatabase.MIGRATION_15_16,
-            WeightDatabase.MIGRATION_16_17
+            WeightDatabase.MIGRATION_16_17,
+            WeightDatabase.MIGRATION_17_18,
+            WeightDatabase.MIGRATION_18_19,
         ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
@@ -59,7 +63,9 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme {
+            val savedProfile by weightDao.getUserProfile().collectAsState(initial = null)
+            
+            WeeklyCoachTheme(appTheme = savedProfile?.theme ?: AppTheme.SYSTEM) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val coroutineScope = rememberCoroutineScope()
 
@@ -67,9 +73,9 @@ class MainActivity : ComponentActivity() {
                     val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
                     val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
                     val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
+                    val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
                     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
                     var isProfileLoaded by remember { mutableStateOf(false) }
-                    val savedProfile by weightDao.getUserProfile().collectAsState(initial = null)
 
                     var currentCalorieTarget by remember { mutableIntStateOf(2000) }
 
@@ -96,6 +102,7 @@ class MainActivity : ComponentActivity() {
                             recentSessions = recentSessions,
                             allExercises = allExercises,
                             allTemplates = allTemplates,
+                            allCheckIns = allCheckIns,
                             currentStreak = currentStreak,
                             totalDaysLogged = allWeightDates.size,
                             loggedDates = loggedDates,
@@ -224,6 +231,47 @@ class MainActivity : ComponentActivity() {
                                             profile.copy(
                                                 pendingCalorieTarget = null,
                                                 pendingAdjustmentReason = null
+                                            )
+                                        )
+                                    }
+                                }
+                            },
+                            onCheckInCompleted = { weight, photos ->
+                                savedProfile?.let { profile ->
+                                    coroutineScope.launch {
+                                        val today = LocalDate.now().toString()
+                                        
+                                        // 1. Insert Weight
+                                        weightDao.insertWeight(
+                                            WeightEntry(
+                                                date = today,
+                                                weight = weight,
+                                                calorieTargetAtEntry = profile.pendingCalorieTarget ?: profile.currentCalorieTarget
+                                            )
+                                        )
+                                        
+                                        // 2. Save CheckIn Record
+                                        weightDao.insertCheckIn(
+                                            CheckIn(
+                                                date = today,
+                                                weight = weight,
+                                                frontPhotoPath = photos.getOrNull(0)?.toString(),
+                                                backPhotoPath = photos.getOrNull(1)?.toString(),
+                                                sidePhotoPath = photos.getOrNull(2)?.toString(),
+                                                calorieTargetBefore = profile.currentCalorieTarget,
+                                                calorieTargetAfter = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
+                                                adjustmentReason = profile.pendingAdjustmentReason ?: "Weekly Check-in"
+                                            )
+                                        )
+
+                                        // 3. Update Profile
+                                        weightDao.saveProfile(
+                                            profile.copy(
+                                                currentCalorieTarget = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
+                                                pendingCalorieTarget = null,
+                                                pendingAdjustmentReason = null,
+                                                checkInDue = false,
+                                                lastCheckInDate = today
                                             )
                                         )
                                     }

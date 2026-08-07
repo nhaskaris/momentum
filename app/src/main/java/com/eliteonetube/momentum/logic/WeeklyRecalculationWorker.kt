@@ -24,7 +24,8 @@ class WeeklyRecalculationWorker(
                 WeightDatabase.MIGRATION_13_14,
                 WeightDatabase.MIGRATION_14_15,
                 WeightDatabase.MIGRATION_15_16,
-                WeightDatabase.MIGRATION_16_17
+                WeightDatabase.MIGRATION_16_17,
+                WeightDatabase.MIGRATION_17_18
             ).fallbackToDestructiveMigration().build()
 
             val dao = database.weightDao()
@@ -40,8 +41,7 @@ class WeeklyRecalculationWorker(
                 }
             }
 
-            // Recalculate maintenance off this week's average weight, not a single reading —
-            // smooths out day-to-day noise the same way the trend comparison does.
+            // Recalculate maintenance off this week's average weight
             val today = LocalDate.now()
             val thisWeekWeights = entries.mapNotNull { entry ->
                 val date = try { LocalDate.parse(entry.date) } catch (e: Exception) { return@mapNotNull null }
@@ -68,22 +68,22 @@ class WeeklyRecalculationWorker(
                 estimatedMaintenance = recalculatedMaintenance
             )
 
-            if (adjustment == null) {
-                if (recalculatedMaintenance != profile.estimatedMaintenanceCalories) {
-                    dao.saveProfile(profile.copy(estimatedMaintenanceCalories = recalculatedMaintenance))
-                }
-                return Result.success()
-            }
+            val reason = adjustment?.reason ?: "Right on track — no change needed."
+            val nextTarget = adjustment?.newTarget ?: profile.currentCalorieTarget
 
             dao.saveProfile(
                 profile.copy(
                     estimatedMaintenanceCalories = recalculatedMaintenance,
-                    pendingCalorieTarget = if (adjustment.deltaCalories != 0) adjustment.newTarget else null,
-                    pendingAdjustmentReason = adjustment.reason
+                    pendingCalorieTarget = nextTarget,
+                    pendingAdjustmentReason = reason,
+                    checkInDue = true
                 )
             )
 
-            NotificationHelper.showAdjustmentNotification(applicationContext, adjustment)
+            NotificationHelper.showAdjustmentNotification(
+                applicationContext,
+                adjustment ?: WeeklyAdjustment(nextTarget, 0, 0.0, reason)
+            )
             Result.success()
         } catch (e: Exception) {
             Result.retry()

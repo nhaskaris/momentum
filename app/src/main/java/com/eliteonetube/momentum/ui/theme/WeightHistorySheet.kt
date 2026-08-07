@@ -1,6 +1,5 @@
 package com.eliteonetube.momentum.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,73 +90,7 @@ fun WeightHistoryBottomSheet(
 
             Text("Visual Weight Trend Chart", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            if (entries.size >= 2) {
-                val chartEntries = entries.take(7).reversed()
-                val lineColor = MaterialTheme.colorScheme.primary
-                val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                    ) {
-                        val weights = chartEntries.map { it.weight }
-                        val minWeight = weights.min()
-                        val maxWeight = weights.max()
-                        val range = (maxWeight - minWeight).takeIf { it > 0.01 } ?: 1.0
-
-                        val paddingY = 16.dp.toPx()
-                        val chartHeight = size.height - (paddingY * 2)
-                        val stepX = if (chartEntries.size > 1) size.width / (chartEntries.size - 1) else 0f
-
-                        val points = chartEntries.mapIndexed { index, entry ->
-                            val x = stepX * index
-                            val normalized = (entry.weight - minWeight) / range
-                            val y = paddingY + (chartHeight * (1 - normalized).toFloat())
-                            Offset(x, y)
-                        }
-
-                        val path = Path().apply {
-                            points.forEachIndexed { index, point ->
-                                if (index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
-                            }
-                        }
-
-                        drawPath(
-                            path = path,
-                            color = lineColor,
-                            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                        )
-
-                        points.forEach { point ->
-                            drawCircle(color = lineColor, radius = 5.dp.toPx(), center = point)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        chartEntries.forEach { entry ->
-                            Text(
-                                text = entry.date.takeLast(5),
-                                fontSize = 8.sp,
-                                color = labelColor
-                            )
-                        }
-                    }
-                }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(120.dp).padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Log more days to populate the layout trend chart", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
+            WeightTrendChart(entries = entries)
 
             Spacer(modifier = Modifier.height(16.dp))
             Text("Logged Entries List", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

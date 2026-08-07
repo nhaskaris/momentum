@@ -16,8 +16,8 @@ android {
         applicationId = "com.eliteonetube.momentum"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.0.1-7"
+        versionCode = 10
+        versionName = "1.0.1-8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -64,4 +64,5 @@ dependencies {
     implementation("androidx.room3:room3-runtime:$room_version")
     ksp("androidx.room3:room3-compiler:$room_version")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 }

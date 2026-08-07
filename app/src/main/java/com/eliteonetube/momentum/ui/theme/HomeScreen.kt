@@ -6,6 +6,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Exercise
 import com.eliteonetube.momentum.data.Goal
 import com.eliteonetube.momentum.data.LoggedSet
@@ -31,6 +32,7 @@ fun HomeScreen(
     recentSessions: List<WorkoutSession>,
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
+    allCheckIns: List<CheckIn> = emptyList(),
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
@@ -41,6 +43,7 @@ fun HomeScreen(
     onGoalChanged: (Goal) -> Unit,
     onAdjustmentAccepted: () -> Unit,
     onAdjustmentDismissed: () -> Unit,
+    onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
     onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?) -> Unit,
@@ -57,6 +60,30 @@ fun HomeScreen(
         } else {
             OnboardingScreen(onOnboardingCompleted)
         }
+        return
+    }
+
+    var showCheckIn by remember { mutableStateOf(false) }
+    var showGallery by remember { mutableStateOf(false) }
+
+    if (showCheckIn) {
+        CheckInScreen(
+            profile = savedProfile,
+            recentWeights = recentWeights,
+            onComplete = { weight, photos ->
+                showCheckIn = false
+                onCheckInCompleted(weight, photos)
+            },
+            onCancel = { showCheckIn = false }
+        )
+        return
+    }
+
+    if (showGallery) {
+        ProgressGalleryScreen(
+            checkIns = allCheckIns,
+            onBack = { showGallery = false }
+        )
         return
     }
 
@@ -104,7 +131,8 @@ fun HomeScreen(
                     loggedDates = loggedDates,
                     onWeightSubmitted = onWeightSubmitted,
                     onAdjustmentAccepted = onAdjustmentAccepted,
-                    onAdjustmentDismissed = onAdjustmentDismissed
+                    onAdjustmentDismissed = onAdjustmentDismissed,
+                    onStartCheckIn = { showCheckIn = true }
                 )
                 AppTab.NUTRITION -> NutritionScreen(
                     calorieTarget = currentCalorieTarget,
@@ -133,9 +161,11 @@ fun HomeScreen(
                 AppTab.PROFILE -> ProfileScreen(
                     profile = savedProfile,
                     recentWeights = recentWeights,
+                    allCheckIns = allCheckIns,
                     onWeightClick = { showHistoryModal = true },
                     onProfileUpdated = onProfileUpdated,
-                    onGoalChanged = onGoalChanged
+                    onGoalChanged = onGoalChanged,
+                    onViewGallery = { showGallery = true }
                 )
             }
         }
