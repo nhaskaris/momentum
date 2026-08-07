@@ -9,9 +9,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -137,6 +140,12 @@ fun ExerciseSetLogger(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.width(36.dp).size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(
                     "SET",
                     modifier = Modifier.width(36.dp),
@@ -224,11 +233,13 @@ private fun SetInputRow(
     var showNotes by remember { mutableStateOf(set.notes?.isNotBlank() == true) }
     var notesInput by remember(set.setNumber) { mutableStateOf(set.notes ?: "") }
 
+    val completedColor = if (set.isCompleted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                completedColor,
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(8.dp)
@@ -237,6 +248,17 @@ private fun SetInputRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = { onUpdate(set.copy(isCompleted = !set.isCompleted)) },
+                modifier = Modifier.size(36.dp)
+            ) {
+                if (set.isCompleted) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Completed", tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    Icon(Icons.Default.RadioButtonUnchecked, contentDescription = "Not Completed", tint = MaterialTheme.colorScheme.outline)
+                }
+            }
+
             Box(
                 modifier = Modifier.width(36.dp),
                 contentAlignment = Alignment.Center

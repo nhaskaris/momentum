@@ -22,7 +22,11 @@ import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Exercise
 import com.eliteonetube.momentum.data.LoggedSet
 import com.eliteonetube.momentum.data.UnitSystem
+import com.eliteonetube.momentum.logic.RestTimerService
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,8 +40,13 @@ fun ActiveSessionScreen(
     onFinish: (List<PendingSet>) -> Unit,
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
 ) {
+    val context = LocalContext.current
     var showExercisePicker by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
+    
+    val timerActive by RestTimerService.isActive.collectAsState()
+    val timeLeft by RestTimerService.timeLeft.collectAsState()
+    var restTimerSeconds by remember { mutableLongStateOf(120L) }
 
     // Derive initial exercises either from parameter or from initialSets
     val resolvedInitialExercises = remember(initialExercises, initialSets, allExercises) {
@@ -294,7 +303,7 @@ fun ActiveSessionScreen(
             } else {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     pageSpacing = 16.dp
                 ) { page ->
@@ -325,10 +334,18 @@ fun ActiveSessionScreen(
                                 setsByExercise = setsByExercise + (currentExercise.id to (list + set))
                             },
                             onSetUpdated = { setNumber, updated ->
-                                val list = setsByExercise[currentExercise.id].orEmpty().map {
+                                val oldList = setsByExercise[currentExercise.id].orEmpty()
+                                val oldSet = oldList.find { it.setNumber == setNumber }
+                                
+                                val list = oldList.map {
                                     if (it.setNumber == setNumber) updated else it
                                 }
                                 setsByExercise = setsByExercise + (currentExercise.id to list)
+                                
+                                // Trigger timer only when marking a set as completed for the first time
+                                if (oldSet?.isCompleted == false && updated.isCompleted) {
+                                    RestTimerService.startTimer(context, restTimerSeconds)
+                                }
                             },
                             onSetRemoved = { setNumber ->
                                 val list = setsByExercise[currentExercise.id].orEmpty()
@@ -342,6 +359,67 @@ fun ActiveSessionScreen(
                             }
                         )
                     }
+                }
+
+                if (timerActive) {
+                    RestTimerOverlay(
+                        timeLeft = timeLeft,
+                        onAdjust = { delta -> RestTimerService.adjustTimer(context, delta) },
+                        onStop = { RestTimerService.stopTimer(context) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestTimerOverlay(
+    timeLeft: Long,
+    onAdjust: (Long) -> Unit,
+    onStop: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (timeLeft > 0) "Resting" else "Finished!",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (timeLeft > 0) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = if (timeLeft > 0) "%d:%02d".format(timeLeft / 60, timeLeft % 60) else "0:00",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedIconButton(onClick = { onAdjust(-15) }) {
+                    Text("-15", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedIconButton(onClick = { onAdjust(15) }) {
+                    Text("+15", style = MaterialTheme.typography.labelSmall)
+                }
+                IconButton(
+                    onClick = onStop,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Stop")
                 }
             }
         }

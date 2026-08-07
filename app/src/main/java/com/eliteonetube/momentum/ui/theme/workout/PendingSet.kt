@@ -10,5 +10,5 @@ data class PendingSet(
     val weightKg: Double,
     val reps: Int,
     val notes: String? = null,
-    val isCompleted: Boolean = true
+    val isCompleted: Boolean = false
 )

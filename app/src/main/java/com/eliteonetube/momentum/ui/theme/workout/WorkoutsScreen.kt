@@ -82,7 +82,10 @@ fun WorkoutsScreen(
                 initialPendingSets = emptyList()
             },
             onFinish = { sets ->
-                onSessionSaved(LocalDate.now().toString(), sets, activeTemplateId, editingSessionId)
+                val completedSets = sets.filter { it.isCompleted }
+                if (completedSets.isNotEmpty()) {
+                    onSessionSaved(LocalDate.now().toString(), completedSets, activeTemplateId, editingSessionId)
+                }
                 isLoggingSession = false
                 activeTemplateId = null
                 editingSessionId = null
@@ -114,7 +117,8 @@ fun WorkoutsScreen(
                             setNumber = set.setNumber,
                             weightKg = set.weightKg,
                             reps = set.reps,
-                            notes = set.notes
+                            notes = set.notes,
+                            isCompleted = true
                         )
                     }
                     selectedSession = null

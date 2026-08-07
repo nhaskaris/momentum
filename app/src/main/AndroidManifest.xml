@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
@@ -17,6 +20,15 @@
         android:roundIcon="@mipmap/momentum_icon_512_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.WeeklyCoach">
+
+        <service
+            android:name=".logic.RestTimerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="workout_rest_timer" />
+        </service>
 
         <activity
             android:name=".MainActivity"
