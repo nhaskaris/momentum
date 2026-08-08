@@ -1,19 +1,25 @@
 package com.eliteonetube.momentum.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
@@ -50,160 +56,230 @@ fun MainDashboard(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
-            .padding(top = 24.dp, bottom = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (profile.checkInDue) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Time for your weekly check-in!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Log your weight and photos to see what's new for the next week.", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = onStartCheckIn) {
-                        Text("Start Check-in")
-                    }
-                }
+        // Hero Section: Gradient Background + Calories
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .padding(top = 48.dp, bottom = 32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "DAILY TARGET",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "$calorieTarget",
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 80.sp),
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    "kcal per day",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
-            Spacer(modifier = Modifier.height(20.dp))
-        } else if (profile.pendingAdjustmentReason != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Weekly check-in", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(profile.pendingAdjustmentReason, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (profile.pendingCalorieTarget != null) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onAdjustmentAccepted) {
-                                Text("Update to ${profile.pendingCalorieTarget} kcal")
-                            }
-                            OutlinedButton(onClick = onAdjustmentDismissed) {
-                                Text("Keep current")
-                            }
-                        }
-                    } else {
-                        TextButton(onClick = onAdjustmentDismissed) {
-                            Text("Got it")
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
         }
 
-        Text(
-            "CURRENT CALORIES",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "$calorieTarget",
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            "kcal per day",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+        ) {
+            // Notifications / Check-in Alerts
+            if (profile.checkInDue) {
+                DashboardAlert(
+                    title = "Weekly Check-in Due",
+                    description = "Time to log your weight and progress photos.",
+                    actionText = "Start Now",
+                    onAction = onStartCheckIn,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            } else if (profile.pendingAdjustmentReason != null) {
+                DashboardAlert(
+                    title = "Adjustment Recommended",
+                    description = profile.pendingAdjustmentReason,
+                    actionText = profile.pendingCalorieTarget?.let { "Update to $it kcal" } ?: "Got it",
+                    onAction = onAdjustmentAccepted,
+                    secondaryActionText = if (profile.pendingCalorieTarget != null) "Dismiss" else null,
+                    onSecondaryAction = onAdjustmentDismissed,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            }
 
-        Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        if (todayEntry != null && !isEditingToday) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            // Weight Entry Card
+            Text(
+                "Weight Tracking",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            if (todayEntry != null && !isEditingToday) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Logged ${Units.displayWeight(todayEntry.weight, profile.unitSystem)} today",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = {
-                        weightInput = if (profile.unitSystem == UnitSystem.IMPERIAL) {
-                            "%.1f".format(Units.kgToLb(todayEntry.weight))
-                        } else {
-                            todayEntry.weight.toString()
+                    Row(
+                        modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                "Today's Weight",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                Units.displayWeight(todayEntry.weight, profile.unitSystem),
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Black
+                            )
                         }
-                        isEditingToday = true
-                    }) {
-                        Text("Edit today's entry")
+                        IconButton(
+                            onClick = {
+                                weightInput = if (profile.unitSystem == UnitSystem.IMPERIAL) {
+                                    "%.1f".format(Units.kgToLb(todayEntry.weight))
+                                } else {
+                                    todayEntry.weight.toString()
+                                }
+                                isEditingToday = true
+                            },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                        ) {
+                            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(
+                            if (todayEntry != null) "Update Entry" else "Log Entry",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = weightInput,
+                            onValueChange = { weightInput = it },
+                            placeholder = { Text("0.0") },
+                            suffix = { Text(unitLabel) },
+                            isError = weightError,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (isEditingToday) {
+                                OutlinedButton(
+                                    onClick = { isEditingToday = false; weightInput = "" },
+                                    modifier = Modifier.weight(1f).height(50.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Cancel") }
+                            }
+                            Button(
+                                onClick = {
+                                    parsedWeightKg?.let {
+                                        onWeightSubmitted(it)
+                                        weightInput = ""
+                                        isEditingToday = false
+                                    }
+                                },
+                                enabled = parsedWeightKg != null,
+                                modifier = Modifier.weight(1.5f).height(50.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Save Weight", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        if (todayEntry != null) "Update today's weight" else "Log today's weight",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
-                        value = weightInput,
-                        onValueChange = { weightInput = it },
-                        label = { Text(unitLabel) },
-                        isError = weightError,
-                        supportingText = { if (weightError) Text("Enter a valid number, e.g. 70.8") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            Spacer(modifier = Modifier.height(32.dp))
 
-                    Spacer(modifier = Modifier.height(12.dp))
+            // Streak Section
+            StreakCard(
+                currentStreak = currentStreak,
+                totalDaysLogged = totalDaysLogged,
+                loggedDates = loggedDates
+            )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (isEditingToday) {
-                            OutlinedButton(onClick = {
-                                isEditingToday = false
-                                weightInput = ""
-                            }) {
-                                Text("Cancel")
-                            }
-                        }
-                        Button(
-                            onClick = {
-                                parsedWeightKg?.let {
-                                    onWeightSubmitted(it)
-                                    weightInput = ""
-                                    isEditingToday = false
-                                }
-                            },
-                            enabled = parsedWeightKg != null
-                        ) {
-                            Text("Submit Weight Entry")
-                        }
+            Spacer(modifier = Modifier.height(48.dp))
+        }
+    }
+}
+
+@Composable
+fun DashboardAlert(
+    title: String,
+    description: String,
+    actionText: String,
+    onAction: () -> Unit,
+    secondaryActionText: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    containerColor: Color
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.NotificationsActive, null, tint = containerColor, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = containerColor)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onAction,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = containerColor)
+                ) {
+                    Text(actionText, fontWeight = FontWeight.Bold)
+                }
+                if (secondaryActionText != null && onSecondaryAction != null) {
+                    TextButton(onClick = onSecondaryAction) {
+                        Text(secondaryActionText)
                     }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        StreakCard(
-            currentStreak = currentStreak,
-            totalDaysLogged = totalDaysLogged,
-            loggedDates = loggedDates
-        )
     }
 }

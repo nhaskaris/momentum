@@ -3,6 +3,7 @@ package com.eliteonetube.momentum.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,10 +25,14 @@ fun StreakCard(
     val today = LocalDate.now()
     val last7Days = (6 downTo 0).map { today.minusDays(it.toLong()) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                if (currentStreak > 0) "🔥 $currentStreak-day streak" else "Start your streak today",
+                if (currentStreak > 0) "🔥 $currentStreak Day Streak" else "Start a Streak Today",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -37,7 +42,7 @@ fun StreakCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -49,29 +54,22 @@ fun StreakCard(
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                            date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(
                                     when {
                                         isLogged -> MaterialTheme.colorScheme.primary
                                         isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                        else -> Color.Transparent
+                                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                                     }
-                                )
-                                .then(
-                                    if (isToday && !isLogged) {
-                                        Modifier.background(
-                                            color = Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    } else Modifier
                                 ),
                             contentAlignment = Alignment.Center
                         ) {

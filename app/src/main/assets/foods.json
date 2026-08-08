@@ -1,0 +1,17 @@
+[
+  { "name": "Chicken Breast (Cooked)", "calories": 165, "protein": 31, "fat": 3.6, "carbs": 0, "servingSize": "100g" },
+  { "name": "White Rice (Cooked)", "calories": 130, "protein": 2.7, "fat": 0.3, "carbs": 28, "servingSize": "100g" },
+  { "name": "Whole Egg (Large)", "calories": 70, "protein": 6, "fat": 5, "carbs": 0.5, "servingSize": "1 egg" },
+  { "name": "Oats (Raw)", "calories": 389, "protein": 16.9, "fat": 6.9, "carbs": 66, "servingSize": "100g" },
+  { "name": "Greek Yogurt (Non-fat)", "calories": 59, "protein": 10, "fat": 0.4, "carbs": 3.6, "servingSize": "100g" },
+  { "name": "Peanut Butter", "calories": 588, "protein": 25, "fat": 50, "carbs": 20, "servingSize": "100g" },
+  { "name": "Banana", "calories": 89, "protein": 1.1, "fat": 0.3, "carbs": 23, "servingSize": "100g" },
+  { "name": "Avocado", "calories": 160, "protein": 2, "fat": 15, "carbs": 9, "servingSize": "100g" },
+  { "name": "Whey Protein Powder", "calories": 400, "protein": 80, "fat": 3, "carbs": 10, "servingSize": "100g" },
+  { "name": "Almonds", "calories": 579, "protein": 21, "fat": 49, "carbs": 22, "servingSize": "100g" },
+  { "name": "Olive Oil", "calories": 884, "protein": 0, "fat": 100, "carbs": 0, "servingSize": "100ml" },
+  { "name": "Milk (Whole)", "calories": 61, "protein": 3.2, "fat": 3.3, "carbs": 4.8, "servingSize": "100ml" },
+  { "name": "Broccoli", "calories": 34, "protein": 2.8, "fat": 0.4, "carbs": 7, "servingSize": "100g" },
+  { "name": "Salmon (Grilled)", "calories": 208, "protein": 20, "fat": 13, "carbs": 0, "servingSize": "100g" },
+  { "name": "Beef (Lean)", "calories": 250, "protein": 26, "fat": 15, "carbs": 0, "servingSize": "100g" }
+]

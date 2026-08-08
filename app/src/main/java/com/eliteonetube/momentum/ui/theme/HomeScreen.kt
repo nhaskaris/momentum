@@ -6,16 +6,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import com.eliteonetube.momentum.data.CheckIn
-import com.eliteonetube.momentum.data.Exercise
-import com.eliteonetube.momentum.data.Goal
-import com.eliteonetube.momentum.data.LoggedSet
-import com.eliteonetube.momentum.data.TemplateExercise
-import com.eliteonetube.momentum.data.UnitSystem
-import com.eliteonetube.momentum.data.UserProfile
-import com.eliteonetube.momentum.data.WeightEntry
-import com.eliteonetube.momentum.data.WorkoutSession
-import com.eliteonetube.momentum.data.WorkoutTemplate
+import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.ui.theme.nutrition.FoodScannerScreen
+import com.eliteonetube.momentum.ui.theme.nutrition.FoodReviewDialog
+import com.eliteonetube.momentum.ui.theme.nutrition.LogQuantityDialog
+import com.eliteonetube.momentum.logic.ScannedNutrition
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
@@ -33,6 +28,8 @@ fun HomeScreen(
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
     allCheckIns: List<CheckIn> = emptyList(),
+    todayFoodLogs: List<FoodLogWithItem> = emptyList(),
+    allFoodItems: List<FoodItem> = emptyList(),
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
@@ -43,6 +40,11 @@ fun HomeScreen(
     onGoalChanged: (Goal) -> Unit,
     onAdjustmentAccepted: () -> Unit,
     onAdjustmentDismissed: () -> Unit,
+    onFoodLogged: (Long, Double) -> Unit,
+    onFoodLogDeleted: (Long) -> Unit,
+    onFoodLogUpdated: (Long, Long, Double) -> Unit,
+    onNewFoodItemCreated: (FoodItem) -> Unit,
+    onGetFoodByBarcode: suspend (String) -> FoodItem?,
     onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
@@ -63,8 +65,16 @@ fun HomeScreen(
         return
     }
 
+    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
+    
     var showCheckIn by remember { mutableStateOf(false) }
     var showGallery by remember { mutableStateOf(false) }
+    var showScanner by remember { mutableStateOf(false) }
+    var scannedResult by remember { mutableStateOf<ScannedNutrition?>(null) }
+    var pendingBarcode by remember { mutableStateOf<String?>(null) }
+    var itemToLogAfterScan by remember { mutableStateOf<FoodItem?>(null) }
+    var logToEdit by remember { mutableStateOf<FoodLogWithItem?>(null) }
 
     if (showCheckIn) {
         CheckInScreen(
@@ -87,19 +97,97 @@ fun HomeScreen(
         return
     }
 
+    if (showScanner) {
+        FoodScannerScreen(
+            onResult = { result, barcode ->
+                scannedResult = result
+                pendingBarcode = barcode
+                showScanner = false
+            },
+            onBarcodeScanned = { barcode ->
+                coroutineScope.launch {
+                    val item = onGetFoodByBarcode(barcode)
+                    if (item != null) {
+                        itemToLogAfterScan = item
+                        showScanner = false
+                        pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
+                    }
+                }
+            },
+            onBack = { showScanner = false }
+        )
+        return
+    }
+
+    scannedResult?.let { result ->
+        FoodReviewDialog(
+            scanned = result,
+            barcode = pendingBarcode,
+            onDismiss = { scannedResult = null },
+            onSave = { item ->
+                onNewFoodItemCreated(item)
+                scannedResult = null
+                pendingBarcode = null
+                
+                itemToLogAfterScan = item
+                coroutineScope.launch {
+                    pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
+                }
+            }
+        )
+    }
+
+    itemToLogAfterScan?.let { item ->
+        LogQuantityDialog(
+            foodItem = item,
+            onDismiss = { itemToLogAfterScan = null },
+            onConfirm = { multiplier ->
+                coroutineScope.launch {
+                    val finalId = if (item.id == 0L) {
+                        allFoodItems.find { it.name == item.name && it.barcode == item.barcode }?.id ?: 0L
+                    } else {
+                        item.id
+                    }
+                    
+                    if (finalId != 0L) {
+                        onFoodLogged(finalId, multiplier)
+                        itemToLogAfterScan = null
+                    } else {
+                        onFoodLogged(item.id, multiplier)
+                        itemToLogAfterScan = null
+                    }
+                }
+            }
+        )
+    }
+
+    logToEdit?.let { log ->
+        LogQuantityDialog(
+            foodItem = FoodItem(
+                id = log.foodItemId,
+                name = log.name,
+                calories = log.calories,
+                protein = log.protein,
+                fat = log.fat,
+                carbs = log.carbs
+            ),
+            initialQuantity = log.quantity,
+            onDismiss = { logToEdit = null },
+            onConfirm = { multiplier ->
+                onFoodLogUpdated(log.id, log.foodItemId, multiplier)
+                logToEdit = null
+            }
+        )
+    }
+
     var showHistoryModal by remember { mutableStateOf(false) }
 
-    // State to track if user is inside an active workout session
     var isSessionActive by remember { mutableStateOf(false) }
-
-    val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
-    val coroutineScope = rememberCoroutineScope()
 
     val currentTab = AppTab.entries[pagerState.currentPage]
 
     Scaffold(
         bottomBar = {
-            // Hide bottom navigation bar completely during an active session
             if (!isSessionActive) {
                 BottomNavBar(
                     currentTab = currentTab,
@@ -114,7 +202,6 @@ fun HomeScreen(
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            // Disable swipe navigation between tabs when a workout is active
             userScrollEnabled = !isSessionActive,
             beyondViewportPageCount = 1,
             modifier = Modifier
@@ -137,7 +224,13 @@ fun HomeScreen(
                 AppTab.NUTRITION -> NutritionScreen(
                     calorieTarget = currentCalorieTarget,
                     profile = savedProfile,
-                    recentWeights = recentWeights
+                    recentWeights = recentWeights,
+                    todayLogs = todayFoodLogs,
+                    allFoodItems = allFoodItems,
+                    onLogFood = onFoodLogged,
+                    onDeleteLog = onFoodLogDeleted,
+                    onEditLog = { logToEdit = it },
+                    onStartScan = { showScanner = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(
                     recentSessions = recentSessions,

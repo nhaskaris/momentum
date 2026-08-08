@@ -7,16 +7,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import kotlinx.coroutines.launch
@@ -56,13 +56,11 @@ fun WorkoutsScreen(
     var sessionPendingDelete by remember { mutableStateOf<WorkoutSession?>(null) }
     var showCreateTemplateDialog by remember { mutableStateOf(false) }
 
-    // Pre-filled state passed when user starts a session from a past session or routine
     var initialPendingSets by remember { mutableStateOf<List<PendingSet>>(emptyList()) }
     var initialSessionExercises by remember { mutableStateOf<List<Exercise>>(emptyList()) }
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Notify parent component whenever session active state toggles
     LaunchedEffect(isLoggingSession) {
         onSessionStateChanged(isLoggingSession)
     }
@@ -129,7 +127,6 @@ fun WorkoutsScreen(
                 coroutineScope.launch {
                     val sets = getSetsForSession(session.id)
                     val exerciseMap = allExercises.associateBy { it.id }
-
                     val uniqueExerciseIds = sets.map { it.exerciseId }.distinct()
 
                     val templateInputs = if (uniqueExerciseIds.isNotEmpty()) {
@@ -137,20 +134,12 @@ fun WorkoutsScreen(
                             val exerciseObj = exerciseMap[exId] ?: return@mapNotNull null
                             val exerciseSets = sets.filter { it.exerciseId == exId }
                             val defaultSetsCount = exerciseSets.size
-
-                            // Carry over the actual weight/reps used, so the routine
-                            // pre-fills with what you last lifted instead of generic defaults.
                             val avgReps = if (exerciseSets.isNotEmpty()) {
-                                (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size)
-                                    .let { Math.round(it).toInt() }
-                            } else {
-                                10
-                            }
+                                (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size).let { Math.round(it).toInt() }
+                            } else 10
                             val avgWeightKg = if (exerciseSets.isNotEmpty()) {
                                 exerciseSets.sumOf { it.weightKg } / exerciseSets.size
-                            } else {
-                                0.0
-                            }
+                            } else 0.0
 
                             TemplateExerciseInput(
                                 exercise = exerciseObj,
@@ -159,17 +148,13 @@ fun WorkoutsScreen(
                                 targetWeightKg = avgWeightKg
                             )
                         }
-                    } else {
-                        emptyList()
-                    }
+                    } else emptyList()
 
-                    // Call callback to save in DB/ViewModel
                     onTemplateCreated(
                         routineName.ifBlank { "Routine from ${formatToPhoneDate(session.date)}" },
                         "Created from past workout on ${formatToPhoneDate(session.date)}",
                         templateInputs
                     )
-
                     selectedSession = null
                 }
             },
@@ -183,13 +168,13 @@ fun WorkoutsScreen(
     sessionPendingDelete?.let { session ->
         AlertDialog(
             onDismissRequest = { sessionPendingDelete = null },
-            title = { Text("Delete workout?") },
+            title = { Text("Delete workout?", fontWeight = FontWeight.Bold) },
             text = { Text("Remove this session from ${formatToPhoneDate(session.date)}? This can't be undone.") },
             confirmButton = {
-                TextButton(onClick = {
-                    onSessionDeleted(session.id)
-                    sessionPendingDelete = null
-                }) { Text("Delete") }
+                Button(
+                    onClick = { onSessionDeleted(session.id); sessionPendingDelete = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { sessionPendingDelete = null }) { Text("Cancel") }
@@ -197,55 +182,79 @@ fun WorkoutsScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Hero Section
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .padding(top = 48.dp, bottom = 32.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text("Workouts", style = MaterialTheme.typography.headlineLarge)
-            FilledIconButton(
-                onClick = {
-                    activeTemplateId = null
-                    editingSessionId = null
-                    initialSessionExercises = emptyList()
-                    initialPendingSets = emptyList()
-                    isLoggingSession = true
-                },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Start quick workout")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "Workouts",
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 60.sp),
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    "Consistency is key",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // WORKOUT TEMPLATES & PAST SESSION ROUTINES
+            // QUICK START BUTTON
             item {
+                Button(
+                    onClick = {
+                        activeTemplateId = null
+                        editingSessionId = null
+                        initialSessionExercises = emptyList()
+                        initialPendingSets = emptyList()
+                        isLoggingSession = true
+                    },
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Start Empty Workout", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            }
+
+            // SAVED ROUTINES
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Saved Routines",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Bookmarks, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saved Routines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
                     TextButton(onClick = { showCreateTemplateDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("New Routine")
+                        Text("New Routine", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -253,14 +262,14 @@ fun WorkoutsScreen(
             if (allTemplates.isEmpty()) {
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(24.dp)
                     ) {
                         Text(
-                            "No routines created yet. Tap 'New Routine' to create a template from scratch or a past session.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodySmall,
+                            "No routines saved yet.",
+                            modifier = Modifier.padding(24.dp),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -274,20 +283,10 @@ fun WorkoutsScreen(
                                 activeTemplateId = template.id
                                 val templateExercises = getExercisesForTemplate(template.id)
                                 val exerciseMap = allExercises.associateBy { it.id }
-                                val loadedExercises = templateExercises.mapNotNull { exerciseMap[it.exerciseId] }
-
-                                // Pre-fill sets from the template's saved targets so starting a
-                                // routine restores the weight/reps you used last time, instead of
-                                // handing you a blank slate for every exercise.
-                                initialSessionExercises = loadedExercises
-                                initialPendingSets = templateExercises.flatMap { templateExercise ->
-                                    (1..templateExercise.targetSets.coerceAtLeast(1)).map { setNumber ->
-                                        PendingSet(
-                                            exerciseId = templateExercise.exerciseId,
-                                            setNumber = setNumber,
-                                            weightKg = templateExercise.targetWeightKg,
-                                            reps = templateExercise.targetReps
-                                        )
+                                initialSessionExercises = templateExercises.mapNotNull { exerciseMap[it.exerciseId] }
+                                initialPendingSets = templateExercises.flatMap { te ->
+                                    (1..te.targetSets.coerceAtLeast(1)).map { sn ->
+                                        PendingSet(exerciseId = te.exerciseId, setNumber = sn, weightKg = te.targetWeightKg, reps = te.targetReps)
                                     }
                                 }
                                 isLoggingSession = true
@@ -298,38 +297,19 @@ fun WorkoutsScreen(
                 }
             }
 
-            // RECENT COMPLETED SESSIONS
+            // RECENT SESSIONS
             item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Recent Sessions",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Recent History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
             }
 
             if (recentSessions.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                "No workouts logged yet",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Tap + or start a routine to log your workout",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    EmptyState("No workouts logged yet.")
                 }
             } else {
                 items(recentSessions, key = { "session_${it.id}" }) { session ->
@@ -342,6 +322,8 @@ fun WorkoutsScreen(
                     )
                 }
             }
+            
+            item { Spacer(modifier = Modifier.height(32.dp)) }
         }
     }
 
@@ -368,33 +350,31 @@ private fun TemplateItemCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(template.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(template.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 template.notes?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Routine", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
                 }
                 Button(
                     onClick = onStartRoutine,
                     shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Start")
                 }
@@ -417,9 +397,7 @@ private fun SwipeableSessionCard(
             if (value == SwipeToDismissBoxValue.EndToStart) {
                 onSwipeToDelete()
                 false
-            } else {
-                false
-            }
+            } else false
         }
     )
 
@@ -429,88 +407,68 @@ private fun SwipeableSessionCard(
         enableDismissFromEndToStart = true,
         backgroundContent = {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(vertical = 6.dp)
-                    .background(MaterialTheme.colorScheme.error, shape = MaterialTheme.shapes.medium)
-                    .padding(horizontal = 20.dp),
+                modifier = Modifier.fillMaxSize().padding(vertical = 4.dp).background(MaterialTheme.colorScheme.error, RoundedCornerShape(24.dp)).padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.White
-                )
-            }
+            ) { Icon(Icons.Default.Delete, null, tint = Color.White) }
         }
     ) {
-        SessionCardItem(
-            session = session,
-            allExercises = allExercises,
-            unitSystem = unitSystem,
-            onClick = onClick
-        )
+        SessionCardItem(session, unitSystem, onClick)
     }
 }
 
 @Composable
 private fun SessionCardItem(
     session: WorkoutSession,
-    allExercises: List<Exercise>,
     unitSystem: UnitSystem,
     onClick: () -> Unit
 ) {
-    val formattedDate = remember(session.date) {
-        formatToPhoneDate(session.date)
-    }
-
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formattedDate,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
+        Row(
+            modifier = Modifier.padding(20.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = formatToPhoneDate(session.date), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${session.exerciseCount} exercises • ${session.setCount} sets",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                val isImperial = unitSystem == UnitSystem.IMPERIAL
+                val vol = if (isImperial) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
+                val unit = if (isImperial) "lb" else "kg"
+                Text(
+                    text = "$vol $unit",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (session.setCount == 0) {
-                Text(
-                    text = "No sets logged",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                val isImperial = unitSystem == UnitSystem.IMPERIAL
-                val totalVolumeDisplay = if (isImperial) {
-                    "${(session.totalVolumeKg * 2.20462).toInt()} lbs total volume"
-                } else {
-                    "${session.totalVolumeKg.toInt()} kg total volume"
-                }
-
-                Text(
-                    text = totalVolumeDisplay,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+@Composable
+private fun EmptyState(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+    ) {
+        Box(modifier = Modifier.padding(32.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

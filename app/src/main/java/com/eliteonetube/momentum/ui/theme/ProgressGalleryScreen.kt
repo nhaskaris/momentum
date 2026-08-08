@@ -21,10 +21,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.rememberAsyncImagePainter
@@ -64,7 +66,7 @@ fun ProgressGalleryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Progress Gallery", fontWeight = FontWeight.Bold) },
+                title = { Text(if (compareMode) "Comparison" else "Gallery", fontWeight = FontWeight.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -75,21 +77,33 @@ fun ProgressGalleryScreen(
                         FilterChip(
                             selected = compareMode,
                             onClick = { compareMode = !compareMode },
-                            label = { Text("Compare") },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier.padding(end = 8.dp)
+                            label = { Text("Side-by-Side") },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.padding(end = 12.dp),
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Hero Gradient Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), Color.Transparent)))
+                    .padding(bottom = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("TRANSFORMATION", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text("Visual History", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                }
+            }
+
             if (compareMode && photoCheckIns.size >= 2) {
                 ComparisonLayout(
                     checkIns = photoCheckIns,
@@ -117,28 +131,29 @@ fun ComparisonLayout(
     onSelect2: (CheckIn) -> Unit,
     onPhotoClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ComparisonColumn("START", photo1, checkIns, onSelect1, onPhotoClick, Modifier.weight(1f))
-            ComparisonColumn("END", photo2, checkIns, onSelect2, onPhotoClick, Modifier.weight(1f))
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ComparisonColumn("EARLIER", photo1, checkIns, onSelect1, onPhotoClick, Modifier.weight(1f))
+            ComparisonColumn("LATEST", photo2, checkIns, onSelect2, onPhotoClick, Modifier.weight(1f))
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             val weightDiff = if (photo1 != null && photo2 != null) photo2.weight - photo1.weight else 0.0
             val color = if (weightDiff <= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(24.dp).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("Overall Change: ", style = MaterialTheme.typography.bodyLarge)
+                Text("Total Weight Change: ", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = "${if (weightDiff > 0) "+" else ""}${"%.1f".format(weightDiff)} kg",
                     style = MaterialTheme.typography.titleLarge,
@@ -160,15 +175,15 @@ fun ComparisonColumn(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
+        Spacer(modifier = Modifier.height(12.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.7f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
                 .let { if (selected?.frontPhotoPath != null) it.clickable { onPhotoClick(selected.frontPhotoPath) } else it }
         ) {
             if (selected?.frontPhotoPath != null) {
@@ -180,43 +195,30 @@ fun ComparisonColumn(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         var expanded by remember { mutableStateOf(false) }
         Box {
             Surface(
                 onClick = { expanded = true },
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        selected?.date ?: "Select Date",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                    Text(selected?.date ?: "Select Date", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ArrowDropDown, null)
                 }
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                checkIns.forEach { checkIn ->
-                    DropdownMenuItem(
-                        text = { Text(checkIn.date) },
-                        onClick = {
-                            onSelect(checkIn)
-                            expanded = false
-                        }
-                    )
+                checkIns.forEach { ci ->
+                    DropdownMenuItem(text = { Text(ci.date) }, onClick = { onSelect(ci); expanded = false })
                 }
             }
-        }
-        if (selected != null) {
-            Text("${selected.weight} kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -225,37 +227,32 @@ fun ComparisonColumn(
 fun GalleryListLayout(checkIns: List<CheckIn>, onPhotoClick: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        contentPadding = PaddingValues(24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        items(checkIns) { checkIn ->
+        items(checkIns) { ci ->
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(checkIn.date, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                    Text(ci.date, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(8.dp)
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text(
-                            "${checkIn.weight} kg",
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("${ci.weight} kg", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    item { PhotoCard("Front", checkIn.frontPhotoPath, onPhotoClick) }
-                    item { PhotoCard("Back", checkIn.backPhotoPath, onPhotoClick) }
-                    item { PhotoCard("Side", checkIn.sidePhotoPath, onPhotoClick) }
+                    item { PhotoCard("Front", ci.frontPhotoPath, onPhotoClick) }
+                    item { PhotoCard("Back", ci.backPhotoPath, onPhotoClick) }
+                    item { PhotoCard("Side", ci.sidePhotoPath, onPhotoClick) }
                 }
             }
         }
@@ -264,13 +261,14 @@ fun GalleryListLayout(checkIns: List<CheckIn>, onPhotoClick: (String) -> Unit) {
 
 @Composable
 fun PhotoCard(label: String, path: String?, onClick: (String) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(140.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(160.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.75f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                 .let { if (path != null) it.clickable { onClick(path) } else it }
         ) {
             if (path != null) {
@@ -282,8 +280,8 @@ fun PhotoCard(label: String, path: String?, onClick: (String) -> Unit) {
                 )
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -294,15 +292,10 @@ fun EmptyGalleryState() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            Icons.Default.PhotoLibrary,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.outline
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("No progress photos yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-        Text("Complete a check-in to start your gallery", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+        Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        Spacer(modifier = Modifier.height(24.dp))
+        Text("No progress photos yet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+        Text("Log photos during check-in", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -312,28 +305,17 @@ fun FullScreenPhotoViewer(path: String, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Image(
                 painter = rememberAsyncImagePainter(path),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
-            
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-            }
+                modifier = Modifier.align(Alignment.TopEnd).padding(20.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+            ) { Icon(Icons.Default.Close, "Close", tint = Color.White) }
         }
     }
 }

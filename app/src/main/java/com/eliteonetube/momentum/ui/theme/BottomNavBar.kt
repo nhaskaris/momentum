@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class AppTab(val label: String, val icon: ImageVector) {
-    DASHBOARD("Dashboard", Icons.Default.Home),
+    DASHBOARD("Home", Icons.Default.Home),
     NUTRITION("Nutrition", Icons.Default.Restaurant),
     WORKOUTS("Workouts", Icons.Default.FitnessCenter),
     PROFILE("Profile", Icons.Default.AccountCircle)

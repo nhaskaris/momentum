@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -15,22 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.room3.Room
-import com.eliteonetube.momentum.data.AppTheme
-import com.eliteonetube.momentum.data.CheckIn
-import com.eliteonetube.momentum.data.Exercise
-import com.eliteonetube.momentum.data.Goal
-import com.eliteonetube.momentum.data.LoggedSet
-import com.eliteonetube.momentum.data.TemplateExercise
-import com.eliteonetube.momentum.data.UnitSystem
-import com.eliteonetube.momentum.data.UserProfile
-import com.eliteonetube.momentum.data.WeightDatabase
-import com.eliteonetube.momentum.data.WeightEntry
-import com.eliteonetube.momentum.data.WorkoutSession
-import com.eliteonetube.momentum.data.WorkoutTemplate
-import com.eliteonetube.momentum.logic.CoachAlgorithm
-import com.eliteonetube.momentum.logic.ExerciseSeeder
-import com.eliteonetube.momentum.logic.StreakCalculator
-import com.eliteonetube.momentum.logic.WorkScheduler
+import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.logic.*
 import com.eliteonetube.momentum.ui.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
@@ -43,13 +30,10 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission granted
-        }
-    }
+    ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Request notification permission for Android 13+
@@ -73,14 +57,18 @@ class MainActivity : ComponentActivity() {
             WeightDatabase.MIGRATION_16_17,
             WeightDatabase.MIGRATION_17_18,
             WeightDatabase.MIGRATION_18_19,
+            WeightDatabase.MIGRATION_19_20,
+            WeightDatabase.MIGRATION_20_21,
         ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
         val workoutDao = database.workoutDao()
+        val foodDao = database.foodDao()
         val algorithm = CoachAlgorithm()
 
         lifecycleScope.launch {
             ExerciseSeeder.seedIfNeeded(applicationContext, workoutDao)
+            FoodSeeder.seedIfNeeded(applicationContext, foodDao)
         }
 
         setContent {
@@ -96,6 +84,11 @@ class MainActivity : ComponentActivity() {
                     val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
                     val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
                     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
+
+                    val today = remember { LocalDate.now().toString() }
+                    val todayFoodLogs by foodDao.getFoodLogsForDate(today).collectAsState(initial = emptyList())
+                    val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
+
                     var isProfileLoaded by remember { mutableStateOf(false) }
 
                     var currentCalorieTarget by remember { mutableIntStateOf(2000) }
@@ -124,6 +117,8 @@ class MainActivity : ComponentActivity() {
                             allExercises = allExercises,
                             allTemplates = allTemplates,
                             allCheckIns = allCheckIns,
+                            todayFoodLogs = todayFoodLogs,
+                            allFoodItems = allFoodItems,
                             currentStreak = currentStreak,
                             totalDaysLogged = allWeightDates.size,
                             loggedDates = loggedDates,
@@ -256,6 +251,42 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                 }
+                            },
+                            onFoodLogged = { foodId, qty ->
+                                coroutineScope.launch {
+                                    foodDao.insertFoodLog(
+                                        DailyFoodLog(
+                                            date = LocalDate.now().toString(),
+                                            foodItemId = foodId,
+                                            quantity = qty
+                                        )
+                                    )
+                                }
+                            },
+                            onFoodLogDeleted = { logId ->
+                                coroutineScope.launch {
+                                    foodDao.deleteFoodLog(logId)
+                                }
+                            },
+                            onFoodLogUpdated = { logId, foodId, qty ->
+                                coroutineScope.launch {
+                                    foodDao.updateFoodLog(
+                                        DailyFoodLog(
+                                            id = logId,
+                                            date = LocalDate.now().toString(),
+                                            foodItemId = foodId,
+                                            quantity = qty
+                                        )
+                                    )
+                                }
+                            },
+                            onNewFoodItemCreated = { item ->
+                                coroutineScope.launch {
+                                    foodDao.insertFoodItem(item)
+                                }
+                            },
+                            onGetFoodByBarcode = { barcode ->
+                                foodDao.getFoodItemByBarcode(barcode)
                             },
                             onCheckInCompleted = { weight, photos ->
                                 savedProfile?.let { profile ->

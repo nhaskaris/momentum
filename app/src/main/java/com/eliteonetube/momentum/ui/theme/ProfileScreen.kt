@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -83,190 +84,212 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+        // Hero Section
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .padding(top = 48.dp, bottom = 32.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Your Profile",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold
+                    text = "Profile",
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 60.sp),
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Personal stats & settings",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Manage your metrics",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
-            FilledTonalIconButton(
-                onClick = { isEditing = true },
-                shape = RoundedCornerShape(12.dp)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Settings, contentDescription = "Edit Profile")
-            }
-        }
-
-        // 1. Body Composition Block
-        ProfileBlock(title = "Body Composition", icon = Icons.Default.MonitorWeight) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Weight",
-                    value = if (currentWeightKg > 0) Units.displayWeight(currentWeightKg, profile.unitSystem) else "--",
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    onClick = onWeightClick
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Body Fat",
-                    value = if (profile.bodyFatPercentage != null) "${profile.bodyFatPercentage}%" else "--",
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            }
-        }
-
-        // 2. Physical Details Block
-        ProfileBlock(title = "Physical Details", icon = Icons.Default.Person) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProfileStatRow(
-                    icon = Icons.Default.Straighten,
-                    label = "Height",
-                    value = Units.displayHeight(profile.height, profile.unitSystem)
-                )
-                ProfileStatRow(
-                    icon = Icons.Default.Cake,
-                    label = "Age",
-                    value = "${profile.age} years"
-                )
-                ProfileStatRow(
-                    icon = Icons.Default.Wc,
-                    label = "Sex",
-                    value = if (profile.isMale) "Male" else "Female"
-                )
-            }
-        }
-
-        // 3. Activity & Connectivity Block
-        ProfileBlock(title = "Activity & Integration", icon = Icons.AutoMirrored.Filled.DirectionsWalk) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProfileStatRow(
-                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                    label = "Daily Steps",
-                    value = "${profile.averageDailySteps}"
-                )
-                ProfileStatRow(
-                    icon = Icons.Default.HealthAndSafety,
-                    label = "Health Connect",
-                    value = if (profile.useHealthConnect) "Connected" else "Disconnected",
-                    valueColor = if (profile.useHealthConnect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                )
-                ProfileStatRow(
-                    icon = Icons.Default.Tune,
-                    label = "Units",
-                    value = if (profile.unitSystem == UnitSystem.IMPERIAL) "Imperial" else "Metric"
-                )
-            }
-        }
-
-        // 4. Goal & Metabolism Block
-        ProfileBlock(title = "Goal & Metabolism", icon = Icons.Default.LocalFireDepartment) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showChangeGoalDialog = true },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                Text("Stats & Settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                FilledTonalIconButton(
+                    onClick = { isEditing = true },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Icon(Icons.Default.Settings, contentDescription = "Edit Profile")
+                }
+            }
+
+            // 1. Body Composition Block
+            ProfileBlock(title = "Body Composition", icon = Icons.Default.MonitorWeight) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Weight",
+                        value = if (currentWeightKg > 0) Units.displayWeight(currentWeightKg, profile.unitSystem) else "--",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        onClick = onWeightClick
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Body Fat",
+                        value = if (profile.bodyFatPercentage != null) "${profile.bodyFatPercentage}%" else "--",
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                }
+            }
+
+            // 2. Physical Details Block
+            ProfileBlock(title = "Physical Details", icon = Icons.Default.Person) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ProfileStatRow(
+                        icon = Icons.Default.Straighten,
+                        label = "Height",
+                        value = Units.displayHeight(profile.height, profile.unitSystem)
+                    )
+                    ProfileStatRow(
+                        icon = Icons.Default.Cake,
+                        label = "Age",
+                        value = "${profile.age} years"
+                    )
+                    ProfileStatRow(
+                        icon = Icons.Default.Wc,
+                        label = "Sex",
+                        value = if (profile.isMale) "Male" else "Female"
+                    )
+                }
+            }
+
+            // 3. Activity & Connectivity Block
+            ProfileBlock(title = "Activity & Integration", icon = Icons.AutoMirrored.Filled.DirectionsWalk) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ProfileStatRow(
+                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                        label = "Daily Steps",
+                        value = "${profile.averageDailySteps}"
+                    )
+                    ProfileStatRow(
+                        icon = Icons.Default.HealthAndSafety,
+                        label = "Health Connect",
+                        value = if (profile.useHealthConnect) "Connected" else "Disconnected",
+                        valueColor = if (profile.useHealthConnect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
+                    ProfileStatRow(
+                        icon = Icons.Default.Tune,
+                        label = "Units",
+                        value = if (profile.unitSystem == UnitSystem.IMPERIAL) "Imperial" else "Metric"
+                    )
+                }
+            }
+
+            // 4. Goal & Metabolism Block
+            ProfileBlock(title = "Goal & Metabolism", icon = Icons.Default.LocalFireDepartment) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showChangeGoalDialog = true },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("Current Goal", style = MaterialTheme.typography.labelSmall)
-                                Text(
-                                    profile.goal.name.lowercase().replaceFirstChar { it.uppercase() },
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("Current Goal", style = MaterialTheme.typography.labelSmall)
+                                    Text(
+                                        profile.goal.name.lowercase().replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = null)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Estimated Maintenance", style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                "${profile.estimatedMaintenanceCalories} kcal",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 5. Progress Gallery Block
+            if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
+                ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "Track your visual transformation over time.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onViewGallery,
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Compare, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("View & Compare Photos", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 6. App Settings Block
+            ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("App Theme", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        AppTheme.entries.forEachIndexed { index, theme ->
+                            SegmentedButton(
+                                selected = profile.theme == theme,
+                                onClick = { onProfileUpdated(profile.copy(theme = theme)) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = AppTheme.entries.size)
+                            ) {
+                                Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
                             }
                         }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null)
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Estimated Maintenance", style = MaterialTheme.typography.labelSmall)
-                        Text(
-                            "${profile.estimatedMaintenanceCalories} kcal",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                     }
                 }
             }
-        }
 
-        // 5. Progress Gallery Block
-        if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
-            ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Track your visual transformation over time.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onViewGallery,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Compare, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("View & Compare Photos")
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(48.dp))
         }
-
-        // 6. App Settings Block
-        ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Theme", style = MaterialTheme.typography.labelSmall)
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    AppTheme.entries.forEachIndexed { index, theme ->
-                        SegmentedButton(
-                            selected = profile.theme == theme,
-                            onClick = { onProfileUpdated(profile.copy(theme = theme)) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = AppTheme.entries.size)
-                        ) {
-                            Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -279,7 +302,7 @@ private fun ProfileBlock(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
+            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
         ) {
             Icon(
                 icon,
@@ -297,10 +320,10 @@ private fun ProfileBlock(
         }
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 content()
             }
         }
@@ -317,19 +340,20 @@ private fun StatCard(
 ) {
     Card(
         modifier = modifier
-            .height(90.dp)
+            .height(100.dp)
             .let { if (onClick != null) it.clickable { onClick() } else it },
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = 0.2f)),
+        shape = RoundedCornerShape(20.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = containerColor, fontWeight = FontWeight.Bold)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, fontSize = 24.sp)
         }
     }
 }
@@ -352,13 +376,13 @@ private fun ProfileStatRow(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = valueColor)
+        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = valueColor)
     }
 }
 
@@ -382,9 +406,9 @@ private fun ChangeGoalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Change Goal", fontWeight = FontWeight.Bold) },
+        title = { Text("Update Strategy", fontWeight = FontWeight.Black) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 goalOptions.forEach { option ->
                     val isSelected = selectedGoal == option.goal
                     Card(
@@ -395,17 +419,17 @@ private fun ChangeGoalDialog(
                             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                         ),
                         border = if (!isSelected) CardDefaults.outlinedCardBorder() else null,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = isSelected, onClick = { selectedGoal = option.goal })
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(option.label, fontWeight = FontWeight.Bold)
-                                Text(option.description, style = MaterialTheme.typography.bodySmall)
+                                Text(option.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                Text(option.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -414,13 +438,14 @@ private fun ChangeGoalDialog(
                 if (selectedGoal != currentProfile.goal) {
                     Card(
                         modifier = Modifier.padding(top = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             transition.explanation,
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
@@ -430,9 +455,9 @@ private fun ChangeGoalDialog(
             Button(
                 onClick = { onConfirm(selectedGoal) },
                 enabled = selectedGoal != currentProfile.goal,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Confirm Change")
+                Text("Confirm Change", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -450,12 +475,10 @@ private fun EditProfileForm(
     onSave: (UserProfile) -> Unit
 ) {
     var unitSystem by remember { mutableStateOf(profile.unitSystem) }
-
     val context = LocalContext.current
     val healthConnectManager = remember { HealthConnectManager(context) }
     var useHealthConnect by remember { mutableStateOf(profile.useHealthConnect) }
 
-    // Height input state depends on unit system — cm as a single field, or feet+inches as two
     val initialFeetInches = remember { Units.cmToFeetInches(profile.height) }
     var heightCmInput by remember { mutableStateOf(profile.height.toString()) }
     var heightFeetInput by remember { mutableStateOf(initialFeetInches.first.toString()) }
@@ -491,188 +514,133 @@ private fun EditProfileForm(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            "Edit Profile",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Black
-        )
-        Text(
-            "Update your parameters",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        // Form Hero
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), MaterialTheme.colorScheme.background)))
+                .padding(top = 48.dp, bottom = 32.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Imperial Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("lb, ft/in", style = MaterialTheme.typography.bodySmall)
-                }
-                Switch(
-                    checked = unitSystem == UnitSystem.IMPERIAL,
-                    onCheckedChange = {
-                        unitSystem = if (it) UnitSystem.IMPERIAL else UnitSystem.METRIC
-                    }
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("EDIT", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text("Profile", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
             }
         }
 
-        if (unitSystem == UnitSystem.IMPERIAL) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = heightFeetInput,
-                    onValueChange = { heightFeetInput = it },
-                    label = { Text("Height (ft)") },
-                    isError = heightError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = heightInchesInput,
-                    onValueChange = { heightInchesInput = it },
-                    label = { Text("Height (in)") },
-                    isError = heightError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        } else {
-            OutlinedTextField(
-                value = heightCmInput,
-                onValueChange = { heightCmInput = it },
-                label = { Text("Height (cm)") },
-                isError = heightError,
-                supportingText = { if (heightError) Text("Enter a valid number") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = age,
-                onValueChange = { age = it },
-                label = { Text("Age") },
-                isError = ageError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = bodyFatInput,
-                onValueChange = { bodyFatInput = it },
-                label = { Text("Body Fat %") },
-                isError = bfError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-
-        OutlinedTextField(
-            value = stepsInput,
-            onValueChange = { stepsInput = it },
-            label = { Text("Average Daily Steps") },
-            isError = stepsError,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Biological Sex", fontWeight = FontWeight.Bold)
-            SingleChoiceSegmentedButtonRow {
-                SegmentedButton(
-                    selected = isMale,
-                    onClick = { isMale = true },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("Male") }
-                SegmentedButton(
-                    selected = !isMale,
-                    onClick = { isMale = false },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("Female") }
-            }
-        }
-
-        if (healthConnectManager.isAvailable()) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            // Unit Switch
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)),
-                shape = RoundedCornerShape(16.dp),
-                border = CardDefaults.outlinedCardBorder()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.HealthAndSafety, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("Health Connect", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Sync steps automatically", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column {
+                        Text("Imperial Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("lb, ft/in", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(
-                        checked = useHealthConnect,
-                        onCheckedChange = { useHealthConnect = it }
+                        checked = unitSystem == UnitSystem.IMPERIAL,
+                        onCheckedChange = { unitSystem = if (it) UnitSystem.IMPERIAL else UnitSystem.METRIC }
                     )
                 }
             }
-        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                Text("Cancel")
-            }
-            Button(
-                onClick = {
-                    onSave(
-                        profile.copy(
-                            height = parsedHeightCm!!,
-                            age = parsedAge!!,
-                            isMale = isMale,
-                            averageDailySteps = parsedSteps!!,
-                            unitSystem = unitSystem,
-                            bodyFatPercentage = parsedBodyFat,
-                            useHealthConnect = useHealthConnect
-                        )
+            // Height
+            if (unitSystem == UnitSystem.IMPERIAL) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = heightFeetInput,
+                        onValueChange = { heightFeetInput = it },
+                        label = { Text("Feet") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
                     )
-                },
-                enabled = allValid,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Save")
+                    OutlinedTextField(
+                        value = heightInchesInput,
+                        onValueChange = { heightInchesInput = it },
+                        label = { Text("Inches") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = heightCmInput,
+                    onValueChange = { heightCmInput = it },
+                    label = { Text("Height (cm)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    isError = heightError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                )
             }
+
+            // Age & BF
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = age,
+                    onValueChange = { age = it },
+                    label = { Text("Age") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    isError = ageError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                )
+                OutlinedTextField(
+                    value = bodyFatInput,
+                    onValueChange = { bodyFatInput = it },
+                    label = { Text("Body Fat %") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    isError = bfError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
+                )
+            }
+
+            // Steps
+            OutlinedTextField(
+                value = stepsInput,
+                onValueChange = { stepsInput = it },
+                label = { Text("Average Daily Steps") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                isError = stepsError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
+            )
+
+            // Sex
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Biological Sex", fontWeight = FontWeight.Bold)
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(selected = isMale, onClick = { isMale = true }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("Male") }
+                    SegmentedButton(selected = !isMale, onClick = { isMale = false }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("Female") }
+                }
+            }
+
+            // Actions
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect))
+                    },
+                    enabled = allValid,
+                    modifier = Modifier.weight(1.5f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) { Text("Save Changes", fontWeight = FontWeight.Bold) }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }
