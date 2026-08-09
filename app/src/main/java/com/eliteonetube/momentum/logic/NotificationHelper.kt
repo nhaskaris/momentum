@@ -73,7 +73,8 @@ object NotificationHelper {
         }
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            action = MainActivity.ACTION_OPEN_WEIGHT_ENTRY
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             context, 1002, intent,
@@ -91,6 +92,10 @@ object NotificationHelper {
             .build()
 
         NotificationManagerCompat.from(context).notify(1002, notification)
+    }
+
+    fun cancelWeighInReminder(context: Context) {
+        NotificationManagerCompat.from(context).cancel(1002)
     }
 
     fun showRestFinishedNotification(context: Context) {

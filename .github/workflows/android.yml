@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -26,8 +28,26 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew assembleDebug
 
-    - name: Upload Artifact
+    - name: Upload APK artifact for pull requests
+      if: github.event_name == 'pull_request'
       uses: actions/upload-artifact@v4
       with:
         name: momentum-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Create GitHub release with APK
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        APK_PATH: app/build/outputs/apk/debug/app-debug.apk
+      run: |
+        tag="build-${GITHUB_SHA::7}"
+        if gh release view "$tag" >/dev/null 2>&1; then
+          gh release upload "$tag" "$APK_PATH#momentum-debug.apk" --clobber
+        else
+          gh release create "$tag" "$APK_PATH#momentum-debug.apk" \
+            --target "$GITHUB_SHA" \
+            --title "Momentum build ${GITHUB_SHA::7}" \
+            --generate-notes \
+            --latest=false
+        fi

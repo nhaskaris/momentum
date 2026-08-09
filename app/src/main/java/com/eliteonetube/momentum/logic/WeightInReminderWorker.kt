@@ -36,7 +36,7 @@ class WeighInReminderWorker(
             val dao = database.weightDao()
             val profile = dao.getUserProfile().first() ?: return Result.success()
             val today = LocalDate.now().toString()
-            val loggedToday = dao.getLastTwoWeeks().first().any { it.date == today }
+            val loggedToday = dao.hasWeightForDate(today)
 
             if (!loggedToday) {
                 NotificationHelper.showWeighInReminder(applicationContext)

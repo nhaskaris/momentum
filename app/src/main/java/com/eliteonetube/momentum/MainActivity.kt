@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_OPEN_ACTIVE_WORKOUT = "com.eliteonetube.momentum.action.OPEN_ACTIVE_WORKOUT"
+        const val ACTION_OPEN_WEIGHT_ENTRY = "com.eliteonetube.momentum.action.OPEN_WEIGHT_ENTRY"
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -39,12 +40,16 @@ class MainActivity : ComponentActivity() {
     ) { _ -> }
 
     private val openWorkoutRequests = MutableStateFlow(0)
+    private val openWeightEntryRequests = MutableStateFlow(0)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
             openWorkoutRequests.value++
+        }
+        if (intent.action == ACTION_OPEN_WEIGHT_ENTRY) {
+            openWeightEntryRequests.value++
         }
     }
 
@@ -54,6 +59,9 @@ class MainActivity : ComponentActivity() {
 
         if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
             openWorkoutRequests.value++
+        }
+        if (intent.action == ACTION_OPEN_WEIGHT_ENTRY) {
+            openWeightEntryRequests.value++
         }
 
         // Request notification permission for Android 13+
@@ -110,6 +118,7 @@ class MainActivity : ComponentActivity() {
 
                     val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
                     val openWorkoutRequest by openWorkoutRequests.collectAsState()
+                    val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
 
                     val today = remember { LocalDate.now().toString() }
                     val todayFoodLogs by foodDao.getFoodLogsForDate(today).collectAsState(initial = emptyList())
@@ -147,18 +156,21 @@ class MainActivity : ComponentActivity() {
                             activeSets = activeSets,
                             hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
                             openWorkoutRequest = openWorkoutRequest,
+                            openWeightEntryRequest = openWeightEntryRequest,
                             currentStreak = currentStreak,
                             totalDaysLogged = allWeightDates.size,
                             loggedDates = loggedDates,
                             onWeightSubmitted = { enteredWeight ->
                                 coroutineScope.launch {
+                                    val today = LocalDate.now().toString()
                                     weightDao.insertWeight(
                                         WeightEntry(
-                                            date = LocalDate.now().toString(),
+                                            date = today,
                                             weight = enteredWeight,
                                             calorieTargetAtEntry = currentCalorieTarget
                                         )
                                     )
+                                    NotificationHelper.cancelWeighInReminder(applicationContext)
                                 }
                             },
                             onPastWeightSubmitted = { date, enteredWeight ->
@@ -170,6 +182,9 @@ class MainActivity : ComponentActivity() {
                                             calorieTargetAtEntry = currentCalorieTarget
                                         )
                                     )
+                                    if (date == LocalDate.now().toString()) {
+                                        NotificationHelper.cancelWeighInReminder(applicationContext)
+                                    }
                                 }
                             },
                             onProfileUpdated = { updatedProfile ->
@@ -380,6 +395,7 @@ class MainActivity : ComponentActivity() {
                                                 lastCheckInDate = today
                                             )
                                         )
+                                        NotificationHelper.cancelWeighInReminder(applicationContext)
                                     }
                                 }
                             },

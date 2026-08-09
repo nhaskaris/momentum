@@ -34,6 +34,7 @@ fun HomeScreen(
     activeSets: List<ActiveWorkoutSet> = emptyList(),
     hasActiveWorkout: Boolean = false,
     openWorkoutRequest: Int = 0,
+    openWeightEntryRequest: Int = 0,
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
@@ -87,6 +88,12 @@ fun HomeScreen(
     LaunchedEffect(openWorkoutRequest) {
         if (openWorkoutRequest > 0) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
+        }
+    }
+
+    LaunchedEffect(openWeightEntryRequest) {
+        if (openWeightEntryRequest > 0) {
+            pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.DASHBOARD))
         }
     }
     
