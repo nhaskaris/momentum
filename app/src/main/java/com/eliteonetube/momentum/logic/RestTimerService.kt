@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.logic
 
+import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -29,11 +31,7 @@ class RestTimerService : Service() {
                 action = "START"
                 putExtra("SECONDS", seconds)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            context.startForegroundService(intent)
         }
 
         fun stopTimer(context: Context) {
@@ -92,7 +90,13 @@ class RestTimerService : Service() {
             override fun onFinish() {
                 currentSecondsRemaining = 0
                 _timeLeft.value = 0
+                
+                // Update persistent notification to show completion
                 updateNotification(0, true)
+                
+                // Show high-priority "Get back to your workout" notification
+                NotificationHelper.showRestFinishedNotification(this@RestTimerService)
+                
                 vibrate()
                 
                 // Keep the service alive for 5 more seconds so UI shows "Finished"
@@ -107,18 +111,16 @@ class RestTimerService : Service() {
         }.start()
     }
 
-    private fun createNotification(seconds: Long, finished: Boolean = false): android.app.Notification {
+    private fun createNotification(seconds: Long, finished: Boolean = false): Notification {
         val manager = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                CHANNEL_ID,
-                "Workout Rest Timer",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                setShowBadge(false)
-            }
-            manager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Workout Rest Timer",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            setShowBadge(false)
         }
+        manager.createNotificationChannel(channel)
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -153,19 +155,14 @@ class RestTimerService : Service() {
 
     private fun vibrate() {
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
             vibratorManager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(500)
-        }
+        vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     override fun onDestroy() {
