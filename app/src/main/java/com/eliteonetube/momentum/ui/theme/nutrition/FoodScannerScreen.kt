@@ -44,6 +44,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -56,13 +57,15 @@ private const val TAG = "FoodScannerScreen"
 @AndroidxOptIn(markerClass = [ExperimentalGetImage::class])
 @Composable
 fun FoodScannerScreen(
+    apiEnabled: Boolean = false,
     onResult: (ScannedNutrition, String?) -> Unit,
-    onBarcodeScanned: (String) -> Unit,
+    onBarcodeScanned: suspend (String) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val coroutineScope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         onDispose { cameraExecutor.shutdown() }
@@ -73,6 +76,7 @@ fun FoodScannerScreen(
     var detectedName by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf("Align barcode in frame") }
     var isCapturing by remember { mutableStateOf(false) }
+    var isSearchingBarcode by remember { mutableStateOf(false) }
     var capturedNutrition by remember { mutableStateOf<ScannedNutrition?>(null) }
 
     var hasCameraPermission by remember {
@@ -187,7 +191,13 @@ fun FoodScannerScreen(
                                                     val barcode = barcodes[0].rawValue
                                                     if (barcode != null && barcode != currentBarcode) {
                                                         currentBarcode = barcode
-                                                        onBarcodeScanned(barcode)
+                                                        coroutineScope.launch {
+                                                            statusMessage = "Searching barcode..."
+                                                            isSearchingBarcode = true
+                                                            onBarcodeScanned(barcode)
+                                                            isSearchingBarcode = false
+                                                            statusMessage = "Align barcode in frame"
+                                                        }
                                                     }
                                                 }
                                             }
@@ -360,10 +370,26 @@ fun FoodScannerScreen(
                     ) {
                         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("New Barcode: $currentBarcode", color = Color.White, fontWeight = FontWeight.Bold)
-                            Text("Not in database.", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(onClick = { scannerMode = ScannerMode.FRONT_PACKAGE; statusMessage = "Scan package name" }) {
-                                Text("Add New Food")
+                            
+                            if (isSearchingBarcode) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Cyan, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (apiEnabled) "Checking online database..." else "Searching locally...",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else {
+                                Text(
+                                    text = if (apiEnabled) "Not found locally or online." else "Not found in database.",
+                                    color = Color.White.copy(alpha = 0.6f), 
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(onClick = { scannerMode = ScannerMode.FRONT_PACKAGE; statusMessage = "Scan package name" }) {
+                                    Text("Add New Food Manually")
+                                }
                             }
                         }
                     }

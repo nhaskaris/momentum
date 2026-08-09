@@ -68,7 +68,10 @@ data class UserProfile(
     val useHealthConnect: Boolean = false,
     val lastCheckInDate: String? = null,
     val checkInDue: Boolean = false,
-    val theme: AppTheme = AppTheme.SYSTEM
+    val theme: AppTheme = AppTheme.SYSTEM,
+    val useExternalApi: Boolean = false,
+    val activeWorkoutTemplateId: Long? = null,
+    val hasActiveWorkout: Boolean = false
 )
 
 @Entity(tableName = "check_in_table")
@@ -225,6 +228,17 @@ data class LoggedSet(
     val notes: String? = null
 )
 
+@Entity(tableName = "active_workout_set_table")
+data class ActiveWorkoutSet(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val exerciseId: Long,
+    val setNumber: Int,
+    val weightKg: Double,
+    val reps: Int,
+    val notes: String? = null,
+    val isCompleted: Boolean = false
+)
+
 @Dao
 interface WeightDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -323,7 +337,25 @@ interface WorkoutDao {
     @Query("SELECT * FROM logged_set_table WHERE sessionId = :sessionId ORDER BY id ASC")
     fun getSetsForSession(sessionId: Long): Flow<List<LoggedSet>>
 
-    @Query("DELETE FROM logged_set_table WHERE id = :setId")
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertActiveSet(activeSet: ActiveWorkoutSet)
+
+    @Query("SELECT * FROM active_workout_set_table ORDER BY id ASC")
+    fun getActiveSets(): Flow<List<ActiveWorkoutSet>>
+
+    @Query("DELETE FROM active_workout_set_table")
+    suspend fun clearActiveSets()
+
+    @Query("DELETE FROM active_workout_set_table WHERE exerciseId = :exerciseId AND setNumber = :setNumber")
+    suspend fun deleteActiveSet(exerciseId: Long, setNumber: Int)
+
+    @Update
+    suspend fun updateActiveSet(activeSet: ActiveWorkoutSet)
+
+    @Query("DELETE FROM active_workout_set_table WHERE exerciseId = :exerciseId")
+    suspend fun deleteActiveSetsForExercise(exerciseId: Long)
+
+    @Query("DELETE FROM active_workout_set_table WHERE id = :setId")
     suspend fun deleteSet(setId: Long)
 
     @Query("SELECT COUNT(*) FROM exercise_table")
@@ -401,9 +433,10 @@ interface WorkoutDao {
         LoggedSet::class,
         CheckIn::class,
         FoodItem::class,
-        DailyFoodLog::class
+        DailyFoodLog::class,
+        ActiveWorkoutSet::class
     ],
-    version = 21
+    version = 24
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -509,6 +542,37 @@ abstract class WeightDatabase : RoomDatabase() {
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE food_item_table ADD COLUMN barcode TEXT")
+            }
+        }
+
+        val MIGRATION_21_22 = object : Migration(21, 22) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN useExternalApi INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_22_23 = object : Migration(22, 23) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN activeWorkoutTemplateId INTEGER")
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS active_workout_set_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        exerciseId INTEGER NOT NULL,
+                        setNumber INTEGER NOT NULL,
+                        weightKg REAL NOT NULL,
+                        reps INTEGER NOT NULL,
+                        notes TEXT,
+                        isCompleted INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_23_24 = object : Migration(23, 24) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN hasActiveWorkout INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

@@ -123,7 +123,8 @@ class RestTimerService : Service() {
         manager.createNotificationChannel(channel)
 
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,

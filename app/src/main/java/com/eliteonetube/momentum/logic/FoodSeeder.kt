@@ -25,7 +25,8 @@ object FoodSeeder {
                 fat = obj.getDouble("fat"),
                 carbs = obj.getDouble("carbs"),
                 servingSize = obj.optString("servingSize", "100g"),
-                isCustom = false
+                isCustom = false,
+                barcode = if (obj.has("barcode")) obj.getString("barcode") else null
             )
         }
 

@@ -11,6 +11,7 @@ import com.eliteonetube.momentum.ui.theme.nutrition.FoodScannerScreen
 import com.eliteonetube.momentum.ui.theme.nutrition.FoodReviewDialog
 import com.eliteonetube.momentum.ui.theme.nutrition.LogQuantityDialog
 import com.eliteonetube.momentum.logic.ScannedNutrition
+import com.eliteonetube.momentum.logic.ExternalFoodApi
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
@@ -30,6 +31,9 @@ fun HomeScreen(
     allCheckIns: List<CheckIn> = emptyList(),
     todayFoodLogs: List<FoodLogWithItem> = emptyList(),
     allFoodItems: List<FoodItem> = emptyList(),
+    activeSets: List<ActiveWorkoutSet> = emptyList(),
+    hasActiveWorkout: Boolean = false,
+    openWorkoutRequest: Int = 0,
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
@@ -44,6 +48,8 @@ fun HomeScreen(
     onFoodLogDeleted: (Long) -> Unit,
     onFoodLogUpdated: (Long, Long, Double) -> Unit,
     onNewFoodItemCreated: (FoodItem) -> Unit,
+    onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
+    onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
     onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
@@ -67,6 +73,22 @@ fun HomeScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
+
+    // Auto-switch to Workouts tab if a session is recovered from DB
+    var hasAutoSwitched by remember { mutableStateOf(false) }
+    LaunchedEffect(activeSets, hasActiveWorkout) {
+        if ((activeSets.isNotEmpty() || hasActiveWorkout) && !hasAutoSwitched) {
+            pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
+            hasAutoSwitched = true
+        }
+    }
+
+    // A rest-timer notification explicitly requests the active workout.
+    LaunchedEffect(openWorkoutRequest) {
+        if (openWorkoutRequest > 0) {
+            pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
+        }
+    }
     
     var showCheckIn by remember { mutableStateOf(false) }
     var showGallery by remember { mutableStateOf(false) }
@@ -75,6 +97,11 @@ fun HomeScreen(
     var pendingBarcode by remember { mutableStateOf<String?>(null) }
     var itemToLogAfterScan by remember { mutableStateOf<FoodItem?>(null) }
     var logToEdit by remember { mutableStateOf<FoodLogWithItem?>(null) }
+
+    // State for tracking if a session is currently being logged (to hide navigation)
+    var isSessionActive by remember(activeSets, hasActiveWorkout) {
+        mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
+    }
 
     if (showCheckIn) {
         CheckInScreen(
@@ -99,16 +126,29 @@ fun HomeScreen(
 
     if (showScanner) {
         FoodScannerScreen(
+            apiEnabled = savedProfile.useExternalApi,
             onResult = { result, barcode ->
                 scannedResult = result
                 pendingBarcode = barcode
                 showScanner = false
             },
             onBarcodeScanned = { barcode ->
-                coroutineScope.launch {
-                    val item = onGetFoodByBarcode(barcode)
-                    if (item != null) {
-                        itemToLogAfterScan = item
+                val localItem = onGetFoodByBarcode(barcode)
+                if (localItem != null) {
+                    itemToLogAfterScan = localItem
+                    showScanner = false
+                    pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
+                } else if (savedProfile.useExternalApi) {
+                    val externalItem = ExternalFoodApi.fetchByBarcode(barcode)
+                    if (externalItem != null) {
+                        scannedResult = ScannedNutrition(
+                            name = externalItem.name,
+                            calories = externalItem.calories,
+                            protein = externalItem.protein,
+                            fat = externalItem.fat,
+                            carbs = externalItem.carbs
+                        )
+                        pendingBarcode = barcode
                         showScanner = false
                         pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
                     }
@@ -182,13 +222,15 @@ fun HomeScreen(
 
     var showHistoryModal by remember { mutableStateOf(false) }
 
-    var isSessionActive by remember { mutableStateOf(false) }
-
     val currentTab = AppTab.entries[pagerState.currentPage]
 
     Scaffold(
         bottomBar = {
-            if (!isSessionActive) {
+            // Only hide navigation if we are actually ON the Workouts tab AND a session is active
+            val isOnWorkoutsTab = pagerState.currentPage == AppTab.entries.indexOf(AppTab.WORKOUTS)
+            val shouldShowNav = !isSessionActive || !isOnWorkoutsTab
+            
+            if (shouldShowNav) {
                 BottomNavBar(
                     currentTab = currentTab,
                     onTabSelected = { tab ->
@@ -202,7 +244,8 @@ fun HomeScreen(
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            userScrollEnabled = !isSessionActive,
+            // Disable swipe navigation only when a workout is active on the workout tab
+            userScrollEnabled = !(isSessionActive && pagerState.currentPage == AppTab.entries.indexOf(AppTab.WORKOUTS)),
             beyondViewportPageCount = 1,
             modifier = Modifier
                 .padding(innerPadding)
@@ -236,10 +279,14 @@ fun HomeScreen(
                     recentSessions = recentSessions,
                     allExercises = allExercises,
                     allTemplates = allTemplates,
+                    activeSets = activeSets,
+                    hasActiveWorkout = hasActiveWorkout,
+                    activeTemplateId = savedProfile.activeWorkoutTemplateId,
                     unitSystem = savedProfile.unitSystem,
                     getSetsForSession = getSetsForSession,
                     getExercisesForTemplate = getExercisesForTemplate,
                     onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long? ->
+                        onClearActiveWorkout()
                         isSessionActive = false
                         onSessionSaved(date, sets, templateId, sessionId)
                     },
@@ -249,6 +296,8 @@ fun HomeScreen(
                     onSessionStateChanged = { active ->
                         isSessionActive = active
                     },
+                    onUpdateActiveWorkout = onUpdateActiveWorkout,
+                    onClearActiveWorkout = onClearActiveWorkout,
                     onCreateExercise = onCreateExercise
                 )
                 AppTab.PROFILE -> ProfileScreen(

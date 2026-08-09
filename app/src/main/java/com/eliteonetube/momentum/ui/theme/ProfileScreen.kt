@@ -273,6 +273,23 @@ fun ProfileScreen(
             // 6. App Settings Block
             ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Online Barcode Lookup", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text("Search Open Food Facts if barcode is not found locally.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = profile.useExternalApi,
+                            onCheckedChange = { onProfileUpdated(profile.copy(useExternalApi = it)) }
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                     Text("App Theme", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         AppTheme.entries.forEachIndexed { index, theme ->

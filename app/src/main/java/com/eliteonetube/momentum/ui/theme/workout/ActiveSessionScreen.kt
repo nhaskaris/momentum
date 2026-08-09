@@ -44,6 +44,7 @@ fun ActiveSessionScreen(
     getExerciseHistory: suspend (Long) -> List<LoggedSet> = { emptyList() },
     onCancel: () -> Unit,
     onFinish: (List<PendingSet>) -> Unit,
+    onUpdateActiveSets: (List<PendingSet>) -> Unit = {},
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
@@ -65,6 +66,12 @@ fun ActiveSessionScreen(
     val initialMap = remember(initialSets) { initialSets.groupBy { it.exerciseId } }
     var sessionExercises by remember { mutableStateOf(resolvedInitialExercises) }
     var setsByExercise by remember { mutableStateOf(initialMap) }
+
+    // Persist to DB whenever sets or exercises change
+    LaunchedEffect(setsByExercise, sessionExercises) {
+        val allSets = sessionExercises.flatMap { setsByExercise[it.id].orEmpty() }
+        onUpdateActiveSets(allSets)
+    }
 
     LaunchedEffect(resolvedInitialExercises, initialMap) {
         sessionExercises = resolvedInitialExercises

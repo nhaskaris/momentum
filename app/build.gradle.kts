@@ -16,8 +16,8 @@ android {
         applicationId = "com.eliteonetube.momentum"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.0.1-8"
+        versionCode = 11
+        versionName = "1.0.1-9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -59,6 +59,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.health.connect:connect-client:1.1.0-alpha12")
+
+    // Networking for External API
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     val room_version = "3.0.0"
     implementation("androidx.room3:room3-runtime:$room_version")

@@ -22,10 +22,10 @@ object NutritionScanner {
     private const val KJ_TO_KCAL_RATIO = 4.184
     private const val RATIO_TOLERANCE = 0.3 // Increased tolerance for OCR errors
 
-    private val caloriesKeyword = Regex("""(?i)(?:Total\s*)?Calories|Energy|Energija|Evépyeia""")
-    private val proteinKeyword = Regex("""(?i)(?:Total\s*)?Protein|Prot\.|Belančevine|lporeivEÇ|lpureivEc""")
-    private val fatKeyword = Regex("""(?i)(?:Total\s*)?Fat|Masti|Lipides|Amapá""")
-    private val carbsKeyword = Regex("""(?i)(?:Total\s*)?Carb(?:ohydrate)?s?|Glucides|Ugljeni\s*hidrati|Yõardv@pakE|Yöarbvepaxe""")
+    private val caloriesKeyword = Regex("""(?i)(?:Total\s*)?Calories|Energy|Energija|Ενέργεια|Θερμίδες|Evépyeia""")
+    private val proteinKeyword = Regex("""(?i)(?:Total\s*)?Protein|Prot\.|Belančevine|Πρωτεΐνη|Πρωτεΐνες|lporeivEÇ|lpureivEc""")
+    private val fatKeyword = Regex("""(?i)(?:Total\s*)?Fat|Masti|Lipides|Λιπαρά|Λίπος|Amapá""")
+    private val carbsKeyword = Regex("""(?i)(?:Total\s*)?Carb(?:ohydrate)?s?|Glucides|Ugljeni\s*hidrati|Υδατάνθρακες|Yõardv@pakE|Yöarbvepaxe""")
 
     /**
      * Attempts to extract a food name from a package front. 

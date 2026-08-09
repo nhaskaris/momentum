@@ -39,6 +39,9 @@ fun WorkoutsScreen(
     recentSessions: List<WorkoutSession>,
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
+    activeSets: List<ActiveWorkoutSet> = emptyList(),
+    activeTemplateId: Long? = null,
+    hasActiveWorkout: Boolean = false,
     unitSystem: UnitSystem,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
@@ -47,17 +50,39 @@ fun WorkoutsScreen(
     onTemplateCreated: (String, String?, exercises: List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
     onSessionStateChanged: (Boolean) -> Unit = {},
+    onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit = { _, _ -> },
+    onClearActiveWorkout: () -> Unit = {},
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
 ) {
-    var isLoggingSession by remember { mutableStateOf(false) }
-    var activeTemplateId by remember { mutableStateOf<Long?>(null) }
+    var isLoggingSession by remember(activeSets, hasActiveWorkout) {
+        mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
+    }
+    var currentActiveTemplateId by remember(activeTemplateId) { mutableStateOf(activeTemplateId) }
     var editingSessionId by remember { mutableStateOf<Long?>(null) }
     var selectedSession by remember { mutableStateOf<WorkoutSession?>(null) }
     var sessionPendingDelete by remember { mutableStateOf<WorkoutSession?>(null) }
     var showCreateTemplateDialog by remember { mutableStateOf(false) }
 
-    var initialPendingSets by remember { mutableStateOf<List<PendingSet>>(emptyList()) }
-    var initialSessionExercises by remember { mutableStateOf<List<Exercise>>(emptyList()) }
+    var initialPendingSets by remember(activeSets) {
+        mutableStateOf(
+            activeSets.map {
+                PendingSet(
+                    exerciseId = it.exerciseId,
+                    setNumber = it.setNumber,
+                    weightKg = it.weightKg,
+                    reps = it.reps,
+                    notes = it.notes,
+                    isCompleted = it.isCompleted
+                )
+            }
+        )
+    }
+    
+    var initialSessionExercises by remember(activeSets, allExercises) {
+        mutableStateOf(
+            activeSets.map { it.exerciseId }.distinct().mapNotNull { id -> allExercises.find { it.id == id } }
+        )
+    }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -73,8 +98,9 @@ fun WorkoutsScreen(
             initialSets = initialPendingSets,
             onCreateExercise = onCreateExercise,
             onCancel = {
+                onClearActiveWorkout()
                 isLoggingSession = false
-                activeTemplateId = null
+                currentActiveTemplateId = null
                 editingSessionId = null
                 initialSessionExercises = emptyList()
                 initialPendingSets = emptyList()
@@ -82,13 +108,17 @@ fun WorkoutsScreen(
             onFinish = { sets ->
                 val completedSets = sets.filter { it.isCompleted }
                 if (completedSets.isNotEmpty()) {
-                    onSessionSaved(LocalDate.now().toString(), completedSets, activeTemplateId, editingSessionId)
+                    onSessionSaved(LocalDate.now().toString(), completedSets, currentActiveTemplateId, editingSessionId)
                 }
+                onClearActiveWorkout()
                 isLoggingSession = false
-                activeTemplateId = null
+                currentActiveTemplateId = null
                 editingSessionId = null
                 initialSessionExercises = emptyList()
                 initialPendingSets = emptyList()
+            },
+            onUpdateActiveSets = { sets ->
+                onUpdateActiveWorkout(currentActiveTemplateId, sets)
             }
         )
         return
@@ -107,7 +137,7 @@ fun WorkoutsScreen(
                     val exerciseMap = allExercises.associateBy { it.id }
 
                     editingSessionId = session.id
-                    activeTemplateId = session.templateId
+                    currentActiveTemplateId = session.templateId
                     initialSessionExercises = sets.mapNotNull { exerciseMap[it.exerciseId] }.distinctBy { it.id }
                     initialPendingSets = sets.map { set ->
                         PendingSet(
@@ -119,6 +149,7 @@ fun WorkoutsScreen(
                             isCompleted = true
                         )
                     }
+                    onUpdateActiveWorkout(currentActiveTemplateId, initialPendingSets)
                     selectedSession = null
                     isLoggingSession = true
                 }
@@ -183,7 +214,6 @@ fun WorkoutsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Hero Section
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,14 +250,14 @@ fun WorkoutsScreen(
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // QUICK START BUTTON
             item {
                 Button(
                     onClick = {
-                        activeTemplateId = null
                         editingSessionId = null
+                        currentActiveTemplateId = null
                         initialSessionExercises = emptyList()
                         initialPendingSets = emptyList()
+                        onUpdateActiveWorkout(null, emptyList())
                         isLoggingSession = true
                     },
                     modifier = Modifier.fillMaxWidth().height(64.dp),
@@ -240,7 +270,6 @@ fun WorkoutsScreen(
                 }
             }
 
-            // SAVED ROUTINES
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -280,7 +309,7 @@ fun WorkoutsScreen(
                         template = template,
                         onStartRoutine = {
                             coroutineScope.launch {
-                                activeTemplateId = template.id
+                                currentActiveTemplateId = template.id
                                 val templateExercises = getExercisesForTemplate(template.id)
                                 val exerciseMap = allExercises.associateBy { it.id }
                                 initialSessionExercises = templateExercises.mapNotNull { exerciseMap[it.exerciseId] }
@@ -289,6 +318,7 @@ fun WorkoutsScreen(
                                         PendingSet(exerciseId = te.exerciseId, setNumber = sn, weightKg = te.targetWeightKg, reps = te.targetReps)
                                     }
                                 }
+                                onUpdateActiveWorkout(currentActiveTemplateId, initialPendingSets)
                                 isLoggingSession = true
                             }
                         },
@@ -297,7 +327,6 @@ fun WorkoutsScreen(
                 }
             }
 
-            // RECENT SESSIONS
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -422,6 +451,9 @@ private fun SessionCardItem(
     unitSystem: UnitSystem,
     onClick: () -> Unit
 ) {
+    val formattedDate = remember(session.date) {
+        formatToPhoneDate(session.date)
+    }
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
@@ -433,7 +465,7 @@ private fun SessionCardItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(text = formatToPhoneDate(session.date), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(text = formattedDate, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${session.exerciseCount} exercises • ${session.setCount} sets",
                     style = MaterialTheme.typography.bodyMedium,

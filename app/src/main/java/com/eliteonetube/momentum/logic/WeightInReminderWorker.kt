@@ -25,7 +25,12 @@ class WeighInReminderWorker(
                 WeightDatabase.MIGRATION_15_16,
                 WeightDatabase.MIGRATION_16_17,
                 WeightDatabase.MIGRATION_17_18,
-                WeightDatabase.MIGRATION_18_19
+                WeightDatabase.MIGRATION_18_19,
+                WeightDatabase.MIGRATION_19_20,
+                WeightDatabase.MIGRATION_20_21,
+                WeightDatabase.MIGRATION_21_22,
+                WeightDatabase.MIGRATION_22_23,
+                WeightDatabase.MIGRATION_23_24
             ).fallbackToDestructiveMigration().build()
 
             val dao = database.weightDao()

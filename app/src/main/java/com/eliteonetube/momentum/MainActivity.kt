@@ -2,6 +2,7 @@ package com.eliteonetube.momentum
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -23,18 +24,37 @@ import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val ACTION_OPEN_ACTIVE_WORKOUT = "com.eliteonetube.momentum.action.OPEN_ACTIVE_WORKOUT"
+    }
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
 
+    private val openWorkoutRequests = MutableStateFlow(0)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
+            openWorkoutRequests.value++
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
+            openWorkoutRequests.value++
+        }
 
         // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -59,6 +79,9 @@ class MainActivity : ComponentActivity() {
             WeightDatabase.MIGRATION_18_19,
             WeightDatabase.MIGRATION_19_20,
             WeightDatabase.MIGRATION_20_21,
+            WeightDatabase.MIGRATION_21_22,
+            WeightDatabase.MIGRATION_22_23,
+            WeightDatabase.MIGRATION_23_24,
         ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
@@ -85,12 +108,14 @@ class MainActivity : ComponentActivity() {
                     val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
                     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
 
+                    val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
+                    val openWorkoutRequest by openWorkoutRequests.collectAsState()
+
                     val today = remember { LocalDate.now().toString() }
                     val todayFoodLogs by foodDao.getFoodLogsForDate(today).collectAsState(initial = emptyList())
                     val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
 
                     var isProfileLoaded by remember { mutableStateOf(false) }
-
                     var currentCalorieTarget by remember { mutableIntStateOf(2000) }
 
                     val currentStreak = remember(allWeightDates) { StreakCalculator.currentStreak(allWeightDates) }
@@ -119,6 +144,9 @@ class MainActivity : ComponentActivity() {
                             allCheckIns = allCheckIns,
                             todayFoodLogs = todayFoodLogs,
                             allFoodItems = allFoodItems,
+                            activeSets = activeSets,
+                            hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
+                            openWorkoutRequest = openWorkoutRequest,
                             currentStreak = currentStreak,
                             totalDaysLogged = allWeightDates.size,
                             loggedDates = loggedDates,
@@ -155,8 +183,6 @@ class MainActivity : ComponentActivity() {
                                         bodyFatPercentage = updatedProfile.bodyFatPercentage
                                     )
                                     
-                                    // If user is on a maintenance goal, we should update their current target 
-                                    // to match the new maintenance estimate immediately.
                                     var finalProfile = updatedProfile.copy(estimatedMaintenanceCalories = recalculated)
                                     if (finalProfile.goal == Goal.MAINTAIN) {
                                         finalProfile = finalProfile.copy(currentCalorieTarget = recalculated)
@@ -288,12 +314,44 @@ class MainActivity : ComponentActivity() {
                             onGetFoodByBarcode = { barcode ->
                                 foodDao.getFoodItemByBarcode(barcode)
                             },
+                            onUpdateActiveWorkout = { templateId, sets ->
+                                coroutineScope.launch {
+                                    weightDao.saveProfile(
+                                        savedProfile!!.copy(
+                                            activeWorkoutTemplateId = templateId,
+                                            hasActiveWorkout = true
+                                        )
+                                    )
+                                    workoutDao.clearActiveSets()
+                                    sets.forEach { pendingSet ->
+                                        workoutDao.insertActiveSet(
+                                            ActiveWorkoutSet(
+                                                exerciseId = pendingSet.exerciseId,
+                                                setNumber = pendingSet.setNumber,
+                                                weightKg = pendingSet.weightKg,
+                                                reps = pendingSet.reps,
+                                                notes = pendingSet.notes,
+                                                isCompleted = pendingSet.isCompleted
+                                            )
+                                        )
+                                    }
+                                }
+                            },
+                            onClearActiveWorkout = {
+                                coroutineScope.launch {
+                                    weightDao.saveProfile(
+                                        savedProfile!!.copy(
+                                            activeWorkoutTemplateId = null,
+                                            hasActiveWorkout = false
+                                        )
+                                    )
+                                    workoutDao.clearActiveSets()
+                                }
+                            },
                             onCheckInCompleted = { weight, photos ->
                                 savedProfile?.let { profile ->
                                     coroutineScope.launch {
                                         val today = LocalDate.now().toString()
-                                        
-                                        // 1. Insert Weight
                                         weightDao.insertWeight(
                                             WeightEntry(
                                                 date = today,
@@ -301,8 +359,6 @@ class MainActivity : ComponentActivity() {
                                                 calorieTargetAtEntry = profile.pendingCalorieTarget ?: profile.currentCalorieTarget
                                             )
                                         )
-                                        
-                                        // 2. Save CheckIn Record
                                         weightDao.insertCheckIn(
                                             CheckIn(
                                                 date = today,
@@ -315,8 +371,6 @@ class MainActivity : ComponentActivity() {
                                                 adjustmentReason = profile.pendingAdjustmentReason ?: "Weekly Check-in"
                                             )
                                         )
-
-                                        // 3. Update Profile
                                         weightDao.saveProfile(
                                             profile.copy(
                                                 currentCalorieTarget = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
@@ -377,19 +431,13 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
 
-                                    // If this session was started from a routine, update the routine's 
-                                    // default weights/reps to reflect what was just lifted.
                                     templateId?.let { tid: Long ->
                                         val uniqueExerciseIds = sets.map { it.exerciseId }.distinct()
-
                                         uniqueExerciseIds.forEach { exId ->
                                             val exerciseSets = sets.filter { it.exerciseId == exId }
                                             if (exerciseSets.isNotEmpty()) {
-                                                val avgReps = (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size)
-                                                    .let { Math.round(it).toInt() }
+                                                val avgReps = (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size).let { Math.round(it).toInt() }
                                                 val avgWeight = exerciseSets.sumOf { it.weightKg } / exerciseSets.size
-
-                                                // Update existing template exercise record
                                                 workoutDao.updateTemplateExerciseTargets(
                                                     templateId = tid,
                                                     exerciseId = exId,
@@ -423,7 +471,8 @@ class MainActivity : ComponentActivity() {
                                             currentCalorieTarget = initialTarget,
                                             unitSystem = unitSystem,
                                             bodyFatPercentage = bf,
-                                            useHealthConnect = useHC
+                                            useHealthConnect = useHC,
+                                            useExternalApi = false
                                         )
                                     )
                                     weightDao.insertWeight(
