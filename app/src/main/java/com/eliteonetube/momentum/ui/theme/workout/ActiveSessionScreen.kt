@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -18,7 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +37,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.eliteonetube.momentum.ui.theme.MomentumGlass
+import com.eliteonetube.momentum.ui.theme.bounceClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -331,46 +336,58 @@ private fun ActiveWorkoutProgressCard(
 ) {
     val progress = if (exerciseCount == 0) 0f else (currentStepIndex.coerceAtMost(exerciseCount).toFloat() / exerciseCount)
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)),
+        tonalElevation = 1.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        if (isFinishStep) "READY TO REVIEW" else "NOW TRAINING",
+                        if (isFinishStep) "READY TO REVIEW" else "TRAINING SESSION",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.5.sp
                     )
                     Text(
-                        if (isFinishStep) "Review your workout" else "Exercise ${currentStepIndex + 1} of $exerciseCount",
-                        style = MaterialTheme.typography.titleLarge,
+                        if (isFinishStep) "Review Workout" else "Exercise ${currentStepIndex + 1} of $exerciseCount",
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
                         maxLines = 1
                     )
                 }
-                Text(
-                    "$completedSets",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "$completedSets sets",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                strokeCap = StrokeCap.Round
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
-                "Completed sets  •  $volumeDisplay total volume",
+                "Cumulative Volume: $volumeDisplay",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -382,27 +399,97 @@ private fun RestTimerOverlay(
     onAdjust: (Long) -> Unit,
     onStop: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).animateContentSize(),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 8.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("REST IN PROGRESS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
-                Text(
-                    text = if (timeLeft > 0) "%d:%02d".format(timeLeft / 60, timeLeft % 60) else "GO!",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalIconButton(onClick = { onAdjust(15) }, modifier = Modifier.size(44.dp)) { Text("+15", fontSize = 10.sp) }
-                IconButton(onClick = onStop, colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.error)) {
-                    Icon(Icons.Default.Close, null)
+        Surface(
+            modifier = Modifier
+                .height(72.dp)
+                .fillMaxWidth()
+                .animateContentSize(),
+            color = MomentumGlass.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(36.dp),
+            shadowElevation = 12.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                width = 0.5.dp,
+                color = Color.White.copy(alpha = 0.2f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Stop/Close Button
+                IconButton(
+                    onClick = onStop,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                            shape = CircleShape
+                        )
+                        .bounceClick(onStop)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Stop rest timer",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(16.dp))
+
+                // Time Display
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "RESTING",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.5.sp
+                    )
+                    Text(
+                        text = if (timeLeft > 0) "%d:%02d".format(timeLeft / 60, timeLeft % 60) else "GO!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = if (timeLeft > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Adjustment Buttons
+                Row(
+                    modifier = Modifier.padding(end = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalIconButton(
+                        onClick = { onAdjust(-15) },
+                        modifier = Modifier.size(44.dp).bounceClick { onAdjust(-15) },
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text("-15", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+
+                    FilledTonalIconButton(
+                        onClick = { onAdjust(15) },
+                        modifier = Modifier.size(44.dp).bounceClick { onAdjust(15) },
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("+15", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -426,21 +513,24 @@ private fun WorkoutStepBar(
             val isSelected = currentStepIndex == index
             val setsLogged = setsByExercise[exercise.id].orEmpty().filter { it.isCompleted }.size
             
-            FilterChip(
-                selected = isSelected,
-                onClick = { onStepSelected(index) },
-                label = { Text("${index + 1}") },
-                leadingIcon = {
-                    if (setsLogged > 0) Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
-                },
-                modifier = Modifier.semantics { contentDescription = "Exercise ${index + 1}: ${exercise.name}" },
-                shape = RoundedCornerShape(14.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onStepSelected(index) },
+                    label = { Text("${index + 1}", fontWeight = FontWeight.Black) },
+                    leadingIcon = {
+                        if (setsLogged > 0) Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(14.dp))
+                    },
+                    modifier = Modifier.semantics { contentDescription = "Exercise ${index + 1}: ${exercise.name}" },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    border = null
                 )
-            )
         }
         item {
             FilterChip(
