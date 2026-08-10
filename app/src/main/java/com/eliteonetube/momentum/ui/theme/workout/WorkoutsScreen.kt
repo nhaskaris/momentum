@@ -1,7 +1,7 @@
 package com.eliteonetube.momentum.ui.workout
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.ui.theme.bounceClick
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -230,13 +231,13 @@ fun WorkoutsScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "Workouts",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 60.sp),
+                    "Train",
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 44.sp),
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    "Consistency is key",
+                    "Pick a routine or build your own session.",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -260,13 +261,13 @@ fun WorkoutsScreen(
                         onUpdateActiveWorkout(null, emptyList())
                         isLoggingSession = true
                     },
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
                     shape = RoundedCornerShape(20.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Start Empty Workout", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Start workout", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             }
 
@@ -296,7 +297,7 @@ fun WorkoutsScreen(
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Text(
-                            "No routines saved yet.",
+                            "Save a routine to make your next workout one tap away.",
                             modifier = Modifier.padding(24.dp),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -352,7 +353,7 @@ fun WorkoutsScreen(
                 }
             }
             
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(120.dp)) }
         }
     }
 
@@ -377,8 +378,11 @@ private fun TemplateItemCard(
     onStartRoutine: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    var showMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -395,8 +399,20 @@ private fun TemplateItemCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, "Routine options", modifier = Modifier.size(20.dp))
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Delete routine", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                showDeleteConfirmation = true
+                            }
+                        )
+                    }
                 }
                 Button(
                     onClick = onStartRoutine,
@@ -409,6 +425,21 @@ private fun TemplateItemCard(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete routine?") },
+            text = { Text("${template.name} will be removed. Your completed workout history will stay intact.") },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteConfirmation = false; onDelete() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Keep routine") } }
+        )
     }
 }
 
@@ -455,7 +486,7 @@ private fun SessionCardItem(
         formatToPhoneDate(session.date)
     }
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).bounceClick(onClick),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

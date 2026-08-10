@@ -33,6 +33,7 @@ import com.eliteonetube.momentum.data.FoodItem
 import com.eliteonetube.momentum.data.FoodLogWithItem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
+import com.eliteonetube.momentum.ui.theme.bounceClick
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -97,7 +98,10 @@ fun NutritionScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
                 Text(
                     text = "${(calorieTarget - caloriesConsumed).roundToInt()}",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = 72.sp,
+                        letterSpacing = (-4).sp
+                    ),
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -118,11 +122,10 @@ fun NutritionScreen(
         }
 
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            // Action Buttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = { showFoodSearch = true },
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    modifier = Modifier.weight(1f).height(56.dp).bounceClick(),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
@@ -132,7 +135,7 @@ fun NutritionScreen(
                 }
                 Button(
                     onClick = onStartScan,
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    modifier = Modifier.weight(1f).height(56.dp).bounceClick(),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -195,7 +198,7 @@ fun NutritionScreen(
                 color = MaterialTheme.colorScheme.secondary
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
         }
     }
 }
@@ -278,7 +281,7 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .bounceClick { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

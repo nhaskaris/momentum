@@ -1,6 +1,7 @@
 package com.eliteonetube.momentum.ui.workout
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -43,10 +44,10 @@ fun ExerciseSetLogger(
     var showMenu by remember { mutableStateOf(false) }
     val unitLabel = if (unitSystem == UnitSystem.IMPERIAL) "lbs" else "kg"
 
-    Card(
+    ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             Row(
@@ -56,7 +57,19 @@ fun ExerciseSetLogger(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = exercise.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                    Text(text = exercise.targetMuscleGroup.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = exercise.targetMuscleGroup.uppercase(),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
                 }
                 Box {
                     IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null) }
@@ -83,7 +96,7 @@ fun ExerciseSetLogger(
                         Icon(Icons.Default.History, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "PREVIOUS: " + lastSets.joinToString(", ") { set ->
+                            text = "Last session  •  " + lastSets.joinToString(", ") { set ->
                                 val w = if (unitSystem == UnitSystem.IMPERIAL) "${(set.weightKg * 2.20462).toInt()} lb" else "${set.weightKg.toInt()} kg"
                                 "$w × ${set.reps}"
                             },
@@ -112,14 +125,14 @@ fun ExerciseSetLogger(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
+            FilledTonalButton(
                 onClick = {
                     val last = sets.lastOrNull()
                     onSetAdded(PendingSet(exerciseId = exercise.id, setNumber = sets.size + 1, weightKg = last?.weightKg ?: 0.0, reps = last?.reps ?: 10))
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.primary)
+                colors = ButtonDefaults.filledTonalButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
             ) {
                 Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -151,12 +164,12 @@ private fun SetInputRow(
 
     val bgColor = if (set.isCompleted) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
 
-    Column(modifier = Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(16.dp)).padding(6.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize().background(bgColor, RoundedCornerShape(16.dp)).padding(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { onUpdate(set.copy(isCompleted = !set.isCompleted)) }, modifier = Modifier.size(40.dp)) {
                 Icon(
                     if (set.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    null,
+                    if (set.isCompleted) "Mark set ${set.setNumber} incomplete" else "Complete set ${set.setNumber}",
                     tint = if (set.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                 )
             }

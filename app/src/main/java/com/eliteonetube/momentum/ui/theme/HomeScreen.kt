@@ -1,10 +1,12 @@
 package com.eliteonetube.momentum.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.nutrition.FoodScannerScreen
@@ -17,6 +19,7 @@ import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
 import com.eliteonetube.momentum.ui.theme.onboarding.IntroScreen
 import com.eliteonetube.momentum.ui.theme.onboarding.OnboardingScreen
+import com.eliteonetube.momentum.ui.theme.MomentumDark
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -38,6 +41,7 @@ fun HomeScreen(
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
+    onIntentReceived: (((android.content.Intent) -> Unit) -> Unit)? = null,
     onWeightSubmitted: (Double) -> Unit,
     onPastWeightSubmitted: (date: String, weight: Double) -> Unit,
     onWeightDeleted: (String) -> Unit,
@@ -228,35 +232,14 @@ fun HomeScreen(
     }
 
     var showHistoryModal by remember { mutableStateOf(false) }
-
     val currentTab = AppTab.entries[pagerState.currentPage]
 
-    Scaffold(
-        bottomBar = {
-            // Only hide navigation if we are actually ON the Workouts tab AND a session is active
-            val isOnWorkoutsTab = pagerState.currentPage == AppTab.entries.indexOf(AppTab.WORKOUTS)
-            val shouldShowNav = !isSessionActive || !isOnWorkoutsTab
-            
-            if (shouldShowNav) {
-                BottomNavBar(
-                    currentTab = currentTab,
-                    onTabSelected = { tab ->
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
-                        }
-                    }
-                )
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize().background(MomentumDark)) {
         HorizontalPager(
             state = pagerState,
-            // Disable swipe navigation only when a workout is active on the workout tab
-            userScrollEnabled = !(isSessionActive && pagerState.currentPage == AppTab.entries.indexOf(AppTab.WORKOUTS)),
+            userScrollEnabled = !(isSessionActive && currentTab == AppTab.WORKOUTS),
             beyondViewportPageCount = 1,
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             when (AppTab.entries[page]) {
                 AppTab.DASHBOARD -> MainDashboard(
@@ -315,6 +298,27 @@ fun HomeScreen(
                     onProfileUpdated = onProfileUpdated,
                     onGoalChanged = onGoalChanged,
                     onViewGallery = { showGallery = true }
+                )
+            }
+        }
+
+        // Floating Navigation Bar
+        val isOnWorkoutsTab = currentTab == AppTab.WORKOUTS
+        val shouldShowNav = !isSessionActive || !isOnWorkoutsTab
+        
+        if (shouldShowNav) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+            ) {
+                BottomNavBar(
+                    currentTab = currentTab,
+                    onTabSelected = { tab ->
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
+                        }
+                    }
                 )
             }
         }

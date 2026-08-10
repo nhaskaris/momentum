@@ -6,10 +6,12 @@ val MomentumBlue = Color(0xFF00B4D8)
 val MomentumCyan = Color(0xFF48CAE4)
 val MomentumDark = Color(0xFF0B0D0F)
 val MomentumSurface = Color(0xFF161B1F)
+val MomentumGlass = Color(0xCC161B1F) // 80% opacity
 
-val ProteinBlue = Color(0xFF0077B6)
-val FatYellow = Color(0xFFF9C74F)
-val CarbGreen = Color(0xFF43AA8B)
+val ProteinBlue = Color(0xFF00B4D8) // Unified with Momentum Blue for cleaner look
+val FatYellow = Color(0xFFFFD166) // Warmer yellow
+val CarbGreen = Color(0xFF06D6A0) // Vibrant mint green
+val CalorieRed = Color(0xFFEF476F) // Soft red for over-limit
 
 // Legacy colors for compatibility if needed
 val Purple80 = Color(0xFFD0BCFF)

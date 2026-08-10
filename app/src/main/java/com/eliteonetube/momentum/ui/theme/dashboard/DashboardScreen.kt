@@ -24,6 +24,7 @@ import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.Units
+import com.eliteonetube.momentum.ui.theme.bounceClick
 import java.time.LocalDate
 
 @Composable
@@ -83,7 +84,10 @@ fun MainDashboard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     "$calorieTarget",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 80.sp),
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = 80.sp,
+                        letterSpacing = (-4).sp // Tighter tracking for "Apple" look
+                    ),
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -211,19 +215,19 @@ fun MainDashboard(
                                 ) { Text("Cancel") }
                             }
                             Button(
-                                onClick = {
-                                    parsedWeightKg?.let {
-                                        onWeightSubmitted(it)
-                                        weightInput = ""
-                                        isEditingToday = false
-                                    }
-                                },
-                                enabled = parsedWeightKg != null,
-                                modifier = Modifier.weight(1.5f).height(50.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Save Weight", fontWeight = FontWeight.Bold)
-                            }
+                            onClick = {
+                                parsedWeightKg?.let {
+                                    onWeightSubmitted(it)
+                                    weightInput = ""
+                                    isEditingToday = false
+                                }
+                            },
+                            enabled = parsedWeightKg != null,
+                            modifier = Modifier.weight(1.5f).height(50.dp).bounceClick(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Save Weight", fontWeight = FontWeight.Bold)
+                        }
                         }
                     }
                 }
@@ -238,7 +242,7 @@ fun MainDashboard(
                 loggedDates = loggedDates
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
         }
     }
 }

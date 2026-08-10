@@ -305,7 +305,7 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
         }
     }
 }

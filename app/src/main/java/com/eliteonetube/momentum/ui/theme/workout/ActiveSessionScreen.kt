@@ -1,12 +1,12 @@
 package com.eliteonetube.momentum.ui.workout
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,13 +14,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +29,10 @@ import com.eliteonetube.momentum.logic.RestTimerService
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +48,7 @@ fun ActiveSessionScreen(
     onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     var showExercisePicker by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
     
@@ -104,6 +105,7 @@ fun ActiveSessionScreen(
 
     val allSets = remember(setsByExercise, sessionExercises) { sessionExercises.flatMap { setsByExercise[it.id].orEmpty() } }
     val totalVolumeKg = allSets.sumOf { it.weightKg * it.reps }
+    val completedSets = allSets.count { it.isCompleted }
 
     val volumeDisplay = if (unitSystem == UnitSystem.IMPERIAL) {
         "${(totalVolumeKg * 2.20462).toInt()} lbs"
@@ -157,17 +159,28 @@ fun ActiveSessionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Active Session", fontWeight = FontWeight.Black) },
+                title = {
+                    Column {
+                        Text("Workout", fontWeight = FontWeight.Black)
+                        if (sessionExercises.isNotEmpty()) {
+                            Text(
+                                "$completedSets completed set${if (completedSets == 1) "" else "s"}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { if (allSets.isNotEmpty()) showCancelConfirm = true else onCancel() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Cancel")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "End workout")
                     }
                 },
                 actions = {
                     TextButton(onClick = { showExercisePicker = true }) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Add", fontWeight = FontWeight.Bold)
+                        Text("Exercise", fontWeight = FontWeight.Bold)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -210,7 +223,7 @@ fun ActiveSessionScreen(
                                 modifier = Modifier.weight(2f).height(56.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Text(if (currentStepIndex == sessionExercises.size - 1) "Summary" else "Next Exercise", fontWeight = FontWeight.Bold)
+                                Text(if (currentStepIndex == sessionExercises.size - 1) "Review workout" else "Next exercise", fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.width(8.dp))
                                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                             }
@@ -222,33 +235,14 @@ fun ActiveSessionScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // Hero Progress Section
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), Color.Transparent)))
-                    .padding(bottom = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (isFinishStep) "READY TO FINISH" else "SESSION IN PROGRESS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = volumeDisplay,
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text("Current Volume", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-
             if (sessionExercises.isNotEmpty()) {
+                ActiveWorkoutProgressCard(
+                    currentStepIndex = currentStepIndex,
+                    exerciseCount = sessionExercises.size,
+                    completedSets = completedSets,
+                    volumeDisplay = volumeDisplay,
+                    isFinishStep = isFinishStep
+                )
                 WorkoutStepBar(
                     exercises = sessionExercises,
                     setsByExercise = setsByExercise,
@@ -262,61 +256,121 @@ fun ActiveSessionScreen(
                     EmptyWorkoutStateCard(onAddExerciseClick = { showExercisePicker = true })
                 }
             } else {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    pageSpacing = 16.dp
-                ) { page ->
-                    if (page >= sessionExercises.size) {
-                        WorkoutSummaryStep(
-                            totalSets = allSets.size,
-                            totalReps = allSets.sumOf { it.reps },
-                            totalVolumeDisplay = volumeDisplay,
-                            exercises = sessionExercises,
-                            setsByExercise = setsByExercise,
-                            onEditExerciseStep = { idx -> coroutineScope.launch { pagerState.animateScrollToPage(idx) } }
-                        )
-                    } else {
-                        val currentExercise = sessionExercises[page]
-                        ExerciseSetLogger(
-                            exercise = currentExercise,
-                            sets = setsByExercise[currentExercise.id].orEmpty(),
-                            historySets = exerciseHistoryMap[currentExercise.id] ?: emptyList(),
-                            unitSystem = unitSystem,
-                            onSetAdded = { s ->
-                                val list = setsByExercise[currentExercise.id].orEmpty()
-                                setsByExercise = setsByExercise + (currentExercise.id to (list + s))
-                            },
-                            onSetUpdated = { sn, upd ->
-                                val oldList = setsByExercise[currentExercise.id].orEmpty()
-                                val oldSet = oldList.find { it.setNumber == sn }
-                                val list = oldList.map { if (it.setNumber == sn) upd else it }
-                                setsByExercise = setsByExercise + (currentExercise.id to list)
-                                if (oldSet?.isCompleted == false && upd.isCompleted) {
-                                    RestTimerService.startTimer(context, restTimerSeconds)
+                Box(modifier = Modifier.weight(1f)) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        pageSpacing = 12.dp
+                    ) { page ->
+                        if (page >= sessionExercises.size) {
+                            WorkoutSummaryStep(
+                                totalSets = allSets.size,
+                                totalReps = allSets.sumOf { it.reps },
+                                totalVolumeDisplay = volumeDisplay,
+                                exercises = sessionExercises,
+                                setsByExercise = setsByExercise,
+                                onEditExerciseStep = { idx -> coroutineScope.launch { pagerState.animateScrollToPage(idx) } }
+                            )
+                        } else {
+                            val currentExercise = sessionExercises[page]
+                            ExerciseSetLogger(
+                                exercise = currentExercise,
+                                sets = setsByExercise[currentExercise.id].orEmpty(),
+                                historySets = exerciseHistoryMap[currentExercise.id] ?: emptyList(),
+                                unitSystem = unitSystem,
+                                onSetAdded = { s ->
+                                    val list = setsByExercise[currentExercise.id].orEmpty()
+                                    setsByExercise = setsByExercise + (currentExercise.id to (list + s))
+                                },
+                                onSetUpdated = { sn, upd ->
+                                    val oldList = setsByExercise[currentExercise.id].orEmpty()
+                                    val oldSet = oldList.find { it.setNumber == sn }
+                                    val list = oldList.map { if (it.setNumber == sn) upd else it }
+                                    setsByExercise = setsByExercise + (currentExercise.id to list)
+                                    if (oldSet?.isCompleted == false && upd.isCompleted) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        RestTimerService.startTimer(context, restTimerSeconds)
+                                    }
+                                },
+                                onSetRemoved = { sn ->
+                                    val list = setsByExercise[currentExercise.id].orEmpty().filterNot { it.setNumber == sn }.mapIndexed { i, ps -> ps.copy(setNumber = i + 1) }
+                                    setsByExercise = setsByExercise + (currentExercise.id to list)
+                                },
+                                onExerciseRemoved = {
+                                    sessionExercises = sessionExercises.filterNot { it.id == currentExercise.id }
+                                    setsByExercise = setsByExercise - currentExercise.id
                                 }
-                            },
-                            onSetRemoved = { sn ->
-                                val list = setsByExercise[currentExercise.id].orEmpty().filterNot { it.setNumber == sn }.mapIndexed { i, ps -> ps.copy(setNumber = i + 1) }
-                                setsByExercise = setsByExercise + (currentExercise.id to list)
-                            },
-                            onExerciseRemoved = {
-                                sessionExercises = sessionExercises.filterNot { it.id == currentExercise.id }
-                                setsByExercise = setsByExercise - currentExercise.id
-                            }
-                        )
+                            )
+                        }
+                    }
+
+                    if (timerActive) {
+                        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                            RestTimerOverlay(
+                                timeLeft = timeLeft,
+                                onAdjust = { d -> RestTimerService.adjustTimer(context, d) },
+                                onStop = { RestTimerService.stopTimer(context) }
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
 
-                if (timerActive) {
-                    RestTimerOverlay(
-                        timeLeft = timeLeft,
-                        onAdjust = { d -> RestTimerService.adjustTimer(context, d) },
-                        onStop = { RestTimerService.stopTimer(context) }
+@Composable
+private fun ActiveWorkoutProgressCard(
+    currentStepIndex: Int,
+    exerciseCount: Int,
+    completedSets: Int,
+    volumeDisplay: String,
+    isFinishStep: Boolean
+) {
+    val progress = if (exerciseCount == 0) 0f else (currentStepIndex.coerceAtMost(exerciseCount).toFloat() / exerciseCount)
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (isFinishStep) "READY TO REVIEW" else "NOW TRAINING",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        if (isFinishStep) "Review your workout" else "Exercise ${currentStepIndex + 1} of $exerciseCount",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1
                     )
                 }
+                Text(
+                    "$completedSets",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Completed sets  •  $volumeDisplay total volume",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -328,7 +382,7 @@ private fun RestTimerOverlay(
     onStop: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp).animateContentSize(),
         color = MaterialTheme.colorScheme.primaryContainer,
         shape = RoundedCornerShape(24.dp),
         shadowElevation = 8.dp,
@@ -336,7 +390,7 @@ private fun RestTimerOverlay(
     ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Rest Timer", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("REST IN PROGRESS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
                 Text(
                     text = if (timeLeft > 0) "%d:%02d".format(timeLeft / 60, timeLeft % 60) else "GO!",
                     style = MaterialTheme.typography.headlineLarge,
@@ -374,10 +428,11 @@ private fun WorkoutStepBar(
             FilterChip(
                 selected = isSelected,
                 onClick = { onStepSelected(index) },
-                label = { Text(exercise.name) },
+                label = { Text("${index + 1}") },
                 leadingIcon = {
                     if (setsLogged > 0) Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
                 },
+                modifier = Modifier.semantics { contentDescription = "Exercise ${index + 1}: ${exercise.name}" },
                 shape = RoundedCornerShape(14.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
