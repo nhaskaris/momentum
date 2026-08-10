@@ -262,6 +262,9 @@ interface WeightDao {
     @Query("SELECT * FROM weight_table ORDER BY date DESC LIMIT 14")
     fun getLastTwoWeeks(): Flow<List<WeightEntry>>
 
+    @Query("SELECT * FROM weight_table ORDER BY date DESC")
+    fun getAllWeights(): Flow<List<WeightEntry>>
+
     @Query("SELECT EXISTS(SELECT 1 FROM weight_table WHERE date = :date)")
     suspend fun hasWeightForDate(date: String): Boolean
 

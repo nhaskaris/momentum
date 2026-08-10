@@ -17,6 +17,7 @@ import com.eliteonetube.momentum.logic.ExternalFoodApi
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.workout.PendingSet
 import com.eliteonetube.momentum.ui.workout.WorkoutsScreen
+import com.eliteonetube.momentum.ui.statistics.StatisticsScreen
 import com.eliteonetube.momentum.ui.theme.onboarding.IntroScreen
 import com.eliteonetube.momentum.ui.theme.onboarding.OnboardingScreen
 import com.eliteonetube.momentum.ui.theme.MomentumDark
@@ -28,6 +29,7 @@ fun HomeScreen(
     currentCalorieTarget: Int,
     savedProfile: UserProfile?,
     recentWeights: List<WeightEntry>,
+    allWeights: List<WeightEntry> = emptyList(),
     recentSessions: List<WorkoutSession>,
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
@@ -253,6 +255,11 @@ fun HomeScreen(
                     onAdjustmentAccepted = onAdjustmentAccepted,
                     onAdjustmentDismissed = onAdjustmentDismissed,
                     onStartCheckIn = { showCheckIn = true }
+                )
+                AppTab.STATISTICS -> StatisticsScreen(
+                    weights = allWeights,
+                    recentSessions = recentSessions,
+                    unitSystem = savedProfile.unitSystem
                 )
                 AppTab.NUTRITION -> NutritionScreen(
                     calorieTarget = currentCalorieTarget,

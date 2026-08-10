@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Restaurant
@@ -30,6 +31,7 @@ import com.eliteonetube.momentum.ui.theme.bounceClick
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     DASHBOARD("Home", Icons.Default.Home),
+    STATISTICS("Stats", Icons.Default.BarChart),
     NUTRITION("Eat", Icons.Default.Restaurant),
     WORKOUTS("Train", Icons.Default.FitnessCenter),
     PROFILE("Me", Icons.Default.AccountCircle)

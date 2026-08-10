@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
                     val coroutineScope = rememberCoroutineScope()
 
                     val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
+                    val allWeights by weightDao.getAllWeights().collectAsState(initial = emptyList())
                     val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
                     val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
                     val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
@@ -148,6 +149,7 @@ class MainActivity : ComponentActivity() {
                             currentCalorieTarget = currentCalorieTarget,
                             savedProfile = savedProfile,
                             recentWeights = recentWeights,
+                            allWeights = allWeights,
                             recentSessions = recentSessions,
                             allExercises = allExercises,
                             allTemplates = allTemplates,
