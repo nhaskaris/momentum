@@ -1,9 +1,14 @@
 package com.eliteonetube.momentum.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,6 +39,10 @@ import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.CoachAlgorithm
 import com.eliteonetube.momentum.logic.HealthConnectManager
 import com.eliteonetube.momentum.logic.Units
+import com.eliteonetube.momentum.logic.WeightHistoryParser
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 private data class GoalOption(val goal: Goal, val label: String, val description: String)
 
@@ -52,10 +61,33 @@ fun ProfileScreen(
     onWeightClick: () -> Unit,
     onProfileUpdated: (UserProfile) -> Unit,
     onGoalChanged: (Goal) -> Unit,
-    onViewGallery: () -> Unit
+    onViewGallery: () -> Unit,
+    onWeightsImported: (List<WeightEntry>) -> Unit = {}
 ) {
+    val context = LocalContext.current
     var isEditing by remember { mutableStateOf(false) }
     var showChangeGoalDialog by remember { mutableStateOf(false) }
+    var detectedWeights by remember { mutableStateOf<List<WeightEntry>?>(null) }
+    var isProcessingImage by remember { mutableStateOf(false) }
+
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            isProcessingImage = true
+            val image = InputImage.fromFilePath(context, it)
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    val parsed = WeightHistoryParser.parse(visionText)
+                    detectedWeights = parsed
+                    isProcessingImage = false
+                }
+                .addOnFailureListener {
+                    isProcessingImage = false
+                }
+        }
+    }
 
     if (isEditing) {
         EditProfileForm(
@@ -76,6 +108,17 @@ fun ProfileScreen(
             onConfirm = { newGoal ->
                 onGoalChanged(newGoal)
                 showChangeGoalDialog = false
+            }
+        )
+    }
+
+    detectedWeights?.let { weights ->
+        ConfirmImportDialog(
+            weights = weights,
+            onDismiss = { detectedWeights = null },
+            onConfirm = { selected ->
+                onWeightsImported(selected)
+                detectedWeights = null
             }
         )
     }
@@ -248,6 +291,32 @@ fun ProfileScreen(
                 }
             }
 
+            // Data Import Block
+            ProfileBlock(title = "Data Management", icon = Icons.Default.FileDownload) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Import your past weight data from other health apps using a screenshot.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { pickerLauncher.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = !isProcessingImage
+                    ) {
+                        if (isProcessingImage) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Import from Screenshot", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             // 5. Progress Gallery Block
             if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
                 ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
@@ -402,6 +471,64 @@ private fun ProfileStatRow(
         }
         Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = valueColor)
     }
+}
+
+@Composable
+private fun ConfirmImportDialog(
+    weights: List<WeightEntry>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<WeightEntry>) -> Unit
+) {
+    var selectedEntries by remember { mutableStateOf(weights.toSet()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm Data Import", fontWeight = FontWeight.Black) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("We found ${weights.size} entries. Select which ones to import:", style = MaterialTheme.typography.bodyMedium)
+                
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(weights) { entry ->
+                        val isSelected = selectedEntries.contains(entry)
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedEntries = if (isSelected) selectedEntries - entry else selectedEntries + entry
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(checked = isSelected, onCheckedChange = {
+                                selectedEntries = if (it) selectedEntries + entry else selectedEntries - entry
+                            })
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(entry.date, fontWeight = FontWeight.Bold)
+                                Text("${entry.weight} kg", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selectedEntries.toList()) },
+                enabled = selectedEntries.isNotEmpty(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Import Selected", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

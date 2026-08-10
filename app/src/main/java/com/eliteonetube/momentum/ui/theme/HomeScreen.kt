@@ -297,7 +297,12 @@ fun HomeScreen(
                     onWeightClick = { showHistoryModal = true },
                     onProfileUpdated = onProfileUpdated,
                     onGoalChanged = onGoalChanged,
-                    onViewGallery = { showGallery = true }
+                    onViewGallery = { showGallery = true },
+                    onWeightsImported = { entries ->
+                        coroutineScope.launch {
+                            entries.forEach { onPastWeightSubmitted(it.date, it.weight) }
+                        }
+                    }
                 )
             }
         }
