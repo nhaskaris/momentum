@@ -48,12 +48,12 @@ fun BottomNavBar(
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            color = MomentumGlass.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             shape = RoundedCornerShape(24.dp),
             shadowElevation = 6.dp,
             border = androidx.compose.foundation.BorderStroke(
                 width = 0.5.dp,
-                color = Color.White.copy(alpha = 0.12f)
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             ),
             modifier = Modifier
                 .height(64.dp)
@@ -67,7 +67,7 @@ fun BottomNavBar(
                 AppTab.entries.forEach { tab ->
                     val isSelected = currentTab == tab
                     val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         animationSpec = spring(stiffness = 500f),
                         label = "tabColor"
                     )

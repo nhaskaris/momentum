@@ -2,16 +2,20 @@ package com.eliteonetube.momentum.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val MomentumBlue = Color(0xFF00B4D8)
-val MomentumCyan = Color(0xFF48CAE4)
-val MomentumDark = Color(0xFF0B0D0F)
-val MomentumSurface = Color(0xFF161B1F)
-val MomentumGlass = Color(0xCC161B1F) // 80% opacity
+// Brand Colors
+val MomentumBlue = Color(0xFF0EA5E9)   // A more vibrant, "pro" athlete blue (Sky 600)
+val MomentumCyan = Color(0xFF38BDF8)   // Brighter accent (Sky 400)
 
-val ProteinBlue = Color(0xFF00B4D8) // Unified with Momentum Blue for cleaner look
-val FatYellow = Color(0xFFFFD166) // Warmer yellow
-val CarbGreen = Color(0xFF06D6A0) // Vibrant mint green
-val CalorieRed = Color(0xFFEF476F) // Soft red for over-limit
+// Dark Theme Neutrals
+val MomentumDark = Color(0xFF09090B)      // Deep Zinc/Ebony - cleaner than muddy black
+val MomentumSurface = Color(0xFF18181B)   // Slightly elevated surface (Zinc 900)
+val MomentumGlass = Color(0xCC18181B)    // Translucent version
+
+// Macro Specifics (kept distinct from theme)
+val ProteinBlue = Color(0xFF0EA5E9)
+val FatYellow = Color(0xFFF59E0B)   // Amber 500 (Cleaner yellow)
+val CarbGreen = Color(0xFF10B981)    // Emerald 500 (Cleaner green)
+val CalorieRed = Color(0xFFEF4444)    // Red 500
 
 // Legacy colors for compatibility if needed
 val Purple80 = Color(0xFFD0BCFF)

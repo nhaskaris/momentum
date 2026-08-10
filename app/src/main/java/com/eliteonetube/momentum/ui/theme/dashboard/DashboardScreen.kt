@@ -1,6 +1,7 @@
 package com.eliteonetube.momentum.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +53,7 @@ fun MainDashboard(
     val parsedWeightKg = parsedInput?.let {
         if (profile.unitSystem == UnitSystem.IMPERIAL) Units.lbToKg(it) else it
     }
+    val isDark = isSystemInDarkTheme()
 
     Column(
         modifier = Modifier
@@ -65,7 +67,7 @@ fun MainDashboard(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
                             MaterialTheme.colorScheme.background
                         )
                     )
@@ -257,20 +259,24 @@ fun DashboardAlert(
     onSecondaryAction: (() -> Unit)? = null,
     containerColor: Color
 ) {
+    val isDark = isSystemInDarkTheme()
+    val bgAlpha = if (isDark) 0.25f else 0.18f
+    val borderAlpha = if (isDark) 0.4f else 0.25f
+    
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = 0.2f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = bgAlpha)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = borderAlpha))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.NotificationsActive, null, tint = containerColor, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = containerColor)
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(

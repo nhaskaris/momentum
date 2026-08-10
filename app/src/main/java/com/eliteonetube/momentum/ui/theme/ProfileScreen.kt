@@ -2,6 +2,7 @@ package com.eliteonetube.momentum.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -359,9 +360,9 @@ private fun StatCard(
         modifier = modifier
             .height(100.dp)
             .let { if (onClick != null) it.clickable { onClick() } else it },
-        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = 0.2f)),
+        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = if(isSystemInDarkTheme()) 0.25f else 0.15f)),
         shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.3f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.4f))
     ) {
         Column(
             modifier = Modifier
@@ -369,8 +370,8 @@ private fun StatCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = containerColor, fontWeight = FontWeight.Bold)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, fontSize = 24.sp)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -394,10 +395,10 @@ private fun ProfileStatRow(
                 icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         }
         Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = valueColor)
     }

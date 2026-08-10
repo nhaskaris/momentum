@@ -24,7 +24,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,12 +45,10 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 enum class ScannerMode { BARCODE, FRONT_PACKAGE, NUTRITION }
 
 private const val NUTRITION_OVERLAY_ASPECT = 0.8f
-private const val TAG = "FoodScannerScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @AndroidxOptIn(markerClass = [ExperimentalGetImage::class])
@@ -149,7 +146,11 @@ fun FoodScannerScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White, navigationIconContentColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent, 
+                    titleContentColor = Color.White, 
+                    navigationIconContentColor = Color.White
+                )
             )
         }
     ) { padding ->
@@ -215,7 +216,7 @@ fun FoodScannerScreen(
                                 CameraSelector.DEFAULT_BACK_CAMERA,
                                 preview, imageAnalysis, imageCapture
                             )
-                        } catch (e: Exception) {}
+                        } catch (_: Exception) {}
                     }, ContextCompat.getMainExecutor(ctx))
                     previewView
                 },
@@ -265,7 +266,7 @@ fun FoodScannerScreen(
                                 .align(Alignment.TopCenter)
                                 .fillMaxHeight(laserPos)
                                 .wrapContentHeight(Alignment.Bottom)
-                                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.Cyan, Color.Transparent)))
+                                .background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.primary, Color.Transparent)))
                         )
                     }
                 }
@@ -314,7 +315,7 @@ fun FoodScannerScreen(
                                                         statusMessage = "Verify values"
                                                     }
                                                 }
-                                            } catch (e: Exception) { isCapturing = false }
+                                            } catch (_: Exception) { isCapturing = false }
                                             finally { image.close() }
                                         }
                                         override fun onError(exc: ImageCaptureException) { isCapturing = false }
@@ -329,13 +330,13 @@ fun FoodScannerScreen(
                     } else {
                         // Glassy review card
                         Surface(
-                            color = Color.Black.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                             shape = RoundedCornerShape(28.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(24.dp)) {
-                                Text(capturedNutrition?.name ?: "Captured Values", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                                Text(capturedNutrition?.name ?: "Captured Values", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     ScanBadge("Calories", capturedNutrition?.calories?.toInt()?.toString() ?: "--")
@@ -349,8 +350,8 @@ fun FoodScannerScreen(
                                         onClick = { capturedNutrition = null; detectedName = null; scannerMode = ScannerMode.FRONT_PACKAGE; statusMessage = "Scan package name" },
                                         modifier = Modifier.weight(1f).height(50.dp),
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                                     ) { Text("Re-take") }
                                     Button(
                                         onClick = { onResult(capturedNutrition!!, currentBarcode) },
@@ -363,27 +364,27 @@ fun FoodScannerScreen(
                     }
                 } else if (currentBarcode != null) {
                     Surface(
-                        color = Color.Black.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                         shape = RoundedCornerShape(24.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("New Barcode: $currentBarcode", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("New Barcode: $currentBarcode", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             
                             if (isSearchingBarcode) {
                                 Spacer(modifier = Modifier.height(16.dp))
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Cyan, strokeWidth = 2.dp)
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = if (apiEnabled) "Checking online database..." else "Searching locally...",
-                                    color = Color.White.copy(alpha = 0.8f),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             } else {
                                 Text(
                                     text = if (apiEnabled) "Not found locally or online." else "Not found in database.",
-                                    color = Color.White.copy(alpha = 0.6f), 
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -402,8 +403,8 @@ fun FoodScannerScreen(
 @Composable
 fun ScanBadge(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
-        Text(label, color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+        Text(value, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
     }
 }
 

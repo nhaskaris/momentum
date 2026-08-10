@@ -17,42 +17,54 @@ import com.eliteonetube.momentum.data.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
     primary = MomentumBlue,
-    onPrimary = Color.Black,
-    primaryContainer = MomentumBlue.copy(alpha = 0.2f),
+    onPrimary = Color.White,
+    primaryContainer = MomentumBlue.copy(alpha = 0.15f),
     onPrimaryContainer = MomentumBlue,
     
-    secondary = CarbGreen,
-    onSecondary = Color.Black,
-    secondaryContainer = CarbGreen.copy(alpha = 0.2f),
-    onSecondaryContainer = CarbGreen,
+    secondary = Color(0xFF71717A), // Neutral Zinc secondary for UI elements
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF27272A),
+    onSecondaryContainer = Color(0xFFE4E4E7),
     
-    tertiary = FatYellow,
+    tertiary = MomentumCyan,
     onTertiary = Color.Black,
-    tertiaryContainer = FatYellow.copy(alpha = 0.2f),
-    onTertiaryContainer = FatYellow,
     
     background = MomentumDark,
-    onBackground = Color.White,
+    onBackground = Color(0xFFFAFAFA),
     surface = MomentumSurface,
-    onSurface = Color.White,
-    surfaceVariant = MomentumSurface.copy(alpha = 0.7f),
-    onSurfaceVariant = Color.White.copy(alpha = 0.7f),
+    onSurface = Color(0xFFFAFAFA),
+    surfaceVariant = Color(0xFF27272A),
+    onSurfaceVariant = Color(0xFFE4E4E7), // Brightened from D4D4D8
     
-    outline = MomentumBlue.copy(alpha = 0.5f),
-    outlineVariant = Color.White.copy(alpha = 0.1f)
+    outline = Color(0xFF3F3F46),
+    outlineVariant = Color(0xFF27272A)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = ProteinBlue,
-    secondary = CarbGreen,
-    tertiary = FatYellow,
-    background = Color(0xFFF8F9FA),
-    surface = Color.White,
     onPrimary = Color.White,
+    primaryContainer = ProteinBlue.copy(alpha = 0.1f),
+    onPrimaryContainer = ProteinBlue,
+    
+    secondary = CarbGreen,
     onSecondary = Color.White,
+    secondaryContainer = CarbGreen.copy(alpha = 0.1f),
+    onSecondaryContainer = CarbGreen,
+    
+    tertiary = FatYellow,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
+    tertiaryContainer = FatYellow.copy(alpha = 0.1f),
+    onTertiaryContainer = FatYellow,
+
+    background = Color(0xFFF9FAFB),
+    surface = Color.White,
+    onBackground = Color(0xFF111827),
+    onSurface = Color(0xFF111827),
+    surfaceVariant = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFF6B7280),
+    
+    outline = Color(0xFFE5E7EB),
+    outlineVariant = Color(0xFFF3F4F6)
 )
 
 @Composable

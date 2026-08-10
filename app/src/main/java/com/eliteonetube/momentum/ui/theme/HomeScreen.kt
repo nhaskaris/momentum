@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -234,7 +234,7 @@ fun HomeScreen(
     var showHistoryModal by remember { mutableStateOf(false) }
     val currentTab = AppTab.entries[pagerState.currentPage]
 
-    Box(modifier = Modifier.fillMaxSize().background(MomentumDark)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !(isSessionActive && currentTab == AppTab.WORKOUTS),

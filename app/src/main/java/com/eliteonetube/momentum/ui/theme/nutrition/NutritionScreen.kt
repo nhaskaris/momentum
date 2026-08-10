@@ -33,7 +33,7 @@ import com.eliteonetube.momentum.data.FoodItem
 import com.eliteonetube.momentum.data.FoodLogWithItem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
-import com.eliteonetube.momentum.ui.theme.bounceClick
+import com.eliteonetube.momentum.ui.theme.*
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -113,11 +113,11 @@ fun NutritionScreen(
                 )
 
                 // Macro Bars
-                MacroBar("Protein", proteinConsumed.roundToInt(), proteinGramsTarget, MaterialTheme.colorScheme.primary)
+                MacroBar("Protein", proteinConsumed.roundToInt(), proteinGramsTarget, ProteinBlue)
                 Spacer(modifier = Modifier.height(12.dp))
-                MacroBar("Fats", fatConsumed.roundToInt(), fatGramsTarget, MaterialTheme.colorScheme.tertiary)
+                MacroBar("Fats", fatConsumed.roundToInt(), fatGramsTarget, FatYellow)
                 Spacer(modifier = Modifier.height(12.dp))
-                MacroBar("Carbs", carbsConsumed.roundToInt(), carbGramsTarget, MaterialTheme.colorScheme.secondary)
+                MacroBar("Carbs", carbsConsumed.roundToInt(), carbGramsTarget, CarbGreen)
             }
         }
 
@@ -183,19 +183,19 @@ fun NutritionScreen(
             MacroExplanationCard(
                 title = "Protein: The Builder",
                 description = "Crucial for repairing and building muscle tissue. Target: 2.0g/kg.",
-                color = MaterialTheme.colorScheme.primary
+                color = ProteinBlue
             )
             Spacer(modifier = Modifier.height(12.dp))
             MacroExplanationCard(
                 title = "Fats: The Regulator",
                 description = "Essential for hormones and brain health. Target: 0.8g/kg.",
-                color = MaterialTheme.colorScheme.tertiary
+                color = FatYellow
             )
             Spacer(modifier = Modifier.height(12.dp))
             MacroExplanationCard(
                 title = "Carbs: The Fuel",
                 description = "Primary energy source for intense training.",
-                color = MaterialTheme.colorScheme.secondary
+                color = CarbGreen
             )
 
             Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
