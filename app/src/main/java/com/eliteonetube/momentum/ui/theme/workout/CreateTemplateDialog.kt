@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Exercise
+import com.eliteonetube.momentum.data.ExerciseType
 import com.eliteonetube.momentum.data.LoggedSet
 import com.eliteonetube.momentum.data.WorkoutSession
 import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
@@ -30,7 +31,7 @@ fun CreateTemplateDialog(
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     onDismiss: () -> Unit,
     onCreateTemplate: (name: String, notes: String?, inputs: List<TemplateExerciseInput>) -> Unit,
-    onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> }
 ) {
     var templateName by remember { mutableStateOf("") }
     var templateNotes by remember { mutableStateOf("") }

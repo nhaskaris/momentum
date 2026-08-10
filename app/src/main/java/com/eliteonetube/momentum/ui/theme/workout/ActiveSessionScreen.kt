@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.Exercise
+import com.eliteonetube.momentum.data.ExerciseType
 import com.eliteonetube.momentum.data.LoggedSet
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.logic.RestTimerService
@@ -45,7 +46,7 @@ fun ActiveSessionScreen(
     onCancel: () -> Unit,
     onFinish: (List<PendingSet>) -> Unit,
     onUpdateActiveSets: (List<PendingSet>) -> Unit = {},
-    onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -125,8 +126,8 @@ fun ActiveSessionScreen(
                 }
                 showExercisePicker = false
             },
-            onCreateExercise = { name, muscleGroup, onCreated ->
-                onCreateExercise(name, muscleGroup) { newlyCreatedExercise ->
+            onCreateExercise = { name, muscleGroup, type, onCreated ->
+                onCreateExercise(name, muscleGroup, type) { newlyCreatedExercise ->
                     if (sessionExercises.none { it.id == newlyCreatedExercise.id }) {
                         sessionExercises = sessionExercises + newlyCreatedExercise
                         setsByExercise = setsByExercise + (newlyCreatedExercise.id to emptyList())

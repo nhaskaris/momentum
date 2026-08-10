@@ -7,8 +7,10 @@ package com.eliteonetube.momentum.ui.workout
 data class PendingSet(
     val exerciseId: Long,
     val setNumber: Int,
-    val weightKg: Double,
-    val reps: Int,
+    val weightKg: Double = 0.0,
+    val reps: Int = 0,
     val notes: String? = null,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val durationSeconds: Int? = null,
+    val distanceKm: Double? = null
 )

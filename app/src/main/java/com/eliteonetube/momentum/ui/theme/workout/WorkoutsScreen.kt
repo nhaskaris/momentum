@@ -53,7 +53,7 @@ fun WorkoutsScreen(
     onSessionStateChanged: (Boolean) -> Unit = {},
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit = { _, _ -> },
     onClearActiveWorkout: () -> Unit = {},
-    onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> }
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> }
 ) {
     var isLoggingSession by remember(activeSets, hasActiveWorkout) {
         mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
@@ -315,8 +315,16 @@ fun WorkoutsScreen(
                                 val exerciseMap = allExercises.associateBy { it.id }
                                 initialSessionExercises = templateExercises.mapNotNull { exerciseMap[it.exerciseId] }
                                 initialPendingSets = templateExercises.flatMap { te ->
+                                    val ex = exerciseMap[te.exerciseId]
                                     (1..te.targetSets.coerceAtLeast(1)).map { sn ->
-                                        PendingSet(exerciseId = te.exerciseId, setNumber = sn, weightKg = te.targetWeightKg, reps = te.targetReps)
+                                        PendingSet(
+                                            exerciseId = te.exerciseId,
+                                            setNumber = sn,
+                                            weightKg = te.targetWeightKg,
+                                            reps = te.targetReps,
+                                            durationSeconds = te.targetDurationSeconds ?: if (ex?.exerciseType == ExerciseType.CARDIO) 600 else null,
+                                            distanceKm = te.targetDistanceKm ?: if (ex?.exerciseType == ExerciseType.CARDIO) 0.0 else null
+                                        )
                                     }
                                 }
                                 onUpdateActiveWorkout(currentActiveTemplateId, initialPendingSets)

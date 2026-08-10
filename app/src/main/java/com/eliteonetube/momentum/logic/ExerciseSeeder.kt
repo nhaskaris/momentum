@@ -2,10 +2,18 @@ package com.eliteonetube.momentum.logic
 
 import android.content.Context
 import com.eliteonetube.momentum.data.Exercise
+import com.eliteonetube.momentum.data.ExerciseType
 import com.eliteonetube.momentum.data.WorkoutDao
 import org.json.JSONArray
 
 object ExerciseSeeder {
+    private val cardioExerciseNames = setOf(
+        "Bicycling", "Bicycling, Stationary", "Elliptical Trainer", 
+        "Jogging, Treadmill", "Rowing, Stationary", "Running, Treadmill", 
+        "Stairmaster", "Step Mill", "Walking, Treadmill", "Rope Jumping",
+        "Fast Skipping", "Wind Sprints", "Trail Running/Walking"
+    )
+
     suspend fun seedIfNeeded(context: Context, workoutDao: WorkoutDao) {
         if (workoutDao.exerciseCount() > 0) return
 
@@ -21,7 +29,10 @@ object ExerciseSeeder {
             } else {
                 "Other"
             }
-            Exercise(name = name, muscleGroup = muscleGroup)
+            
+            val type = if (cardioExerciseNames.contains(name)) ExerciseType.CARDIO else ExerciseType.STRENGTH
+            
+            Exercise(name = name, muscleGroup = muscleGroup, exerciseType = type)
         }
 
         workoutDao.insertExercisesIfNotPresent(exercises)

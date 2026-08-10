@@ -63,7 +63,7 @@ fun HomeScreen(
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
-    onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit = { _, _, _ -> },
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
     onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit
 ) {
     if (savedProfile == null) {

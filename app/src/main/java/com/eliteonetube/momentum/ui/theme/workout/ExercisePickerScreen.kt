@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Exercise
+import com.eliteonetube.momentum.data.ExerciseType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,7 +28,7 @@ fun ExercisePickerScreen(
     allExercises: List<Exercise>,
     onDismiss: () -> Unit,
     onExerciseSelected: (Exercise) -> Unit,
-    onCreateExercise: (String, String, (Exercise) -> Unit) -> Unit
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedMuscleGroup by remember { mutableStateOf<String?>(null) }
@@ -48,8 +50,8 @@ fun ExercisePickerScreen(
     if (showCreateDialog) {
         CreateExerciseDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { name, group ->
-                onCreateExercise(name, group) { newlyCreated ->
+            onCreate = { name, group, type ->
+                onCreateExercise(name, group, type) { newlyCreated ->
                     showCreateDialog = false
                     onExerciseSelected(newlyCreated)
                 }
@@ -176,7 +178,7 @@ fun ExercisePickerScreen(
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
-                                            Icons.Default.FitnessCenter,
+                                            imageVector = if (exercise.exerciseType == ExerciseType.CARDIO) Icons.AutoMirrored.Filled.DirectionsRun else Icons.Default.FitnessCenter,
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp),
                                             tint = MaterialTheme.colorScheme.onSecondaryContainer
@@ -202,10 +204,11 @@ fun ExercisePickerScreen(
 @Composable
 private fun CreateExerciseDialog(
     onDismiss: () -> Unit,
-    onCreate: (name: String, muscleGroup: String) -> Unit
+    onCreate: (name: String, muscleGroup: String, type: ExerciseType) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var muscleGroup by remember { mutableStateOf("") }
+    var exerciseType by remember { mutableStateOf(ExerciseType.STRENGTH) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -226,11 +229,24 @@ private fun CreateExerciseDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                Text("Exercise Type", style = MaterialTheme.typography.labelMedium)
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    ExerciseType.entries.forEachIndexed { index, type ->
+                        SegmentedButton(
+                            selected = exerciseType == type,
+                            onClick = { exerciseType = type },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = ExerciseType.entries.size)
+                        ) {
+                            Text(type.name.lowercase().replaceFirstChar { it.uppercase() })
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onCreate(name.trim(), muscleGroup.trim()) },
+                onClick = { onCreate(name.trim(), muscleGroup.trim(), exerciseType) },
                 enabled = name.isNotBlank() && muscleGroup.isNotBlank()
             ) {
                 Text("Create")

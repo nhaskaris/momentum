@@ -24,6 +24,8 @@ enum class UnitSystem { METRIC, IMPERIAL }
 
 enum class AppTheme { LIGHT, DARK, SYSTEM }
 
+enum class ExerciseType { STRENGTH, CARDIO }
+
 class Converters {
     @TypeConverter
     fun fromGoal(goal: Goal): String = goal.name
@@ -42,6 +44,12 @@ class Converters {
 
     @TypeConverter
     fun toAppTheme(value: String): AppTheme = AppTheme.valueOf(value)
+
+    @TypeConverter
+    fun fromExerciseType(type: ExerciseType): String = type.name
+
+    @TypeConverter
+    fun toExerciseType(value: String): ExerciseType = ExerciseType.valueOf(value)
 }
 
 @Entity(tableName = "weight_table")
@@ -135,7 +143,8 @@ data class FoodLogWithItem(
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val muscleGroup: String
+    val muscleGroup: String,
+    val exerciseType: ExerciseType = ExerciseType.STRENGTH
 ) {
     // Convenience getter so UI calling exercise.targetMuscleGroup or exercise.category works directly
     val targetMuscleGroup: String get() = muscleGroup
@@ -173,7 +182,9 @@ data class TemplateExercise(
     val targetSets: Int = 3,
     val targetReps: Int = 10,
     val targetWeightKg: Double = 0.0,
-    val orderIndex: Int = 0
+    val orderIndex: Int = 0,
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceKm: Double? = null
 )
 
 // --- LOGGING ENTITIES ---
@@ -225,7 +236,9 @@ data class LoggedSet(
     val setNumber: Int,
     val weightKg: Double,
     val reps: Int,
-    val notes: String? = null
+    val notes: String? = null,
+    val durationSeconds: Int? = null,
+    val distanceKm: Double? = null
 )
 
 @Entity(tableName = "active_workout_set_table")
@@ -236,7 +249,9 @@ data class ActiveWorkoutSet(
     val weightKg: Double,
     val reps: Int,
     val notes: String? = null,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val durationSeconds: Int? = null,
+    val distanceKm: Double? = null
 )
 
 @Dao
@@ -383,7 +398,8 @@ interface WorkoutDao {
 
     @Query("""
         UPDATE template_exercise_table 
-        SET targetSets = :newSets, targetReps = :newReps, targetWeightKg = :newWeight
+        SET targetSets = :newSets, targetReps = :newReps, targetWeightKg = :newWeight,
+            targetDurationSeconds = :newDuration, targetDistanceKm = :newDistance
         WHERE templateId = :templateId AND exerciseId = :exerciseId
     """)
     suspend fun updateTemplateExerciseTargets(
@@ -391,7 +407,9 @@ interface WorkoutDao {
         exerciseId: Long,
         newSets: Int,
         newReps: Int,
-        newWeight: Double
+        newWeight: Double,
+        newDuration: Int?,
+        newDistance: Double?
     )
 
     // --- PROGRESSION & PAST HISTORY QUERIES ---
@@ -439,7 +457,7 @@ interface WorkoutDao {
         DailyFoodLog::class,
         ActiveWorkoutSet::class
     ],
-    version = 24
+    version = 25
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -576,6 +594,18 @@ abstract class WeightDatabase : RoomDatabase() {
         val MIGRATION_23_24 = object : Migration(23, 24) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN hasActiveWorkout INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_24_25 = object : Migration(24, 25) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE exercise_table ADD COLUMN exerciseType TEXT NOT NULL DEFAULT 'STRENGTH'")
+                connection.execSQL("ALTER TABLE logged_set_table ADD COLUMN durationSeconds INTEGER")
+                connection.execSQL("ALTER TABLE logged_set_table ADD COLUMN distanceKm REAL")
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN durationSeconds INTEGER")
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN distanceKm REAL")
+                connection.execSQL("ALTER TABLE template_exercise_table ADD COLUMN targetDurationSeconds INTEGER")
+                connection.execSQL("ALTER TABLE template_exercise_table ADD COLUMN targetDistanceKm REAL")
             }
         }
     }

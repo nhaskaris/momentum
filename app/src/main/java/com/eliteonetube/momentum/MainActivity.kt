@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
             WeightDatabase.MIGRATION_21_22,
             WeightDatabase.MIGRATION_22_23,
             WeightDatabase.MIGRATION_23_24,
+            WeightDatabase.MIGRATION_24_25,
         ).fallbackToDestructiveMigration().build()
 
         val weightDao = database.weightDao()
@@ -234,9 +235,9 @@ class MainActivity : ComponentActivity() {
                                     workoutDao.deleteSession(sessionId)
                                 }
                             },
-                            onCreateExercise = { name, muscleGroup, onCreated ->
+                            onCreateExercise = { name, muscleGroup, type, onCreated ->
                                 coroutineScope.launch {
-                                    val newExercise = Exercise(name = name, muscleGroup = muscleGroup)
+                                    val newExercise = Exercise(name = name, muscleGroup = muscleGroup, exerciseType = type)
                                     val newId = workoutDao.insertExercise(newExercise)
                                     onCreated(newExercise.copy(id = newId))
                                 }
@@ -346,7 +347,9 @@ class MainActivity : ComponentActivity() {
                                                 weightKg = pendingSet.weightKg,
                                                 reps = pendingSet.reps,
                                                 notes = pendingSet.notes,
-                                                isCompleted = pendingSet.isCompleted
+                                                isCompleted = pendingSet.isCompleted,
+                                                durationSeconds = pendingSet.durationSeconds,
+                                                distanceKm = pendingSet.distanceKm
                                             )
                                         )
                                     }
@@ -442,7 +445,9 @@ class MainActivity : ComponentActivity() {
                                                 setNumber = pendingSet.setNumber,
                                                 weightKg = pendingSet.weightKg,
                                                 reps = pendingSet.reps,
-                                                notes = pendingSet.notes
+                                                notes = pendingSet.notes,
+                                                durationSeconds = pendingSet.durationSeconds,
+                                                distanceKm = pendingSet.distanceKm
                                             )
                                         )
                                     }
@@ -454,12 +459,21 @@ class MainActivity : ComponentActivity() {
                                             if (exerciseSets.isNotEmpty()) {
                                                 val avgReps = (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size).let { Math.round(it).toInt() }
                                                 val avgWeight = exerciseSets.sumOf { it.weightKg } / exerciseSets.size
+                                                val avgDuration = if (exerciseSets.any { it.durationSeconds != null }) {
+                                                    exerciseSets.mapNotNull { it.durationSeconds }.average().toInt()
+                                                } else null
+                                                val avgDistance = if (exerciseSets.any { it.distanceKm != null }) {
+                                                    exerciseSets.mapNotNull { it.distanceKm }.average()
+                                                } else null
+
                                                 workoutDao.updateTemplateExerciseTargets(
                                                     templateId = tid,
                                                     exerciseId = exId,
                                                     newSets = exerciseSets.size,
                                                     newReps = avgReps,
-                                                    newWeight = avgWeight
+                                                    newWeight = avgWeight,
+                                                    newDuration = avgDuration,
+                                                    newDistance = avgDistance
                                                 )
                                             }
                                         }
