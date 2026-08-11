@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
+import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
+import com.eliteonetube.momentum.ui.theme.bounceClick
 
 data class TutorialStep(
     val title: String,
@@ -46,7 +49,7 @@ fun TutorialOverlay(
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // Animate the highlight hole position and size for buttery smooth transitions
+    // Animate the highlight hole position and size
     val animatedTopLeft by animateOffsetAsState(
         targetValue = with(density) { Offset(targetRect.left - 12.dp.toPx(), targetRect.top - 12.dp.toPx()) },
         animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioLowBouncy),
@@ -64,7 +67,7 @@ fun TutorialOverlay(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
-            ) { /* Consume clicks to prevent background interaction */ }
+            ) { /* Consume clicks */ }
     ) {
         // Dimmed background with hole
         Canvas(modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.99f)) {
@@ -99,47 +102,60 @@ fun TutorialOverlay(
                 },
                 label = "tooltipContent"
             ) { step ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+                Column(
+                    horizontalAlignment = if (isTargetInBottomHalf) Alignment.CenterHorizontally else Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(
-                            text = step.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = step.description,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = {
-                                if (currentStepIdx < steps.lastIndex) {
-                                    currentStepIdx++
-                                    onStepCompleted(currentStepIdx)
-                                } else {
-                                    onFinished()
-                                }
-                            },
-                            modifier = Modifier.align(Alignment.End),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
+                    if (isTargetInBottomHalf) {
+                        MomentumMascot(mood = MascotMood.IDLE, modifier = Modifier.size(64.dp))
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(28.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(24.dp)) {
                             Text(
-                                text = if (currentStepIdx == steps.lastIndex) "Start Journey" else "Next",
-                                fontWeight = FontWeight.Bold
+                                text = step.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.primary
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = step.description,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = {
+                                    if (currentStepIdx < steps.lastIndex) {
+                                        currentStepIdx++
+                                        onStepCompleted(currentStepIdx)
+                                    } else {
+                                        onFinished()
+                                    }
+                                },
+                                modifier = Modifier.align(Alignment.End),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text(
+                                    text = if (currentStepIdx == steps.lastIndex) "Start Journey" else "Next",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
+                    }
+
+                    if (!isTargetInBottomHalf) {
+                        MomentumMascot(mood = MascotMood.IDLE, modifier = Modifier.size(64.dp))
                     }
                 }
             }

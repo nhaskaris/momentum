@@ -23,7 +23,7 @@ private data class IntroPage(val title: String, val body: String)
 private val introPages = listOf(
     IntroPage(
         title = "Momentum",
-        body = "Your personal fitness coach, built with privacy in mind. Everything is stored locally on your device — no cloud, no tracking, just your data and your progress."
+        body = "Your personal fitness helper, built with privacy in mind. Everything is stored locally on your device — no cloud, no tracking, just your data and your progress."
     ),
     IntroPage(
         title = "Cut",
