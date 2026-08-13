@@ -77,14 +77,21 @@ object HelperBrain {
     }
 
     private fun getWorkoutMessage(active: Boolean): String {
-        if (active) return "Focus on the mind-muscle connection. Every rep counts!"
+        val pool = mutableListOf<String>()
         
-        val pool = listOf(
-            "Movement is medicine. Ready for a session?",
-            "Pick a routine and let's get to work!",
-            "Rest is just as important as the work. How are you feeling?",
-            "Strength is built in the recovery. Make sure to sleep well!"
-        )
+        if (active) {
+            pool.add("Focus on the mind-muscle connection. Every rep counts!")
+            pool.add("Need to change things up? You can swap any exercise by tapping the menu on its card.")
+            pool.add("If you swap an exercise during a routine, I'll save the change for next time automatically!")
+        } else {
+            pool.add("Movement is medicine. Ready for a session?")
+            pool.add("Pick a routine and let's get to work!")
+            pool.add("Rest is just as important as the work. How are you feeling?")
+            pool.add("Strength is built in the recovery. Make sure to sleep well!")
+            pool.add("Did you know? You can turn any past workout into a Saved Routine by tapping it in your history!")
+            pool.add("If you have long workouts in another app, you can select multiple screenshots at once to import the whole routine!")
+        }
+        
         return pool.random()
     }
 

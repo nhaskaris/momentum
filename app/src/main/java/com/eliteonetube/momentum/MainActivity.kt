@@ -340,21 +340,19 @@ class MainActivity : ComponentActivity() {
                                             hasActiveWorkout = true
                                         )
                                     )
-                                    workoutDao.clearActiveSets()
-                                    sets.forEach { pendingSet ->
-                                        workoutDao.insertActiveSet(
-                                            ActiveWorkoutSet(
-                                                exerciseId = pendingSet.exerciseId,
-                                                setNumber = pendingSet.setNumber,
-                                                weightKg = pendingSet.weightKg,
-                                                reps = pendingSet.reps,
-                                                notes = pendingSet.notes,
-                                                isCompleted = pendingSet.isCompleted,
-                                                durationSeconds = pendingSet.durationSeconds,
-                                                distanceKm = pendingSet.distanceKm
-                                            )
+                                    val activeSets = sets.map { pendingSet ->
+                                        ActiveWorkoutSet(
+                                            exerciseId = pendingSet.exerciseId,
+                                            setNumber = pendingSet.setNumber,
+                                            weightKg = pendingSet.weightKg,
+                                            reps = pendingSet.reps,
+                                            notes = pendingSet.notes,
+                                            isCompleted = pendingSet.isCompleted,
+                                            durationSeconds = pendingSet.durationSeconds,
+                                            distanceKm = pendingSet.distanceKm
                                         )
                                     }
+                                    workoutDao.replaceActiveSets(activeSets)
                                 }
                             },
                             onClearActiveWorkout = {
@@ -455,8 +453,11 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     templateId?.let { tid: Long ->
+                                        // "Save on top": Update template exercises to match the session
+                                        workoutDao.deleteTemplateExercises(tid)
+                                        
                                         val uniqueExerciseIds = sets.map { it.exerciseId }.distinct()
-                                        uniqueExerciseIds.forEach { exId ->
+                                        uniqueExerciseIds.forEachIndexed { index, exId ->
                                             val exerciseSets = sets.filter { it.exerciseId == exId }
                                             if (exerciseSets.isNotEmpty()) {
                                                 val avgReps = (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size).let { Math.round(it).toInt() }
@@ -468,14 +469,17 @@ class MainActivity : ComponentActivity() {
                                                     exerciseSets.mapNotNull { it.distanceKm }.average()
                                                 } else null
 
-                                                workoutDao.updateTemplateExerciseTargets(
-                                                    templateId = tid,
-                                                    exerciseId = exId,
-                                                    newSets = exerciseSets.size,
-                                                    newReps = avgReps,
-                                                    newWeight = avgWeight,
-                                                    newDuration = avgDuration,
-                                                    newDistance = avgDistance
+                                                workoutDao.insertTemplateExercise(
+                                                    TemplateExercise(
+                                                        templateId = tid,
+                                                        exerciseId = exId,
+                                                        targetSets = exerciseSets.size,
+                                                        targetReps = avgReps,
+                                                        targetWeightKg = avgWeight,
+                                                        orderIndex = index,
+                                                        targetDurationSeconds = avgDuration,
+                                                        targetDistanceKm = avgDistance
+                                                    )
                                                 )
                                             }
                                         }

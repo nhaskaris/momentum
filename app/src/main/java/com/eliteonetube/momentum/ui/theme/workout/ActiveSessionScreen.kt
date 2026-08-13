@@ -57,6 +57,7 @@ fun ActiveSessionScreen(
     val haptics = LocalHapticFeedback.current
     var showExercisePicker by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
+    var exerciseToSwapId by remember { mutableStateOf<Long?>(null) }
     
     val timerActive by RestTimerService.isActive.collectAsState()
     val timeLeft by RestTimerService.timeLeft.collectAsState()
@@ -74,15 +75,28 @@ fun ActiveSessionScreen(
     var sessionExercises by remember { mutableStateOf(resolvedInitialExercises) }
     var setsByExercise by remember { mutableStateOf(initialMap) }
 
-    // Persist to DB whenever sets or exercises change
-    LaunchedEffect(setsByExercise, sessionExercises) {
-        val allSets = sessionExercises.flatMap { setsByExercise[it.id].orEmpty() }
-        onUpdateActiveSets(allSets)
+    // Use a flag to avoid initialization loops
+    var isInitialized by remember { mutableStateOf(false) }
+
+    // Sync to local state ONLY ONCE when the screen is first loaded with data
+    LaunchedEffect(resolvedInitialExercises, initialMap) {
+        if (!isInitialized && resolvedInitialExercises.isNotEmpty()) {
+            sessionExercises = resolvedInitialExercises
+            setsByExercise = initialMap
+            isInitialized = true
+        }
     }
 
-    LaunchedEffect(resolvedInitialExercises, initialMap) {
-        sessionExercises = resolvedInitialExercises
-        setsByExercise = initialMap
+    // Persist to DB whenever local state changes, but use a debounce or check
+    // to avoid triggering loops if the parent passes the same data back
+    LaunchedEffect(setsByExercise, sessionExercises) {
+        if (isInitialized) {
+            val allSets = sessionExercises.flatMap { setsByExercise[it.id].orEmpty() }
+            // Only update if there's actual data to save
+            if (allSets.isNotEmpty()) {
+                onUpdateActiveSets(allSets)
+            }
+        }
     }
 
     val exerciseHistoryMap = remember { mutableStateMapOf<Long, List<LoggedSet>>() }
@@ -100,14 +114,12 @@ fun ActiveSessionScreen(
     val pageCount = if (sessionExercises.isEmpty()) 0 else sessionExercises.size + 1
     val pagerState = rememberPagerState(pageCount = { pageCount })
 
-    LaunchedEffect(sessionExercises.size) {
-        if (sessionExercises.isNotEmpty() && pagerState.currentPage >= pageCount) {
-            pagerState.scrollToPage((pageCount - 1).coerceAtLeast(0))
-        }
-    }
-
-    val currentStepIndex = pagerState.currentPage.coerceAtMost((pageCount - 1).coerceAtLeast(0))
-    val isFinishStep = currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
+    // Safety: ensure we are on a valid page
+    val currentStepIndex = if (pageCount > 0) {
+        pagerState.currentPage.coerceAtMost(pageCount - 1)
+    } else 0
+    
+    val isFinishStep = pageCount > 0 && currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
 
     val allSets = remember(setsByExercise, sessionExercises) { sessionExercises.flatMap { setsByExercise[it.id].orEmpty() } }
     val totalVolumeKg = allSets.sumOf { it.weightKg * it.reps }
@@ -122,9 +134,19 @@ fun ActiveSessionScreen(
     if (showExercisePicker) {
         ExercisePickerScreen(
             allExercises = allExercises,
-            onDismiss = { showExercisePicker = false },
+            onDismiss = { 
+                showExercisePicker = false
+                exerciseToSwapId = null
+            },
             onExerciseSelected = { exercise ->
-                if (sessionExercises.none { it.id == exercise.id }) {
+                if (exerciseToSwapId != null) {
+                    // Swap logic
+                    val oldId = exerciseToSwapId!!
+                    sessionExercises = sessionExercises.map { if (it.id == oldId) exercise else it }
+                    val oldSets = setsByExercise[oldId].orEmpty()
+                    setsByExercise = setsByExercise - oldId + (exercise.id to oldSets.map { it.copy(exerciseId = exercise.id) })
+                    exerciseToSwapId = null
+                } else if (sessionExercises.none { it.id == exercise.id }) {
                     sessionExercises = sessionExercises + exercise
                     setsByExercise = setsByExercise + (exercise.id to emptyList())
                     coroutineScope.launch { pagerState.animateScrollToPage(sessionExercises.size - 1) }
@@ -133,7 +155,14 @@ fun ActiveSessionScreen(
             },
             onCreateExercise = { name, muscleGroup, type, onCreated ->
                 onCreateExercise(name, muscleGroup, type) { newlyCreatedExercise ->
-                    if (sessionExercises.none { it.id == newlyCreatedExercise.id }) {
+                    if (exerciseToSwapId != null) {
+                        // Swap with new
+                        val oldId = exerciseToSwapId!!
+                        sessionExercises = sessionExercises.map { if (it.id == oldId) newlyCreatedExercise else it }
+                        val oldSets = setsByExercise[oldId].orEmpty()
+                        setsByExercise = setsByExercise - oldId + (newlyCreatedExercise.id to oldSets.map { it.copy(exerciseId = newlyCreatedExercise.id) })
+                        exerciseToSwapId = null
+                    } else if (sessionExercises.none { it.id == newlyCreatedExercise.id }) {
                         sessionExercises = sessionExercises + newlyCreatedExercise
                         setsByExercise = setsByExercise + (newlyCreatedExercise.id to emptyList())
                         coroutineScope.launch { pagerState.animateScrollToPage(sessionExercises.size - 1) }
@@ -169,11 +198,20 @@ fun ActiveSessionScreen(
                     Column {
                         Text("Workout", fontWeight = FontWeight.Black)
                         if (sessionExercises.isNotEmpty()) {
-                            Text(
-                                "$completedSets completed set${if (completedSets == 1) "" else "s"}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "$completedSets sets",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(" • ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    volumeDisplay,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 },
@@ -242,13 +280,6 @@ fun ActiveSessionScreen(
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (sessionExercises.isNotEmpty()) {
-                ActiveWorkoutProgressCard(
-                    currentStepIndex = currentStepIndex,
-                    exerciseCount = sessionExercises.size,
-                    completedSets = completedSets,
-                    volumeDisplay = volumeDisplay,
-                    isFinishStep = isFinishStep
-                )
                 WorkoutStepBar(
                     exercises = sessionExercises,
                     setsByExercise = setsByExercise,
@@ -306,6 +337,10 @@ fun ActiveSessionScreen(
                                 onExerciseRemoved = {
                                     sessionExercises = sessionExercises.filterNot { it.id == currentExercise.id }
                                     setsByExercise = setsByExercise - currentExercise.id
+                                },
+                                onExerciseSwapped = {
+                                    exerciseToSwapId = currentExercise.id
+                                    showExercisePicker = true
                                 }
                             )
                         }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ fun ExerciseSetLogger(
     onSetUpdated: (Int, PendingSet) -> Unit,
     onSetRemoved: (Int) -> Unit,
     onExerciseRemoved: () -> Unit,
+    onExerciseSwapped: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -75,6 +77,11 @@ fun ExerciseSetLogger(
                 Box {
                     IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Swap Exercise") },
+                            leadingIcon = { Icon(Icons.Default.SwapHoriz, null) },
+                            onClick = { showMenu = false; onExerciseSwapped() }
+                        )
                         DropdownMenuItem(
                             text = { Text("Remove Exercise", color = MaterialTheme.colorScheme.error) },
                             leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },

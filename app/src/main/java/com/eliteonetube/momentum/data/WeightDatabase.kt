@@ -16,6 +16,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room3.Transaction
 import kotlinx.coroutines.flow.Flow
 
 enum class Goal { CUT, BULK, MAINTAIN, REVERSE }
@@ -379,6 +380,12 @@ interface WorkoutDao {
     @Query("DELETE FROM active_workout_set_table WHERE id = :setId")
     suspend fun deleteSet(setId: Long)
 
+    @Transaction
+    suspend fun replaceActiveSets(newSets: List<ActiveWorkoutSet>) {
+        clearActiveSets()
+        newSets.forEach { insertActiveSet(it) }
+    }
+
     @Query("SELECT COUNT(*) FROM exercise_table")
     suspend fun exerciseCount(): Int
 
@@ -398,6 +405,9 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workout_template_table WHERE id = :templateId")
     suspend fun deleteTemplate(templateId: Long)
+
+    @Query("DELETE FROM template_exercise_table WHERE templateId = :templateId")
+    suspend fun deleteTemplateExercises(templateId: Long)
 
     @Query("""
         UPDATE template_exercise_table 

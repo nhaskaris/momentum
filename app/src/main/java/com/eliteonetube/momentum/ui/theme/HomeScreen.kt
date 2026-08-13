@@ -132,6 +132,14 @@ fun HomeScreen(
     var helperMessage by remember { mutableStateOf<String?>(null) }
     var isAskMode by remember { mutableStateOf(false) }
     var userQuestion by remember { mutableStateOf("") }
+
+    // Auto-dismiss helper messages after 6 seconds
+    LaunchedEffect(helperMessage, isAskMode) {
+        if (helperMessage != null && !isAskMode) {
+            delay(6000)
+            helperMessage = null
+        }
+    }
     
     // Update mascot mood based on tab
     val currentTab = AppTab.entries[pagerState.currentPage]

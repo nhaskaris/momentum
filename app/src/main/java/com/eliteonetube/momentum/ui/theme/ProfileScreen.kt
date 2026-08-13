@@ -71,21 +71,32 @@ fun ProfileScreen(
     var isProcessingImage by remember { mutableStateOf(false) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
             isProcessingImage = true
-            val image = InputImage.fromFilePath(context, it)
             val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            recognizer.process(image)
-                .addOnSuccessListener { visionText ->
-                    val parsed = WeightHistoryParser.parse(visionText)
-                    detectedWeights = parsed
-                    isProcessingImage = false
-                }
-                .addOnFailureListener {
-                    isProcessingImage = false
-                }
+            var processedCount = 0
+            val allDetected = mutableListOf<WeightEntry>()
+
+            uris.forEach { uri ->
+                val image = InputImage.fromFilePath(context, uri)
+                recognizer.process(image)
+                    .addOnSuccessListener { visionText ->
+                        val parsed = WeightHistoryParser.parse(visionText)
+                        allDetected.addAll(parsed)
+                    }
+                    .addOnCompleteListener {
+                        processedCount++
+                        if (processedCount == uris.size) {
+                            if (allDetected.isNotEmpty()) {
+                                // Group by date and keep latest found for that date
+                                detectedWeights = allDetected.distinctBy { it.date }.sortedByDescending { it.date }
+                            }
+                            isProcessingImage = false
+                        }
+                    }
+            }
         }
     }
 
@@ -311,7 +322,7 @@ fun ProfileScreen(
                         } else {
                             Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Import from Screenshot", fontWeight = FontWeight.Bold)
+                            Text("Scan Multi Weights", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
