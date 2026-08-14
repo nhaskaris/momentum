@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.room3.Room
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.logic.*
 import com.eliteonetube.momentum.ui.HomeScreen
@@ -74,24 +73,7 @@ class MainActivity : ComponentActivity() {
         WorkScheduler.scheduleWeeklyRecalculation(applicationContext)
         WorkScheduler.scheduleDailyWeighInReminder(applicationContext)
 
-        val database = Room.databaseBuilder<WeightDatabase>(
-            context = applicationContext,
-            name = "weight_tracker_db",
-        ).addMigrations(
-            WeightDatabase.MIGRATION_12_13,
-            WeightDatabase.MIGRATION_13_14,
-            WeightDatabase.MIGRATION_14_15,
-            WeightDatabase.MIGRATION_15_16,
-            WeightDatabase.MIGRATION_16_17,
-            WeightDatabase.MIGRATION_17_18,
-            WeightDatabase.MIGRATION_18_19,
-            WeightDatabase.MIGRATION_19_20,
-            WeightDatabase.MIGRATION_20_21,
-            WeightDatabase.MIGRATION_21_22,
-            WeightDatabase.MIGRATION_22_23,
-            WeightDatabase.MIGRATION_23_24,
-            WeightDatabase.MIGRATION_24_25,
-        ).fallbackToDestructiveMigration().build()
+        val database = WeightDatabase.getInstance(applicationContext)
 
         val weightDao = database.weightDao()
         val workoutDao = database.workoutDao()

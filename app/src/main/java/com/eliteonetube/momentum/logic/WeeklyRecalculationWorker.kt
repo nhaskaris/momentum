@@ -1,7 +1,6 @@
 package com.eliteonetube.momentum.logic
 
 import android.content.Context
-import androidx.room3.Room
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.eliteonetube.momentum.data.WeightDatabase
@@ -16,23 +15,7 @@ class WeeklyRecalculationWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val database = Room.databaseBuilder<WeightDatabase>(
-                context = applicationContext,
-                name = "weight_tracker_db",
-            ).addMigrations(
-                WeightDatabase.MIGRATION_12_13,
-                WeightDatabase.MIGRATION_13_14,
-                WeightDatabase.MIGRATION_14_15,
-                WeightDatabase.MIGRATION_15_16,
-                WeightDatabase.MIGRATION_16_17,
-                WeightDatabase.MIGRATION_17_18,
-                WeightDatabase.MIGRATION_18_19,
-                WeightDatabase.MIGRATION_19_20,
-                WeightDatabase.MIGRATION_20_21,
-                WeightDatabase.MIGRATION_21_22,
-                WeightDatabase.MIGRATION_22_23,
-                WeightDatabase.MIGRATION_23_24
-            ).fallbackToDestructiveMigration().build()
+            val database = WeightDatabase.getInstance(applicationContext)
 
             val dao = database.weightDao()
             val profile = dao.getUserProfile().first() ?: return Result.success()

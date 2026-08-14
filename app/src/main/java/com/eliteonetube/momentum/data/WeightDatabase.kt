@@ -17,6 +17,7 @@ import androidx.sqlite.execSQL
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room3.Transaction
+import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
 enum class Goal { CUT, BULK, MAINTAIN, REVERSE }
@@ -479,6 +480,26 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
 
     companion object {
+        @Volatile
+        private var INSTANCE: WeightDatabase? = null
+
+        fun getInstance(context: Context): WeightDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = androidx.room3.Room.databaseBuilder(
+                    context.applicationContext,
+                    WeightDatabase::class.java,
+                    "weight_tracker_db"
+                ).addMigrations(
+                    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
+                    MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
+                    MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
+                    MIGRATION_24_25
+                ).fallbackToDestructiveMigration().build()
+                INSTANCE = instance
+                instance
+            }
+        }
+
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE logged_set_table ADD COLUMN notes TEXT")
