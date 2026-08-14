@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
@@ -34,6 +35,7 @@ import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
 import com.eliteonetube.momentum.ui.theme.MomentumDark
 import com.eliteonetube.momentum.ui.theme.bounceClick
+import com.eliteonetube.momentum.widget.WidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -83,6 +85,7 @@ fun HomeScreen(
     onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
     onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit
 ) {
+    val context = LocalContext.current
     if (savedProfile == null) {
         var showIntro by remember { mutableStateOf(true) }
         if (showIntro) {
@@ -296,11 +299,20 @@ fun HomeScreen(
                             onWeightSubmitted(enteredWeight)
                             // Mascot feedback
                             mascotMood = MascotMood.HAPPY
+                            helperMessage = "Logged! Great job keeping the momentum."
                             delay(3000)
                             mascotMood = if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
+                            
+                            // Update widget after logging weight
+                            WidgetUpdater.refresh(context)
                         }
                     },
-                    onAdjustmentAccepted = onAdjustmentAccepted,
+                    onAdjustmentAccepted = {
+                        coroutineScope.launch {
+                            onAdjustmentAccepted()
+                            WidgetUpdater.refresh(context)
+                        }
+                    },
                     onAdjustmentDismissed = onAdjustmentDismissed,
                     onStartCheckIn = { showCheckIn = true }
                 )
@@ -315,10 +327,25 @@ fun HomeScreen(
                     recentWeights = recentWeights,
                     todayLogs = todayFoodLogs,
                     allFoodItems = allFoodItems,
-                    onLogFood = onFoodLogged,
-                    onDeleteLog = onFoodLogDeleted,
-                    onEditLog = { logToEdit = it },
-                    onQuickLog = onQuickLog,
+                    onLogFood = { id, qty ->
+                        coroutineScope.launch {
+                            onFoodLogged(id, qty)
+                            WidgetUpdater.refresh(context)
+                        }
+                    },
+                    onDeleteLog = { id ->
+                        coroutineScope.launch {
+                            onFoodLogDeleted(id)
+                            WidgetUpdater.refresh(context)
+                        }
+                    },
+                    onEditLog = { log -> logToEdit = log },
+                    onQuickLog = { item ->
+                        coroutineScope.launch {
+                            onQuickLog(item)
+                            WidgetUpdater.refresh(context)
+                        }
+                    },
                     onStartScan = { showScanner = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(

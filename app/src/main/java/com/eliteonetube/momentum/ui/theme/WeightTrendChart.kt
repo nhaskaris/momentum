@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -12,6 +13,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.WeightEntry
@@ -36,9 +38,10 @@ fun WeightTrendChart(
         return
     }
 
-    val chartEntries = entries.take(days).reversed()
+    val chartEntries = remember(entries, days) { entries.take(days).reversed() }
     val lineColor = MaterialTheme.colorScheme.primary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val density = LocalDensity.current
 
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Canvas(
@@ -51,7 +54,7 @@ fun WeightTrendChart(
             val maxWeight = weights.max()
             val range = (maxWeight - minWeight).takeIf { it > 0.01 } ?: 1.0
 
-            val paddingY = 16.dp.toPx()
+            val paddingY = with(density) { 16.dp.toPx() }
             val chartHeight = size.height - (paddingY * 2)
             val stepX = if (chartEntries.size > 1) size.width / (chartEntries.size - 1) else 0f
 
@@ -71,11 +74,11 @@ fun WeightTrendChart(
             drawPath(
                 path = path,
                 color = lineColor,
-                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                style = Stroke(width = with(density) { 4.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
 
             points.forEach { point ->
-                drawCircle(color = lineColor, radius = 5.dp.toPx(), center = point)
+                drawCircle(color = lineColor, radius = with(density) { 5.dp.toPx() }, center = point)
             }
         }
 

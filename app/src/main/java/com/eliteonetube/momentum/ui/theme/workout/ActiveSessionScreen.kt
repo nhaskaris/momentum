@@ -121,9 +121,15 @@ fun ActiveSessionScreen(
     
     val isFinishStep = pageCount > 0 && currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
 
-    val allSets = remember(setsByExercise, sessionExercises) { sessionExercises.flatMap { setsByExercise[it.id].orEmpty() } }
-    val totalVolumeKg = allSets.sumOf { it.weightKg * it.reps }
-    val completedSets = allSets.count { it.isCompleted }
+    val allSets = remember(setsByExercise, sessionExercises) { 
+        sessionExercises.flatMap { setsByExercise[it.id].orEmpty() } 
+    }
+    val totalVolumeKg by remember(allSets) { 
+        derivedStateOf { allSets.sumOf { it.weightKg * it.reps } } 
+    }
+    val completedSets by remember(allSets) { 
+        derivedStateOf { allSets.count { it.isCompleted } } 
+    }
 
     val volumeDisplay = if (unitSystem == UnitSystem.IMPERIAL) {
         "${(totalVolumeKg * 2.20462).toInt()} lbs"

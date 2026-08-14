@@ -19,8 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.eliteonetube.momentum.data.FoodItem
+import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.bounceClick
+import com.eliteonetube.momentum.ui.theme.nutrition.QuickMacroDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,10 +35,12 @@ fun AddFoodDialog(
     var searchQuery by remember { mutableStateOf("") }
     var showQuickMacro by remember { mutableStateOf(false) }
 
-    val filteredItems = if (searchQuery.isBlank()) {
-        foodItems.take(10) // Show some recent or popular ones?
-    } else {
-        foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val filteredItems = remember(searchQuery, foodItems) {
+        if (searchQuery.isBlank()) {
+            foodItems.take(20)
+        } else {
+            foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        }
     }
 
     if (showQuickMacro) {

@@ -49,18 +49,30 @@ fun NutritionScreen(
     onQuickLog: (FoodItem) -> Unit,
     onStartScan: () -> Unit
 ) {
-    val currentWeightKg = recentWeights.firstOrNull()?.weight ?: profile.height
+    val currentWeightKg = remember(recentWeights, profile.height) { 
+        recentWeights.firstOrNull()?.weight ?: profile.height 
+    }
 
-    // Consumed stats
-    val caloriesConsumed = todayLogs.sumOf { it.calories * it.quantity }
-    val proteinConsumed = todayLogs.sumOf { it.protein * it.quantity }
-    val fatConsumed = todayLogs.sumOf { it.fat * it.quantity }
-    val carbsConsumed = todayLogs.sumOf { it.carbs * it.quantity }
+    // Consumed stats (wrapped in remember to avoid repeated calculations)
+    val caloriesConsumed by remember(todayLogs) { 
+        derivedStateOf { todayLogs.sumOf { it.calories * it.quantity } } 
+    }
+    val proteinConsumed by remember(todayLogs) { 
+        derivedStateOf { todayLogs.sumOf { it.protein * it.quantity } } 
+    }
+    val fatConsumed by remember(todayLogs) { 
+        derivedStateOf { todayLogs.sumOf { it.fat * it.quantity } } 
+    }
+    val carbsConsumed by remember(todayLogs) { 
+        derivedStateOf { todayLogs.sumOf { it.carbs * it.quantity } } 
+    }
 
     // Targets
-    val proteinGramsTarget = (currentWeightKg * 2.0).roundToInt()
-    val fatGramsTarget = (currentWeightKg * 0.8).roundToInt()
-    val carbGramsTarget = ((calorieTarget - (proteinGramsTarget * 4) - (fatGramsTarget * 9)) / 4.0).roundToInt()
+    val proteinGramsTarget = remember(currentWeightKg) { (currentWeightKg * 2.0).roundToInt() }
+    val fatGramsTarget = remember(currentWeightKg) { (currentWeightKg * 0.8).roundToInt() }
+    val carbGramsTarget = remember(calorieTarget, proteinGramsTarget, fatGramsTarget) { 
+        ((calorieTarget - (proteinGramsTarget * 4) - (fatGramsTarget * 9)) / 4.0).roundToInt() 
+    }
 
     var showAddFood by remember { mutableStateOf(false) }
 

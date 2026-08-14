@@ -43,7 +43,7 @@ fun MainDashboard(
     onStartCheckIn: () -> Unit
 ) {
     val today = remember { LocalDate.now().toString() }
-    val todayEntry = recentWeights.firstOrNull { it.date == today }
+    val todayEntry = remember(recentWeights, today) { recentWeights.firstOrNull { it.date == today } }
     val unitLabel = if (profile.unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
 
     var weightInput by remember { mutableStateOf("") }
