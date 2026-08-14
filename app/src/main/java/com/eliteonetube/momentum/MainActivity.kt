@@ -324,6 +324,18 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
+                            onQuickLog = { item ->
+                                coroutineScope.launch {
+                                    val id = foodDao.insertFoodItem(item)
+                                    foodDao.insertFoodLog(
+                                        DailyFoodLog(
+                                            date = LocalDate.now().toString(),
+                                            foodItemId = id,
+                                            quantity = 1.0
+                                        )
+                                    )
+                                }
+                            },
                             onNewFoodItemCreated = { item ->
                                 coroutineScope.launch {
                                     foodDao.insertFoodItem(item)

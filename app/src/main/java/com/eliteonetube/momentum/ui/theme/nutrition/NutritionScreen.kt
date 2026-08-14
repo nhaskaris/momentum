@@ -1,7 +1,6 @@
 package com.eliteonetube.momentum.ui
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,8 +32,9 @@ import com.eliteonetube.momentum.data.FoodLogWithItem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.ui.theme.*
+import com.eliteonetube.momentum.ui.theme.nutrition.AddFoodDialog
+import com.eliteonetube.momentum.ui.theme.nutrition.QuickMacroDialog
 import kotlin.math.roundToInt
-import java.util.Locale
 
 @Composable
 fun NutritionScreen(
@@ -47,6 +46,7 @@ fun NutritionScreen(
     onLogFood: (Long, Double) -> Unit,
     onDeleteLog: (Long) -> Unit,
     onEditLog: (FoodLogWithItem) -> Unit,
+    onQuickLog: (FoodItem) -> Unit,
     onStartScan: () -> Unit
 ) {
     val currentWeightKg = recentWeights.firstOrNull()?.weight ?: profile.height
@@ -62,16 +62,18 @@ fun NutritionScreen(
     val fatGramsTarget = (currentWeightKg * 0.8).roundToInt()
     val carbGramsTarget = ((calorieTarget - (proteinGramsTarget * 4) - (fatGramsTarget * 9)) / 4.0).roundToInt()
 
-    var showFoodSearch by remember { mutableStateOf(false) }
+    var showAddFood by remember { mutableStateOf(false) }
 
-    if (showFoodSearch) {
-        FoodSearchDialog(
+    if (showAddFood) {
+        AddFoodDialog(
             foodItems = allFoodItems,
-            onDismiss = { showFoodSearch = false },
+            onDismiss = { showAddFood = false },
             onFoodSelected = { foodId, qty ->
                 onLogFood(foodId, qty)
-                showFoodSearch = false
-            }
+                showAddFood = false
+            },
+            onQuickLog = onQuickLog,
+            onStartScan = onStartScan
         )
     }
 
@@ -122,27 +124,15 @@ fun NutritionScreen(
         }
 
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = { showFoodSearch = true },
-                    modifier = Modifier.weight(1f).height(56.dp).bounceClick(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Search", fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onStartScan,
-                    modifier = Modifier.weight(1f).height(56.dp).bounceClick(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scan Food", fontWeight = FontWeight.Bold)
-                }
+            Button(
+                onClick = { showAddFood = true },
+                modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Add Food", fontWeight = FontWeight.Black, fontSize = 18.sp)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -233,20 +223,6 @@ fun MacroBar(label: String, current: Int, target: Int, color: Color) {
 }
 
 @Composable
-fun MiniStat(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(
-            modifier = Modifier.size(8.dp),
-            color = color,
-            shape = CircleShape
-        ) {}
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
 fun SectionHeader(title: String, icon: ImageVector) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -329,81 +305,6 @@ fun MacroExplanationCard(title: String, description: String, color: Color) {
             Text(title, fontWeight = FontWeight.Bold, color = color, style = MaterialTheme.typography.titleSmall)
             Spacer(modifier = Modifier.height(4.dp))
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-fun FoodSearchDialog(
-    foodItems: List<FoodItem>,
-    onDismiss: () -> Unit,
-    onFoodSelected: (Long, Double) -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    val filteredItems = foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Search Foods", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = { if(searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    )
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(filteredItems) { item ->
-                        ListItem(
-                            headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}") },
-                            leadingContent = {
-                                Surface(
-                                    modifier = Modifier.size(40.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(item.name.take(1).uppercase(), color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            },
-                            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { 
-                                onFoodSelected(item.id, 1.0)
-                            }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    }
-                }
-            }
         }
     }
 }

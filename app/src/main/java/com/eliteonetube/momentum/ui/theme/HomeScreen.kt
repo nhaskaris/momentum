@@ -68,6 +68,7 @@ fun HomeScreen(
     onFoodLogged: (Long, Double) -> Unit,
     onFoodLogDeleted: (Long) -> Unit,
     onFoodLogUpdated: (Long, Long, Double) -> Unit,
+    onQuickLog: (FoodItem) -> Unit,
     onNewFoodItemCreated: (FoodItem) -> Unit,
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
     onClearActiveWorkout: () -> Unit,
@@ -317,6 +318,7 @@ fun HomeScreen(
                     onLogFood = onFoodLogged,
                     onDeleteLog = onFoodLogDeleted,
                     onEditLog = { logToEdit = it },
+                    onQuickLog = onQuickLog,
                     onStartScan = { showScanner = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(
