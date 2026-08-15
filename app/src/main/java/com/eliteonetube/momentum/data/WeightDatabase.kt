@@ -81,7 +81,10 @@ data class UserProfile(
     val theme: AppTheme = AppTheme.SYSTEM,
     val useExternalApi: Boolean = false,
     val activeWorkoutTemplateId: Long? = null,
-    val hasActiveWorkout: Boolean = false
+    val hasActiveWorkout: Boolean = false,
+    val remindersEnabled: Boolean = true,
+    val morningReminderTime: String = "08:30",
+    val eveningReminderTime: String = "20:00"
 )
 
 @Entity(tableName = "check_in_table")
@@ -471,7 +474,7 @@ interface WorkoutDao {
         DailyFoodLog::class,
         ActiveWorkoutSet::class
     ],
-    version = 25
+    version = 26
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -493,7 +496,7 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                     MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
-                    MIGRATION_24_25
+                    MIGRATION_24_25, MIGRATION_25_26
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -640,6 +643,14 @@ abstract class WeightDatabase : RoomDatabase() {
                 connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN distanceKm REAL")
                 connection.execSQL("ALTER TABLE template_exercise_table ADD COLUMN targetDurationSeconds INTEGER")
                 connection.execSQL("ALTER TABLE template_exercise_table ADD COLUMN targetDistanceKm REAL")
+            }
+        }
+
+        val MIGRATION_25_26 = object : Migration(25, 26) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN remindersEnabled INTEGER NOT NULL DEFAULT 1")
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN morningReminderTime TEXT NOT NULL DEFAULT '08:30'")
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN eveningReminderTime TEXT NOT NULL DEFAULT '20:00'")
             }
         }
     }

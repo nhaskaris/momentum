@@ -28,8 +28,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.eliteonetube.momentum.data.AppTheme
 import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Goal
@@ -90,7 +93,6 @@ fun ProfileScreen(
                         processedCount++
                         if (processedCount == uris.size) {
                             if (allDetected.isNotEmpty()) {
-                                // Group by date and keep latest found for that date
                                 detectedWeights = allDetected.distinctBy { it.date }.sortedByDescending { it.date }
                             }
                             isProcessingImage = false
@@ -141,7 +143,6 @@ fun ProfileScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Hero Section
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -191,7 +192,6 @@ fun ProfileScreen(
                 }
             }
 
-            // 1. Body Composition Block
             ProfileBlock(title = "Body Composition", icon = Icons.Default.MonitorWeight) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatCard(
@@ -210,7 +210,6 @@ fun ProfileScreen(
                 }
             }
 
-            // 2. Physical Details Block
             ProfileBlock(title = "Physical Details", icon = Icons.Default.Person) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ProfileStatRow(
@@ -231,7 +230,6 @@ fun ProfileScreen(
                 }
             }
 
-            // 3. Activity & Connectivity Block
             ProfileBlock(title = "Activity & Integration", icon = Icons.AutoMirrored.Filled.DirectionsWalk) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ProfileStatRow(
@@ -253,7 +251,6 @@ fun ProfileScreen(
                 }
             }
 
-            // 4. Goal & Metabolism Block
             ProfileBlock(title = "Goal & Metabolism", icon = Icons.Default.LocalFireDepartment) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Card(
@@ -302,7 +299,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Data Import Block
             ProfileBlock(title = "Data Management", icon = Icons.Default.FileDownload) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -328,7 +324,6 @@ fun ProfileScreen(
                 }
             }
 
-            // 5. Progress Gallery Block
             if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
                 ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -351,9 +346,25 @@ fun ProfileScreen(
                 }
             }
 
-            // 6. App Settings Block
             ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Daily Reminders", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text("Morning: ${profile.morningReminderTime} • Evening: ${profile.eveningReminderTime}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = profile.remindersEnabled,
+                            onCheckedChange = { onProfileUpdated(profile.copy(remindersEnabled = it)) }
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -386,7 +397,7 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
@@ -624,6 +635,7 @@ private fun ChangeGoalDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditProfileForm(
     profile: UserProfile,
@@ -632,7 +644,6 @@ private fun EditProfileForm(
 ) {
     var unitSystem by remember { mutableStateOf(profile.unitSystem) }
     val context = LocalContext.current
-    val healthConnectManager = remember { HealthConnectManager(context) }
     var useHealthConnect by remember { mutableStateOf(profile.useHealthConnect) }
 
     val initialFeetInches = remember { Units.cmToFeetInches(profile.height) }
@@ -644,6 +655,48 @@ private fun EditProfileForm(
     var bodyFatInput by remember { mutableStateOf(profile.bodyFatPercentage?.toString() ?: "") }
     var isMale by remember { mutableStateOf(profile.isMale) }
     var stepsInput by remember { mutableStateOf(profile.averageDailySteps.toString()) }
+
+    var morningTime by remember { mutableStateOf(profile.morningReminderTime) }
+    var eveningTime by remember { mutableStateOf(profile.eveningReminderTime) }
+
+    var showMorningPicker by remember { mutableStateOf(false) }
+    var showEveningPicker by remember { mutableStateOf(false) }
+
+    if (showMorningPicker) {
+        val initial = morningTime.split(":")
+        val state = rememberTimePickerState(
+            initialHour = initial.getOrNull(0)?.toIntOrNull() ?: 8,
+            initialMinute = initial.getOrNull(1)?.toIntOrNull() ?: 30,
+            is24Hour = true
+        )
+        TimePickerDialog(
+            onDismiss = { showMorningPicker = false },
+            onConfirm = {
+                morningTime = "%02d:%02d".format(state.hour, state.minute)
+                showMorningPicker = false
+            }
+        ) {
+            TimePicker(state = state)
+        }
+    }
+
+    if (showEveningPicker) {
+        val initial = eveningTime.split(":")
+        val state = rememberTimePickerState(
+            initialHour = initial.getOrNull(0)?.toIntOrNull() ?: 20,
+            initialMinute = initial.getOrNull(1)?.toIntOrNull() ?: 0,
+            is24Hour = true
+        )
+        TimePickerDialog(
+            onDismiss = { showEveningPicker = false },
+            onConfirm = {
+                eveningTime = "%02d:%02d".format(state.hour, state.minute)
+                showEveningPicker = false
+            }
+        ) {
+            TimePicker(state = state)
+        }
+    }
 
     val parsedAge = age.toIntOrNull()
     val parsedBodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()
@@ -672,7 +725,6 @@ private fun EditProfileForm(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Form Hero
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -687,7 +739,6 @@ private fun EditProfileForm(
         }
 
         Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            // Unit Switch
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -709,7 +760,6 @@ private fun EditProfileForm(
                 }
             }
 
-            // Height
             if (unitSystem == UnitSystem.IMPERIAL) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedTextField(
@@ -741,7 +791,6 @@ private fun EditProfileForm(
                 )
             }
 
-            // Age & BF
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = age,
@@ -763,7 +812,6 @@ private fun EditProfileForm(
                 )
             }
 
-            // Steps
             OutlinedTextField(
                 value = stepsInput,
                 onValueChange = { stepsInput = it },
@@ -774,7 +822,6 @@ private fun EditProfileForm(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
             )
 
-            // Sex
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Biological Sex", fontWeight = FontWeight.Bold)
                 SingleChoiceSegmentedButtonRow {
@@ -783,12 +830,26 @@ private fun EditProfileForm(
                 }
             }
 
-            // Actions
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TimeInputButton(
+                    label = "Morning Reminder",
+                    time = morningTime,
+                    onClick = { showMorningPicker = true },
+                    modifier = Modifier.weight(1f)
+                )
+                TimeInputButton(
+                    label = "Evening Reminder",
+                    time = eveningTime,
+                    onClick = { showEveningPicker = true },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Cancel") }
                 Button(
                     onClick = {
-                        onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect))
+                        onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect, morningReminderTime = morningTime, eveningReminderTime = eveningTime))
                     },
                     enabled = allValid,
                     modifier = Modifier.weight(1.5f).height(56.dp),
@@ -799,4 +860,56 @@ private fun EditProfileForm(
             Spacer(modifier = Modifier.height(48.dp))
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeInputButton(
+    label: String,
+    time: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+        Surface(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = time, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("OK") }
+        },
+        text = {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+                content()
+            }
+        },
+        shape = RoundedCornerShape(28.dp)
+    )
 }

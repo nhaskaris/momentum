@@ -71,7 +71,6 @@ class MainActivity : ComponentActivity() {
         }
 
         WorkScheduler.scheduleWeeklyRecalculation(applicationContext)
-        WorkScheduler.scheduleDailyWeighInReminder(applicationContext)
 
         val database = WeightDatabase.getInstance(applicationContext)
 
@@ -121,7 +120,10 @@ class MainActivity : ComponentActivity() {
                     }
 
                     LaunchedEffect(savedProfile) {
-                        savedProfile?.let { currentCalorieTarget = it.currentCalorieTarget }
+                        savedProfile?.let { 
+                            currentCalorieTarget = it.currentCalorieTarget
+                            WorkScheduler.scheduleDailyReminders(applicationContext, it)
+                        }
                     }
 
                     if (!isProfileLoaded) {
