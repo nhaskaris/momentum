@@ -132,16 +132,29 @@ data class DailyFoodLog(
     val quantity: Double
 )
 
+@Entity(tableName = "daily_meal_log_table")
+data class DailyMealLog(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val mealId: Long,
+    val name: String,
+    val calories: Double,
+    val protein: Double,
+    val fat: Double,
+    val carbs: Double
+)
+
 data class FoodLogWithItem(
     val id: Long,
-    val date: String,
+    val date: String = "", 
     val foodItemId: Long,
     val quantity: Double,
     val name: String,
     val calories: Double,
     val protein: Double,
     val fat: Double,
-    val carbs: Double
+    val carbs: Double,
+    val isMeal: Boolean = false
 )
 
 @Entity(tableName = "exercise_table")
@@ -292,6 +305,43 @@ interface WeightDao {
     fun getAllCheckIns(): Flow<List<CheckIn>>
 }
 
+@Entity(tableName = "meal_table")
+data class Meal(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val notes: String? = null
+)
+
+@Entity(
+    tableName = "meal_food_item_table",
+    foreignKeys = [
+        ForeignKey(
+            entity = Meal::class,
+            parentColumns = ["id"],
+            childColumns = ["mealId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = FoodItem::class,
+            parentColumns = ["id"],
+            childColumns = ["foodItemId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("mealId"), Index("foodItemId")]
+)
+data class MealFoodItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val mealId: Long,
+    val foodItemId: Long,
+    val quantity: Double
+)
+
+data class MealWithItems(
+    val meal: Meal,
+    val items: List<FoodLogWithItem> // Reuse FoodLogWithItem or similar structure
+)
+
 @Dao
 interface FoodDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -326,6 +376,40 @@ interface FoodDao {
 
     @Query("SELECT COUNT(*) FROM food_item_table")
     suspend fun foodItemCount(): Int
+
+    // --- MEAL DAO QUERIES ---
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMeal(meal: Meal): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMealFoodItem(mealFoodItem: MealFoodItem)
+
+    @Query("SELECT * FROM meal_table ORDER BY name ASC")
+    fun getAllMeals(): Flow<List<Meal>>
+
+    @Query("""
+        SELECT meal_food_item_table.*, food_item_table.name, food_item_table.calories, 
+               food_item_table.protein, food_item_table.fat, food_item_table.carbs
+        FROM meal_food_item_table
+        INNER JOIN food_item_table ON meal_food_item_table.foodItemId = food_item_table.id
+        WHERE meal_food_item_table.mealId = :mealId
+    """)
+    fun getItemsForMeal(mealId: Long): Flow<List<FoodLogWithItem>>
+
+    @Query("DELETE FROM meal_table WHERE id = :mealId")
+    suspend fun deleteMeal(mealId: Long)
+
+    // --- DAILY MEAL LOG QUERIES ---
+
+    @Insert
+    suspend fun insertDailyMealLog(log: DailyMealLog)
+
+    @Query("SELECT * FROM daily_meal_log_table WHERE date = :date")
+    fun getDailyMealLogsForDate(date: String): Flow<List<DailyMealLog>>
+
+    @Query("DELETE FROM daily_meal_log_table WHERE id = :logId")
+    suspend fun deleteDailyMealLog(logId: Long)
 }
 
 @Dao
@@ -472,9 +556,12 @@ interface WorkoutDao {
         CheckIn::class,
         FoodItem::class,
         DailyFoodLog::class,
-        ActiveWorkoutSet::class
+        ActiveWorkoutSet::class,
+        Meal::class,
+        MealFoodItem::class,
+        DailyMealLog::class
     ],
-    version = 26
+    version = 28
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -496,7 +583,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                     MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
-                    MIGRATION_24_25, MIGRATION_25_26
+                    MIGRATION_24_25, MIGRATION_25_26,
+                    MIGRATION_26_27, MIGRATION_27_28
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -651,6 +739,53 @@ abstract class WeightDatabase : RoomDatabase() {
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN remindersEnabled INTEGER NOT NULL DEFAULT 1")
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN morningReminderTime TEXT NOT NULL DEFAULT '08:30'")
                 connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN eveningReminderTime TEXT NOT NULL DEFAULT '20:00'")
+            }
+        }
+
+        val MIGRATION_26_27 = object : Migration(26, 27) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meal_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        notes TEXT
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meal_food_item_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        mealId INTEGER NOT NULL,
+                        foodItemId INTEGER NOT NULL,
+                        quantity REAL NOT NULL,
+                        FOREIGN KEY(mealId) REFERENCES meal_table(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(foodItemId) REFERENCES food_item_table(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_meal_food_item_table_mealId ON meal_food_item_table (mealId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_meal_food_item_table_foodItemId ON meal_food_item_table (foodItemId)")
+            }
+        }
+
+        val MIGRATION_27_28 = object : Migration(27, 28) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS daily_meal_log_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        date TEXT NOT NULL,
+                        mealId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        calories REAL NOT NULL,
+                        protein REAL NOT NULL,
+                        fat REAL NOT NULL,
+                        carbs REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

@@ -27,10 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.eliteonetube.momentum.data.FoodItem
-import com.eliteonetube.momentum.data.FoodLogWithItem
-import com.eliteonetube.momentum.data.UserProfile
-import com.eliteonetube.momentum.data.WeightEntry
+import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.*
 import com.eliteonetube.momentum.ui.theme.nutrition.AddFoodDialog
 import com.eliteonetube.momentum.ui.theme.nutrition.QuickMacroDialog
@@ -43,10 +40,13 @@ fun NutritionScreen(
     recentWeights: List<WeightEntry>,
     todayLogs: List<FoodLogWithItem> = emptyList(),
     allFoodItems: List<FoodItem> = emptyList(),
+    allMeals: List<Meal> = emptyList(),
     onLogFood: (Long, Double) -> Unit,
-    onDeleteLog: (Long) -> Unit,
+    onLogMeal: (Long) -> Unit,
+    onDeleteLog: (Long, Boolean) -> Unit,
     onEditLog: (FoodLogWithItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
+    onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onStartScan: () -> Unit
 ) {
     val currentWeightKg = remember(recentWeights, profile.height) { 
@@ -79,11 +79,17 @@ fun NutritionScreen(
     if (showAddFood) {
         AddFoodDialog(
             foodItems = allFoodItems,
+            allMeals = allMeals,
             onDismiss = { showAddFood = false },
             onFoodSelected = { foodId, qty ->
                 onLogFood(foodId, qty)
                 showAddFood = false
             },
+            onMealSelected = { mealId ->
+                onLogMeal(mealId)
+                showAddFood = false
+            },
+            onMealCreated = onMealCreated,
             onQuickLog = onQuickLog,
             onStartScan = onStartScan
         )
@@ -164,7 +170,7 @@ fun NutritionScreen(
                         todayLogs.forEachIndexed { index, log ->
                             FoodLogItem(
                                 log = log, 
-                                onDelete = { onDeleteLog(log.id) },
+                                onDelete = { onDeleteLog(log.id, log.isMeal) },
                                 onClick = { onEditLog(log) }
                             )
                             if (index < todayLogs.size - 1) {
@@ -269,7 +275,7 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onClick() }
+            .bounceClick { if (!log.isMeal) onClick() } // Meals might not be editable yet
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -278,25 +284,50 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                color = if (log.isMeal) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f) 
+                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(log.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    if (log.isMeal) {
+                        Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                    } else {
+                        Text(log.name.take(1).uppercase(), fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(log.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(log.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                    if (log.isMeal) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                "MEAL", 
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
                 Text(
-                    "${(log.calories * log.quantity).roundToInt()} kcal • ${if (log.quantity >= 1.0) log.quantity.roundToInt() else log.quantity} qty",
+                    text = if (log.isMeal) "${log.calories.roundToInt()} kcal • Bundle"
+                           else "${(log.calories * log.quantity).roundToInt()} kcal • ${if (log.quantity >= 1.0) log.quantity.roundToInt() else log.quantity} qty",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClick) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            if (!log.isMeal) {
+                IconButton(onClick = onClick) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))

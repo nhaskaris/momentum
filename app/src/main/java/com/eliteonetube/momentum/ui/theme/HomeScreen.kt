@@ -50,6 +50,7 @@ fun HomeScreen(
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
     allCheckIns: List<CheckIn> = emptyList(),
+    allMeals: List<Meal> = emptyList(),
     todayFoodLogs: List<FoodLogWithItem> = emptyList(),
     allFoodItems: List<FoodItem> = emptyList(),
     activeSets: List<ActiveWorkoutSet> = emptyList(),
@@ -68,8 +69,10 @@ fun HomeScreen(
     onAdjustmentAccepted: () -> Unit,
     onAdjustmentDismissed: () -> Unit,
     onFoodLogged: (Long, Double) -> Unit,
-    onFoodLogDeleted: (Long) -> Unit,
+    onFoodLogDeleted: (Long, Boolean) -> Unit,
     onFoodLogUpdated: (Long, Long, Double) -> Unit,
+    onLogMeal: (Long) -> Unit,
+    onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onNewFoodItemCreated: (FoodItem) -> Unit,
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
@@ -327,15 +330,22 @@ fun HomeScreen(
                     recentWeights = recentWeights,
                     todayLogs = todayFoodLogs,
                     allFoodItems = allFoodItems,
+                    allMeals = allMeals,
                     onLogFood = { id, qty ->
                         coroutineScope.launch {
                             onFoodLogged(id, qty)
                             WidgetUpdater.refresh(context)
                         }
                     },
-                    onDeleteLog = { id ->
+                    onLogMeal = { mealId ->
                         coroutineScope.launch {
-                            onFoodLogDeleted(id)
+                            onLogMeal(mealId)
+                            WidgetUpdater.refresh(context)
+                        }
+                    },
+                    onDeleteLog = { id, isMeal ->
+                        coroutineScope.launch {
+                            onFoodLogDeleted(id, isMeal)
                             WidgetUpdater.refresh(context)
                         }
                     },
@@ -346,6 +356,7 @@ fun HomeScreen(
                             WidgetUpdater.refresh(context)
                         }
                     },
+                    onMealCreated = onMealCreated,
                     onStartScan = { showScanner = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(

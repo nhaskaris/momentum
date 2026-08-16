@@ -15,8 +15,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.eliteonetube.momentum.data.*
@@ -27,19 +29,32 @@ import com.eliteonetube.momentum.ui.theme.nutrition.QuickMacroDialog
 @Composable
 fun AddFoodDialog(
     foodItems: List<FoodItem>,
+    allMeals: List<Meal>,
     onDismiss: () -> Unit,
     onFoodSelected: (Long, Double) -> Unit,
+    onMealSelected: (Long) -> Unit,
+    onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onStartScan: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showQuickMacro by remember { mutableStateOf(false) }
+    var showCreateMeal by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     val filteredItems = remember(searchQuery, foodItems) {
         if (searchQuery.isBlank()) {
             foodItems.take(20)
         } else {
             foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        }
+    }
+    
+    val filteredMeals = remember(searchQuery, allMeals) {
+        if (searchQuery.isBlank()) {
+            allMeals
+        } else {
+            allMeals.filter { it.name.contains(searchQuery, ignoreCase = true) }
         }
     }
 
@@ -50,6 +65,18 @@ fun AddFoodDialog(
                 onQuickLog(it)
                 showQuickMacro = false
                 onDismiss()
+            }
+        )
+    }
+
+    if (showCreateMeal) {
+        CreateMealDialog(
+            allFoodItems = foodItems,
+            onDismiss = { showCreateMeal = false },
+            onStartScan = onStartScan,
+            onSave = { name, items ->
+                onMealCreated(name, items)
+                showCreateMeal = false
             }
         )
     }
@@ -130,43 +157,121 @@ fun AddFoodDialog(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Text(
-                        text = if (searchQuery.isBlank()) "Recent Foods" else "Results",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = Color.Transparent,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            if (tabPositions.isNotEmpty()) {
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    ) {
+                        Tab(
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            text = { Text("Items", fontWeight = FontWeight.Bold) }
+                        )
+                        Tab(
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            text = { Text("Meals", fontWeight = FontWeight.Bold) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(filteredItems) { item ->
-                        ListItem(
-                            headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}") },
-                            leadingContent = {
-                                Surface(
-                                    modifier = Modifier.size(40.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(item.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                if (selectedTab == 0) {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(filteredItems) { item ->
+                            ListItem(
+                                headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}") },
+                                leadingContent = {
+                                    Surface(
+                                        modifier = Modifier.size(40.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(item.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        }
                                     }
+                                },
+                                trailingContent = {
+                                    Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                                },
+                                modifier = Modifier
+                                    .clickable { onFoodSelected(item.id, 1.0) }
+                                    .padding(horizontal = 8.dp)
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 24.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        item {
+                            Button(
+                                onClick = { showCreateMeal = true },
+                                modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp).bounceClick(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                            ) {
+                                Icon(Icons.Default.Add, null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Create New Meal", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (filteredMeals.isEmpty()) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        "No meals saved yet.\nSave a group of items to see them here!",
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            },
-                            trailingContent = {
-                                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
-                            },
-                            modifier = Modifier
-                                .clickable { onFoodSelected(item.id, 1.0) }
-                                .padding(horizontal = 8.dp)
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                        )
+                            }
+                        } else {
+                            items(filteredMeals) { meal ->
+                                ListItem(
+                                    headlineContent = { Text(meal.name, fontWeight = FontWeight.Bold) },
+                                    supportingContent = { meal.notes?.let { Text(it) } },
+                                    leadingContent = {
+                                        Surface(
+                                            modifier = Modifier.size(40.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                                            }
+                                        }
+                                    },
+                                    trailingContent = {
+                                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                                    },
+                                    modifier = Modifier
+                                        .clickable { onMealSelected(meal.id) }
+                                        .padding(horizontal = 8.dp)
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+                            }
+                        }
                     }
                 }
             }

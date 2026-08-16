@@ -22,6 +22,7 @@ import com.eliteonetube.momentum.ui.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import com.eliteonetube.momentum.ui.workout.PendingSet
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -97,6 +98,7 @@ class MainActivity : ComponentActivity() {
                     val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
                     val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
                     val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
+                    val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
                     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
 
                     val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
@@ -104,7 +106,29 @@ class MainActivity : ComponentActivity() {
                     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
 
                     val today = remember { LocalDate.now().toString() }
-                    val todayFoodLogs by foodDao.getFoodLogsForDate(today).collectAsState(initial = emptyList())
+                    
+                    val todayFoodLogsFlow = remember(today) {
+                        combine(
+                            foodDao.getFoodLogsForDate(today),
+                            foodDao.getDailyMealLogsForDate(today)
+                        ) { items, meals ->
+                            val mappedMeals = meals.map { meal ->
+                                FoodLogWithItem(
+                                    id = meal.id,
+                                    foodItemId = meal.mealId,
+                                    quantity = 1.0,
+                                    name = meal.name,
+                                    calories = meal.calories,
+                                    protein = meal.protein,
+                                    fat = meal.fat,
+                                    carbs = meal.carbs,
+                                    isMeal = true
+                                )
+                            }
+                            items + mappedMeals
+                        }
+                    }
+                    val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
                     val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
 
                     var isProfileLoaded by remember { mutableStateOf(false) }
@@ -140,6 +164,7 @@ class MainActivity : ComponentActivity() {
                             allCheckIns = allCheckIns,
                             todayFoodLogs = todayFoodLogs,
                             allFoodItems = allFoodItems,
+                            allMeals = allMeals,
                             activeSets = activeSets,
                             hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
                             openWorkoutRequest = openWorkoutRequest,
@@ -291,9 +316,13 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            onFoodLogDeleted = { logId ->
+                            onFoodLogDeleted = { logId, isMeal ->
                                 coroutineScope.launch {
-                                    foodDao.deleteFoodLog(logId)
+                                    if (isMeal) {
+                                        foodDao.deleteDailyMealLog(logId)
+                                    } else {
+                                        foodDao.deleteFoodLog(logId)
+                                    }
                                 }
                             },
                             onFoodLogUpdated = { logId, foodId, qty ->
@@ -306,6 +335,43 @@ class MainActivity : ComponentActivity() {
                                             quantity = qty
                                         )
                                     )
+                                }
+                            },
+                            onLogMeal = { mealId ->
+                                coroutineScope.launch {
+                                    val meal = foodDao.getAllMeals().first().find { it.id == mealId } ?: return@launch
+                                    val items = foodDao.getItemsForMeal(mealId).first()
+                                    
+                                    val totalCals = items.sumOf { it.calories * it.quantity }
+                                    val totalProt = items.sumOf { it.protein * it.quantity }
+                                    val totalFat = items.sumOf { it.fat * it.quantity }
+                                    val totalCarb = items.sumOf { it.carbs * it.quantity }
+
+                                    foodDao.insertDailyMealLog(
+                                        DailyMealLog(
+                                            date = LocalDate.now().toString(),
+                                            mealId = mealId,
+                                            name = meal.name,
+                                            calories = totalCals,
+                                            protein = totalProt,
+                                            fat = totalFat,
+                                            carbs = totalCarb
+                                        )
+                                    )
+                                }
+                            },
+                            onMealCreated = { name, items ->
+                                coroutineScope.launch {
+                                    val mealId = foodDao.insertMeal(Meal(name = name))
+                                    items.forEach { (food, qty) ->
+                                        foodDao.insertMealFoodItem(
+                                            MealFoodItem(
+                                                mealId = mealId,
+                                                foodItemId = food.id,
+                                                quantity = qty
+                                            )
+                                        )
+                                    }
                                 }
                             },
                             onQuickLog = { item ->
