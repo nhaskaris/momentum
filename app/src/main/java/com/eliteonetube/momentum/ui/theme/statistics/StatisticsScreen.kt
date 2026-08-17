@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -22,8 +23,13 @@ import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.data.WorkoutSession
 import com.eliteonetube.momentum.logic.Units
+import com.eliteonetube.momentum.ui.WeightTrendChart
+import com.eliteonetube.momentum.ui.VolumeTrendChart
+import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
+import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
 import java.time.LocalDate
 import kotlin.math.roundToInt
+import androidx.compose.animation.*
 
 @Composable
 fun StatisticsScreen(
@@ -32,6 +38,9 @@ fun StatisticsScreen(
     unitSystem: UnitSystem
 ) {
     val scrollState = rememberScrollState()
+    var mascotMood by remember { mutableStateOf(MascotMood.IDLE) }
+    var scrubText by remember { mutableStateOf<String?>(null) }
+    var helperMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -50,20 +59,70 @@ fun StatisticsScreen(
                         )
                     )
                 )
-                .padding(top = 48.dp, bottom = 32.dp),
+                .padding(top = 48.dp, bottom = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                ) {
+                    // Helper Message Bubble
+                    AnimatedVisibility(
+                        visible = helperMessage != null,
+                        enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End) + scaleIn(transformOrigin = TransformOrigin(1f, 0.5f)),
+                        exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End) + scaleOut(transformOrigin = TransformOrigin(1f, 0.5f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
+                            shadowElevation = 8.dp,
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 0.5.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            ),
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = helperMessage ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Interactive Mascot
+                    Box(modifier = Modifier.size(100.dp)) {
+                        MomentumMascot(mood = mascotMood, modifier = Modifier.fillMaxSize())
+                    }
+                }
+                
+                scrubText?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp),
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } ?: run {
+                    Text(
+                        text = "Analytics",
+                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp),
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                
                 Text(
-                    text = "Analytics",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 60.sp),
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Track your long-term evolution",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    text = if (scrubText != null) "" else "Track your long-term evolution",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -74,13 +133,71 @@ fun StatisticsScreen(
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Weight Stats Section
+            // Weight Trends Section
             StatsSection("Weight Trends", Icons.Default.MonitorWeight) {
+                WeightTrendChart(
+                    entries = weights,
+                    unitSystem = unitSystem,
+                    onScrub = { entry ->
+                        if (entry != null) {
+                            val index = weights.indexOf(entry)
+                            val nextEntry = weights.getOrNull(index + 1)
+                            
+                            val comment = if (nextEntry != null) {
+                                val diff = entry.weight - nextEntry.weight
+                                when {
+                                    diff < -0.2 -> "Scale moved down! Persistence pays off."
+                                    diff > 0.2 -> "Don't sweat a daily shift—it's usually just water."
+                                    else -> "Holding steady. Consistency is our secret weapon."
+                                }
+                            } else {
+                                "Every data point helps me optimize your plan."
+                            }
+                            
+                            mascotMood = if (nextEntry != null && entry.weight < nextEntry.weight) MascotMood.HAPPY else MascotMood.IDLE
+                            scrubText = Units.displayWeight(entry.weight, unitSystem)
+                            helperMessage = comment
+                        } else {
+                            mascotMood = MascotMood.IDLE
+                            scrubText = null
+                            helperMessage = null
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 WeightStatsContent(weights, unitSystem)
             }
 
-            // Workout Stats Section
-            StatsSection("Workout Insights", Icons.Default.FitnessCenter) {
+            // Workout Trends Section
+            StatsSection("Training Volume", Icons.Default.FitnessCenter) {
+                val avgVolume = remember(recentSessions) { 
+                    if (recentSessions.isNotEmpty()) recentSessions.map { it.totalVolumeKg }.average() else 0.0 
+                }
+                
+                VolumeTrendChart(
+                    sessions = recentSessions,
+                    unitSystem = unitSystem,
+                    onScrub = { session ->
+                        if (session != null) {
+                            val comment = when {
+                                session.totalVolumeKg > avgVolume * 1.2 -> "Incredible session! You're building serious strength."
+                                session.totalVolumeKg < avgVolume * 0.8 -> "Every bit of movement counts toward the goal."
+                                else -> "Solid training day. Great job showing up!"
+                            }
+                            
+                            mascotMood = if (session.totalVolumeKg >= avgVolume) MascotMood.HAPPY else MascotMood.IDLE
+                            val vol = if (unitSystem == UnitSystem.IMPERIAL) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
+                            val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
+                            scrubText = "$vol $unit"
+                            helperMessage = comment
+                        } else {
+                            mascotMood = MascotMood.IDLE
+                            scrubText = null
+                            helperMessage = null
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 WorkoutStatsContent(recentSessions, unitSystem)
             }
             

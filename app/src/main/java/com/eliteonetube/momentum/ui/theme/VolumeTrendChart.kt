@@ -19,20 +19,19 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.eliteonetube.momentum.data.WeightEntry
-import com.eliteonetube.momentum.logic.Units
+import com.eliteonetube.momentum.data.WorkoutSession
 import com.eliteonetube.momentum.data.UnitSystem
 import kotlin.math.roundToInt
 
 @Composable
-fun WeightTrendChart(
-    entries: List<WeightEntry>,
+fun VolumeTrendChart(
+    sessions: List<WorkoutSession>,
     unitSystem: UnitSystem,
     modifier: Modifier = Modifier,
-    days: Int = 7,
-    onScrub: (WeightEntry?) -> Unit = {}
+    sessionsCount: Int = 10,
+    onScrub: (WorkoutSession?) -> Unit = {}
 ) {
-    if (entries.size < 2) {
+    if (sessions.size < 2) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -41,7 +40,7 @@ fun WeightTrendChart(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Log more weights to unlock trends.",
+                "Log more sessions to unlock trends.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -49,8 +48,8 @@ fun WeightTrendChart(
         return
     }
 
-    val chartEntries = remember(entries, days) { entries.take(days).reversed() }
-    val lineColor = MaterialTheme.colorScheme.primary
+    val chartEntries = remember(sessions, sessionsCount) { sessions.take(sessionsCount).reversed() }
+    val lineColor = Color(0xFF10B981) // CarbGreen / Volume Emerald
     val haptics = LocalHapticFeedback.current
 
     var scrubIndex by remember { mutableIntStateOf(-1) }
@@ -87,10 +86,10 @@ fun WeightTrendChart(
                 }
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val weights = chartEntries.map { it.weight }
-                val minWeight = weights.min()
-                val maxWeight = weights.max()
-                val range = (maxWeight - minWeight).takeIf { it > 0.01 } ?: 1.0
+                val volumes = chartEntries.map { it.totalVolumeKg }
+                val minVol = 0.0
+                val maxVol = volumes.max()
+                val range = maxVol.takeIf { it > 1.0 } ?: 1.0
 
                 val paddingY = 20.dp.toPx()
                 val chartHeight = size.height - (paddingY * 2)
@@ -99,7 +98,7 @@ fun WeightTrendChart(
                 points.clear()
                 chartEntries.forEachIndexed { index, entry ->
                     val x = stepX * index
-                    val normalized = (entry.weight - minWeight) / range
+                    val normalized = (entry.totalVolumeKg - minVol) / range
                     val y = paddingY + (chartHeight * (1 - normalized).toFloat())
                     points.add(Offset(x, y))
                 }
@@ -152,8 +151,11 @@ fun WeightTrendChart(
 
             if (scrubIndex != -1 && scrubIndex < chartEntries.size) {
                 val entry = chartEntries[scrubIndex]
+                val vol = if (unitSystem == UnitSystem.IMPERIAL) (entry.totalVolumeKg * 2.20462).toInt() else entry.totalVolumeKg.toInt()
+                val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
+                
                 Surface(
-                    color = MaterialTheme.colorScheme.primary,
+                    color = lineColor,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -165,16 +167,16 @@ fun WeightTrendChart(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = Units.displayWeight(entry.weight, unitSystem),
+                            text = "$vol $unit",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = entry.date.takeLast(5),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                     }
                 }

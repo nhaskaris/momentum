@@ -318,6 +318,7 @@ private fun SummaryStep(
         
         WeightTrendChart(
             entries = listOf(WeightEntry(LocalDate.now().toString(), newWeight)) + recentWeights,
+            unitSystem = profile.unitSystem,
             modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 8.dp)
         )
 

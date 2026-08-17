@@ -403,17 +403,20 @@ fun HomeScreen(
 
         // Floating Navigation Bar
         val isOnWorkoutsTab = currentTab == AppTab.WORKOUTS
+        val isOnStatsTab = currentTab == AppTab.STATISTICS
         val shouldShowNav = !isSessionActive || !isOnWorkoutsTab
         
         if (shouldShowNav) {
             // Floating Mascot + Speech Bubble
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 12.dp, end = 16.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
+            // Hide global mascot on stats tab because it has its own interactive hero mascot
+            if (!isOnStatsTab) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 12.dp, end = 16.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
@@ -555,6 +558,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
 
             Box(
                 modifier = Modifier

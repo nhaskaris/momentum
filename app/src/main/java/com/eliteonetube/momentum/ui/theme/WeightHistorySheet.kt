@@ -90,7 +90,11 @@ fun WeightHistoryBottomSheet(
 
             Text("Visual Weight Trend Chart", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            WeightTrendChart(entries = entries)
+            WeightTrendChart(
+                entries = entries,
+                unitSystem = unitSystem,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
             Text("Logged Entries List", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
