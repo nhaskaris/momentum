@@ -73,6 +73,7 @@ fun HomeScreen(
     onFoodLogUpdated: (Long, Long, Double) -> Unit,
     onLogMeal: (Long) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onFoodCreated: (FoodItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onNewFoodItemCreated: (FoodItem) -> Unit,
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
@@ -357,6 +358,7 @@ fun HomeScreen(
                         }
                     },
                     onMealCreated = onMealCreated,
+                    onFoodCreated = onFoodCreated,
                     onStartScan = { showScanner = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(

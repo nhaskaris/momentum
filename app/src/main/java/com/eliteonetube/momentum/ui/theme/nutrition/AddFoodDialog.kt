@@ -34,12 +34,14 @@ fun AddFoodDialog(
     onFoodSelected: (Long, Double) -> Unit,
     onMealSelected: (Long) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onFoodCreated: (FoodItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onStartScan: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showQuickMacro by remember { mutableStateOf(false) }
     var showCreateMeal by remember { mutableStateOf(false) }
+    var showCreateFood by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val filteredItems = remember(searchQuery, foodItems) {
@@ -77,6 +79,16 @@ fun AddFoodDialog(
             onSave = { name, items ->
                 onMealCreated(name, items)
                 showCreateMeal = false
+            }
+        )
+    }
+
+    if (showCreateFood) {
+        CreateFoodDialog(
+            onDismiss = { showCreateFood = false },
+            onSave = {
+                onFoodCreated(it)
+                showCreateFood = false
             }
         )
     }
@@ -189,6 +201,19 @@ fun AddFoodDialog(
 
                 if (selectedTab == 0) {
                     LazyColumn(modifier = Modifier.weight(1f)) {
+                        item {
+                            Button(
+                                onClick = { showCreateFood = true },
+                                modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp).bounceClick(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                            ) {
+                                Icon(Icons.Default.Add, null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Create Custom Food", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         items(filteredItems) { item ->
                             ListItem(
                                 headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },

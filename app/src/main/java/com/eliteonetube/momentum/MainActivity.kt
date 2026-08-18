@@ -374,6 +374,11 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
+                            onFoodCreated = { item ->
+                                coroutineScope.launch {
+                                    foodDao.insertFoodItem(item)
+                                }
+                            },
                             onQuickLog = { item ->
                                 coroutineScope.launch {
                                     val id = foodDao.insertFoodItem(item)

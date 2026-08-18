@@ -47,6 +47,7 @@ fun NutritionScreen(
     onEditLog: (FoodLogWithItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onFoodCreated: (FoodItem) -> Unit,
     onStartScan: () -> Unit
 ) {
     val currentWeightKg = remember(recentWeights, profile.height) { 
@@ -90,6 +91,7 @@ fun NutritionScreen(
                 showAddFood = false
             },
             onMealCreated = onMealCreated,
+            onFoodCreated = onFoodCreated,
             onQuickLog = onQuickLog,
             onStartScan = onStartScan
         )
