@@ -35,6 +35,7 @@ import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
 import com.eliteonetube.momentum.ui.theme.MomentumDark
 import com.eliteonetube.momentum.ui.theme.bounceClick
+import com.eliteonetube.momentum.logic.HealthConnectManager
 import com.eliteonetube.momentum.widget.WidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -162,6 +163,17 @@ fun HomeScreen(
     // State for tracking if a session is currently being logged (to hide navigation)
     var isSessionActive by remember(activeSets, hasActiveWorkout) {
         mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
+    }
+
+    // Live Step Update from Health Connect
+    val healthConnectManager = remember { HealthConnectManager(context) }
+    LaunchedEffect(savedProfile.useHealthConnect) {
+        if (savedProfile.useHealthConnect) {
+            val avgSteps = healthConnectManager.fetchAverageStepsLast7Days()
+            if (avgSteps != null && avgSteps != savedProfile.averageDailySteps) {
+                onProfileUpdated(savedProfile.copy(averageDailySteps = avgSteps))
+            }
+        }
     }
 
     if (showCheckIn) {

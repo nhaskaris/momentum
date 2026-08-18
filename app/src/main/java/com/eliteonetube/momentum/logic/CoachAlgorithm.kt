@@ -26,7 +26,7 @@ class CoachAlgorithm {
         bodyFatPercentage: Double? = null
     ): Int {
         val bmr = if (bodyFatPercentage != null && bodyFatPercentage > 0) {
-            // Katch-McArdle Formula
+            // Katch-McArdle Formula (more accurate if LBM is known)
             val lbm = weightKg * (100 - bodyFatPercentage) / 100.0
             370 + (21.6 * lbm)
         } else {
@@ -35,9 +35,15 @@ class CoachAlgorithm {
             (10 * weightKg) + (6.25 * heightCm) - (5 * age) + genderBonus
         }
 
-        val sedentaryMaintenance = bmr * 1.2
-        val stepCaloriesBurned = (averageDailySteps / 1000.0) * 35.0
-        return (sedentaryMaintenance + stepCaloriesBurned).roundToInt()
+        // Standard Sedentary Multiplier (1.2) covers ~3,000-4,000 steps.
+        // We use a base multiplier of 1.15 and then add granular step calories
+        // to avoid overestimating for active users.
+        val baseMaintenance = bmr * 1.15
+        
+        // 30 kcal per 1000 steps is a safe, conservative estimate
+        val stepCaloriesBurned = (averageDailySteps / 1000.0) * 30.0
+        
+        return (baseMaintenance + stepCaloriesBurned).roundToInt()
     }
 
     fun calculateGoalTransition(

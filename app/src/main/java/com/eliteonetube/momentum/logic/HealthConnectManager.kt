@@ -6,9 +6,11 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.aggregate.AggregateMetric
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -41,28 +43,19 @@ class HealthConnectManager(private val context: Context) {
         if (!isAvailable() || !hasAllPermissions()) return null
 
         try {
-            val endTime = Instant.now()
-            val startTime = endTime.minus(7, ChronoUnit.DAYS)
+            val now = Instant.now()
+            val startTime = now.minus(7, ChronoUnit.DAYS)
 
-            val response = healthConnectClient.readRecords(
-                ReadRecordsRequest(
-                    recordType = StepsRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+            val metrics = setOf(StepsRecord.COUNT_TOTAL)
+            val response = healthConnectClient.aggregate(
+                AggregateRequest(
+                    metrics = metrics,
+                    timeRangeFilter = TimeRangeFilter.between(startTime, now)
                 )
             )
 
-            if (response.records.isEmpty()) return null
-
-            // Group by day to get total steps per day
-            val stepsByDay = response.records.groupBy {
-                ZonedDateTime.ofInstant(it.startTime, it.startZoneOffset ?: ZoneId.systemDefault()).toLocalDate()
-            }.mapValues { entry ->
-                entry.value.sumOf { it.count }
-            }
-
-            if (stepsByDay.isEmpty()) return 0
-            
-            return stepsByDay.values.average().toInt()
+            val totalSteps = response[StepsRecord.COUNT_TOTAL] ?: return 0
+            return (totalSteps / 7).toInt()
         } catch (e: Exception) {
             return null
         }
