@@ -342,6 +342,28 @@ data class MealWithItems(
     val items: List<FoodLogWithItem> // Reuse FoodLogWithItem or similar structure
 )
 
+@Entity(
+    tableName = "template_set_table",
+    foreignKeys = [
+        ForeignKey(
+            entity = TemplateExercise::class,
+            parentColumns = ["id"],
+            childColumns = ["templateExerciseId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("templateExerciseId")]
+)
+data class TemplateSet(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val templateExerciseId: Long,
+    val setNumber: Int,
+    val targetReps: Int,
+    val targetWeightKg: Double,
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceKm: Double? = null
+)
+
 @Dao
 interface FoodDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -485,6 +507,15 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTemplateExercise(templateExercise: TemplateExercise): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTemplateSet(templateSet: TemplateSet): Long
+
+    @Query("SELECT * FROM template_set_table WHERE templateExerciseId = :templateExerciseId ORDER BY setNumber ASC")
+    suspend fun getSetsForTemplateExercise(templateExerciseId: Long): List<TemplateSet>
+
+    @Query("DELETE FROM template_set_table WHERE templateExerciseId IN (SELECT id FROM template_exercise_table WHERE templateId = :templateId)")
+    suspend fun deleteTemplateSetsByTemplateId(templateId: Long)
+
     @Query("SELECT * FROM workout_template_table ORDER BY name ASC")
     fun getAllTemplates(): Flow<List<WorkoutTemplate>>
 
@@ -559,9 +590,10 @@ interface WorkoutDao {
         ActiveWorkoutSet::class,
         Meal::class,
         MealFoodItem::class,
-        DailyMealLog::class
+        DailyMealLog::class,
+        TemplateSet::class
     ],
-    version = 28
+    version = 29
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -584,7 +616,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                     MIGRATION_24_25, MIGRATION_25_26,
-                    MIGRATION_26_27, MIGRATION_27_28
+                    MIGRATION_26_27, MIGRATION_27_28,
+                    MIGRATION_28_29
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -786,6 +819,26 @@ abstract class WeightDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_28_29 = object : Migration(28, 29) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS template_set_table (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        templateExerciseId INTEGER NOT NULL,
+                        setNumber INTEGER NOT NULL,
+                        targetReps INTEGER NOT NULL,
+                        targetWeightKg REAL NOT NULL,
+                        targetDurationSeconds INTEGER,
+                        targetDistanceKm REAL,
+                        FOREIGN KEY(templateExerciseId) REFERENCES template_exercise_table(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_template_set_table_templateExerciseId ON template_set_table (templateExerciseId)")
             }
         }
     }

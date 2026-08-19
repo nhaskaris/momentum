@@ -280,6 +280,9 @@ class MainActivity : ComponentActivity() {
                             getExercisesForTemplate = { templateId ->
                                 workoutDao.getExercisesForTemplate(templateId).first()
                             },
+                            getSetsForTemplateExercise = { templateExerciseId ->
+                                workoutDao.getSetsForTemplateExercise(templateExerciseId)
+                            },
                             onAdjustmentAccepted = {
                                 savedProfile?.let { profile ->
                                     coroutineScope.launch {
@@ -476,9 +479,12 @@ class MainActivity : ComponentActivity() {
                             },
                             onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, existingSessionId: Long? ->
                                 coroutineScope.launch {
-                                    val totalVolume = sets.sumOf { it.weightKg * it.reps }
-                                    val exerciseCount = sets.map { it.exerciseId }.distinct().size
-                                    val setCount = sets.size
+                                    val completedSets = sets.filter { it.isCompleted || it.weightKg > 0 || it.reps > 0 }
+                                    if (completedSets.isEmpty()) return@launch
+
+                                    val totalVolume = completedSets.sumOf { it.weightKg * it.reps }
+                                    val exerciseCount = completedSets.map { it.exerciseId }.distinct().size
+                                    val setCount = completedSets.size
 
                                     val sessionId = if (existingSessionId != null) {
                                         workoutDao.updateSession(
@@ -504,7 +510,8 @@ class MainActivity : ComponentActivity() {
                                             )
                                         )
                                     }
-                                    sets.forEach { pendingSet ->
+
+                                    completedSets.forEach { pendingSet ->
                                         workoutDao.insertSet(
                                             LoggedSet(
                                                 sessionId = sessionId,
@@ -520,34 +527,67 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     templateId?.let { tid: Long ->
-                                        // "Save on top": Update template exercises to match the session
+                                        // "Save on top": Update template structure and targets
+                                        workoutDao.deleteTemplateSetsByTemplateId(tid)
                                         workoutDao.deleteTemplateExercises(tid)
                                         
-                                        val uniqueExerciseIds = sets.map { it.exerciseId }.distinct()
-                                        uniqueExerciseIds.forEachIndexed { index, exId ->
+                                        // Use ALL exercises that were in the session (including new ones added)
+                                        val allSessionExerciseIds = sets.map { it.exerciseId }.distinct()
+                                        
+                                        allSessionExerciseIds.forEachIndexed { index, exId ->
                                             val exerciseSets = sets.filter { it.exerciseId == exId }
-                                            if (exerciseSets.isNotEmpty()) {
-                                                val avgReps = (exerciseSets.sumOf { it.reps }.toDouble() / exerciseSets.size).let { Math.round(it).toInt() }
-                                                val avgWeight = exerciseSets.sumOf { it.weightKg } / exerciseSets.size
-                                                val avgDuration = if (exerciseSets.any { it.durationSeconds != null }) {
-                                                    exerciseSets.mapNotNull { it.durationSeconds }.average().toInt()
-                                                } else null
-                                                val avgDistance = if (exerciseSets.any { it.distanceKm != null }) {
-                                                    exerciseSets.mapNotNull { it.distanceKm }.average()
-                                                } else null
-
-                                                workoutDao.insertTemplateExercise(
+                                            val validSets = exerciseSets.filter { it.setNumber > 0 && (it.reps > 0 || it.weightKg > 0) }
+                                            
+                                            if (validSets.isNotEmpty()) {
+                                                // Create the template exercise entry
+                                                val templateExerciseId = workoutDao.insertTemplateExercise(
                                                     TemplateExercise(
                                                         templateId = tid,
                                                         exerciseId = exId,
-                                                        targetSets = exerciseSets.size,
-                                                        targetReps = avgReps,
-                                                        targetWeightKg = avgWeight,
-                                                        orderIndex = index,
-                                                        targetDurationSeconds = avgDuration,
-                                                        targetDistanceKm = avgDistance
+                                                        targetSets = validSets.size,
+                                                        // Main targets for fallback, but we'll save per-set data too
+                                                        targetReps = validSets.first().reps,
+                                                        targetWeightKg = validSets.first().weightKg,
+                                                        orderIndex = index
                                                     )
                                                 )
+                                                
+                                                // Save EVERY set specifically to the template
+                                                validSets.forEach { ps ->
+                                                    workoutDao.insertTemplateSet(
+                                                        TemplateSet(
+                                                            templateExerciseId = templateExerciseId,
+                                                            setNumber = ps.setNumber,
+                                                            targetReps = ps.reps,
+                                                            targetWeightKg = ps.weightKg,
+                                                            targetDurationSeconds = ps.durationSeconds,
+                                                            targetDistanceKm = ps.distanceKm
+                                                        )
+                                                    )
+                                                }
+                                            } else {
+                                                // Default entry for added but untouched exercises
+                                                val templateExerciseId = workoutDao.insertTemplateExercise(
+                                                    TemplateExercise(
+                                                        templateId = tid,
+                                                        exerciseId = exId,
+                                                        targetSets = 3,
+                                                        targetReps = 10,
+                                                        targetWeightKg = 0.0,
+                                                        orderIndex = index
+                                                    )
+                                                )
+                                                // Optional: add default sets for these too
+                                                repeat(3) { sn ->
+                                                    workoutDao.insertTemplateSet(
+                                                        TemplateSet(
+                                                            templateExerciseId = templateExerciseId,
+                                                            setNumber = sn + 1,
+                                                            targetReps = 10,
+                                                            targetWeightKg = 0.0
+                                                        )
+                                                    )
+                                                }
                                             }
                                         }
                                     }

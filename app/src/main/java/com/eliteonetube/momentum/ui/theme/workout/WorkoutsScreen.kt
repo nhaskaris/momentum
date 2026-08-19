@@ -46,6 +46,7 @@ fun WorkoutsScreen(
     unitSystem: UnitSystem,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
+    getSetsForTemplateExercise: suspend (Long) -> List<TemplateSet> = { emptyList() },
     onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, exercises: List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
@@ -107,10 +108,8 @@ fun WorkoutsScreen(
                 initialPendingSets = emptyList()
             },
             onFinish = { sets ->
-                val completedSets = sets.filter { it.isCompleted }
-                if (completedSets.isNotEmpty()) {
-                    onSessionSaved(LocalDate.now().toString(), completedSets, currentActiveTemplateId, editingSessionId)
-                }
+                // Pass all sets, MainActivity will filter for meaningful ones
+                onSessionSaved(LocalDate.now().toString(), sets, currentActiveTemplateId, editingSessionId)
                 onClearActiveWorkout()
                 isLoggingSession = false
                 currentActiveTemplateId = null
@@ -315,16 +314,30 @@ fun WorkoutsScreen(
                                 val exerciseMap = allExercises.associateBy { it.id }
                                 initialSessionExercises = templateExercises.mapNotNull { exerciseMap[it.exerciseId] }
                                 initialPendingSets = templateExercises.flatMap { te ->
-                                    val ex = exerciseMap[te.exerciseId]
-                                    (1..te.targetSets.coerceAtLeast(1)).map { sn ->
-                                        PendingSet(
-                                            exerciseId = te.exerciseId,
-                                            setNumber = sn,
-                                            weightKg = te.targetWeightKg,
-                                            reps = te.targetReps,
-                                            durationSeconds = te.targetDurationSeconds ?: if (ex?.exerciseType == ExerciseType.CARDIO) 600 else null,
-                                            distanceKm = te.targetDistanceKm ?: if (ex?.exerciseType == ExerciseType.CARDIO) 0.0 else null
-                                        )
+                                    val templateSets = getSetsForTemplateExercise(te.id)
+                                    if (templateSets.isNotEmpty()) {
+                                        templateSets.map { ts ->
+                                            PendingSet(
+                                                exerciseId = te.exerciseId,
+                                                setNumber = ts.setNumber,
+                                                weightKg = ts.targetWeightKg,
+                                                reps = ts.targetReps,
+                                                durationSeconds = ts.targetDurationSeconds,
+                                                distanceKm = ts.targetDistanceKm
+                                            )
+                                        }
+                                    } else {
+                                        val ex = exerciseMap[te.exerciseId]
+                                        (1..te.targetSets.coerceAtLeast(1)).map { sn ->
+                                            PendingSet(
+                                                exerciseId = te.exerciseId,
+                                                setNumber = sn,
+                                                weightKg = te.targetWeightKg,
+                                                reps = te.targetReps,
+                                                durationSeconds = te.targetDurationSeconds ?: if (ex?.exerciseType == ExerciseType.CARDIO) 600 else null,
+                                                distanceKm = te.targetDistanceKm ?: if (ex?.exerciseType == ExerciseType.CARDIO) 0.0 else null
+                                            )
+                                        }
                                     }
                                 }
                                 onUpdateActiveWorkout(currentActiveTemplateId, initialPendingSets)

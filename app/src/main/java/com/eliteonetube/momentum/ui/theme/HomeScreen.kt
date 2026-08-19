@@ -83,6 +83,7 @@ fun HomeScreen(
     onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
+    getSetsForTemplateExercise: suspend (Long) -> List<TemplateSet> = { emptyList() },
     onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
@@ -383,6 +384,7 @@ fun HomeScreen(
                     unitSystem = savedProfile.unitSystem,
                     getSetsForSession = getSetsForSession,
                     getExercisesForTemplate = getExercisesForTemplate,
+                    getSetsForTemplateExercise = getSetsForTemplateExercise,
                     onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long? ->
                         onClearActiveWorkout()
                         isSessionActive = false

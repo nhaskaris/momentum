@@ -87,15 +87,19 @@ fun ActiveSessionScreen(
         }
     }
 
-    // Persist to DB whenever local state changes, but use a debounce or check
-    // to avoid triggering loops if the parent passes the same data back
-    LaunchedEffect(setsByExercise, sessionExercises) {
+    // Persist to DB whenever local state changes
+    LaunchedEffect(setsByExercise, sessionExercises, isInitialized) {
         if (isInitialized) {
-            val allSets = sessionExercises.flatMap { setsByExercise[it.id].orEmpty() }
-            // Only update if there's actual data to save
-            if (allSets.isNotEmpty()) {
-                onUpdateActiveSets(allSets)
+            val allSets = sessionExercises.flatMap { ex ->
+                val exerciseSets = setsByExercise[ex.id].orEmpty()
+                if (exerciseSets.isEmpty()) {
+                    // Send a dummy placeholder set so the DB knows this exercise belongs to the active session
+                    listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false))
+                } else {
+                    exerciseSets
+                }
             }
+            onUpdateActiveSets(allSets)
         }
     }
 
