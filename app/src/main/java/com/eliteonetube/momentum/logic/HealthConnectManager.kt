@@ -26,6 +26,10 @@ class HealthConnectManager(private val context: Context) {
         return HealthConnectClient.getSdkStatus(context)
     }
 
+    suspend fun revokeAllPermissions() {
+        healthConnectClient.permissionController.revokeAllPermissions()
+    }
+
     fun isAvailable(): Boolean {
         return getAvailabilityStatus() == HealthConnectClient.SDK_AVAILABLE
     }
@@ -59,5 +63,9 @@ class HealthConnectManager(private val context: Context) {
         } catch (e: Exception) {
             return null
         }
+    }
+
+    companion object {
+        const val ACTION_MANAGE_PERMISSIONS = "androidx.health.connect.action.MANAGE_HEALTH_PERMISSIONS"
     }
 }

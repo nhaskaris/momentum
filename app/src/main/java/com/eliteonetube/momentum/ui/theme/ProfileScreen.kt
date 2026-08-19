@@ -1,6 +1,8 @@
 package com.eliteonetube.momentum.ui
 
+import android.content.Intent
 import android.net.Uri
+import android.os.Process
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.health.connect.client.HealthConnectClient
 import com.eliteonetube.momentum.data.AppTheme
 import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Goal
@@ -46,6 +50,8 @@ import com.eliteonetube.momentum.logic.WeightHistoryParser
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.launch
+import kotlin.system.exitProcess
 
 private data class GoalOption(val goal: Goal, val label: String, val description: String)
 
@@ -68,10 +74,78 @@ fun ProfileScreen(
     onWeightsImported: (List<WeightEntry>) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val coroutineScope = rememberCoroutineScope()
+    val healthConnectManager = remember { HealthConnectManager(context) }
+
     var isEditing by remember { mutableStateOf(false) }
     var showChangeGoalDialog by remember { mutableStateOf(false) }
+    var showDisconnectDialog by remember { mutableStateOf(false) }
+    var showRestartDialog by remember { mutableStateOf(false) }
     var detectedWeights by remember { mutableStateOf<List<WeightEntry>?>(null) }
     var isProcessingImage by remember { mutableStateOf(false) }
+
+    // Reconcile in case the user revoked access from Health Connect settings directly
+    LaunchedEffect(Unit) {
+        if (profile.useHealthConnect && !healthConnectManager.hasAllPermissions()) {
+            onProfileUpdated(profile.copy(useHealthConnect = false))
+        }
+    }
+
+    val healthConnectPermissionLauncher = rememberLauncherForActivityResult(
+        contract = healthConnectManager.requestPermissionsContract()
+    ) { grantedPermissions ->
+        coroutineScope.launch {
+            val allGranted = grantedPermissions.containsAll(healthConnectManager.permissions)
+            onProfileUpdated(profile.copy(useHealthConnect = allGranted))
+        }
+    }
+
+    fun connectHealthConnect() {
+        when (healthConnectManager.getAvailabilityStatus()) {
+            HealthConnectClient.SDK_AVAILABLE -> {
+                healthConnectPermissionLauncher.launch(healthConnectManager.permissions)
+            }
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+                // Pre-Android 14: Health Connect is a standalone app that needs installing/updating
+                try {
+                    uriHandler.openUri("market://details?id=com.google.android.apps.healthdata")
+                } catch (e: Exception) {
+                    uriHandler.openUri("https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata")
+                }
+            }
+            else -> {
+                // SDK_UNAVAILABLE — device genuinely doesn't support Health Connect
+            }
+        }
+    }
+
+    fun disconnectHealthConnect() {
+        // Update local state immediately — Health Connect can report stale
+        // grant status within the same app session after a revoke, so we
+        // don't wait on or re-verify against getGrantedPermissions().
+        onProfileUpdated(profile.copy(useHealthConnect = false))
+
+        coroutineScope.launch {
+            try {
+                healthConnectManager.revokeAllPermissions()
+            } catch (e: Exception) {
+                // Revoke best-effort; app-level state is already updated above,
+                // and the OS-level grant can still be cleared manually via
+                // Health Connect settings if this fails.
+            }
+            showRestartDialog = true
+        }
+    }
+
+    fun restartApp() {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+        val componentName = intent?.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
+    }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -122,6 +196,26 @@ fun ProfileScreen(
                 onGoalChanged(newGoal)
                 showChangeGoalDialog = false
             }
+        )
+    }
+
+    if (showDisconnectDialog) {
+        DisconnectHealthConnectDialog(
+            onDismiss = { showDisconnectDialog = false },
+            onConfirmDisconnect = {
+                showDisconnectDialog = false
+                disconnectHealthConnect()
+            }
+        )
+    }
+
+    if (showRestartDialog) {
+        RestartAppDialog(
+            onRestartNow = {
+                showRestartDialog = false
+                restartApp()
+            },
+            onLater = { showRestartDialog = false }
         )
     }
 
@@ -237,12 +331,53 @@ fun ProfileScreen(
                         label = "Daily Steps",
                         value = "${profile.averageDailySteps}"
                     )
-                    ProfileStatRow(
-                        icon = Icons.Default.HealthAndSafety,
-                        label = "Health Connect",
-                        value = if (profile.useHealthConnect) "Connected" else "Disconnected",
-                        valueColor = if (profile.useHealthConnect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Default.HealthAndSafety,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Health Connect", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    if (profile.useHealthConnect) "Connected" else "Disconnected",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (profile.useHealthConnect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        if (profile.useHealthConnect) {
+                            OutlinedButton(
+                                onClick = { showDisconnectDialog = true },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Disconnect")
+                            }
+                        } else {
+                            FilledTonalButton(
+                                onClick = { connectHealthConnect() },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Connect")
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                     ProfileStatRow(
                         icon = Icons.Default.Tune,
                         label = "Units",
@@ -496,6 +631,87 @@ private fun ProfileStatRow(
 }
 
 @Composable
+private fun DisconnectHealthConnectDialog(
+    onDismiss: () -> Unit,
+    onConfirmDisconnect: () -> Unit
+) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Disconnect Health Connect", fontWeight = FontWeight.Black) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "This disconnects Momentum from Health Connect and revokes its access to your step data.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                TextButton(
+                    onClick = {
+                        try {
+                            context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+                        } catch (e: Exception) {
+                            // No activity found to handle it
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.Start)
+                ) {
+                    Text("View in Health Connect Settings")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmDisconnect,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Disconnect", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+private fun RestartAppDialog(
+    onRestartNow: () -> Unit,
+    onLater: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        title = { Text("Restart Required", fontWeight = FontWeight.Black) },
+        text = {
+            Text(
+                "Health Connect has been disconnected. Restart Momentum now to make sure the change is fully applied.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onRestartNow,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Restart Now", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onLater) {
+                Text("Later")
+            }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
 private fun ConfirmImportDialog(
     weights: List<WeightEntry>,
     onDismiss: () -> Unit,
@@ -509,11 +725,11 @@ private fun ConfirmImportDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("We found ${weights.size} entries. Select which ones to import:", style = MaterialTheme.typography.bodyMedium)
-                
+
                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                     items(weights) { entry ->
                         val isSelected = selectedEntries.contains(entry)
-                        
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
