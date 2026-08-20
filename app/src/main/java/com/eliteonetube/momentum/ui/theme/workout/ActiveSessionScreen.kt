@@ -30,6 +30,10 @@ import com.eliteonetube.momentum.data.ExerciseType
 import com.eliteonetube.momentum.data.LoggedSet
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.logic.RestTimerService
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.platform.LocalContext
@@ -60,7 +64,6 @@ fun ActiveSessionScreen(
     var exerciseToSwapId by remember { mutableStateOf<Long?>(null) }
     
     val timerActive by RestTimerService.isActive.collectAsState()
-    val timeLeft by RestTimerService.timeLeft.collectAsState()
     var restTimerSeconds by remember { mutableLongStateOf(120L) }
 
     val resolvedInitialExercises = remember(initialExercises, initialSets, allExercises) {
@@ -87,19 +90,31 @@ fun ActiveSessionScreen(
         }
     }
 
-    // Persist to DB whenever local state changes
+    // Debounced Persistence: Avoid writing to DB on every keystroke
+    val persistenceFlow = remember { MutableStateFlow<List<PendingSet>?>(null) }
+    
+    @OptIn(FlowPreview::class)
+    LaunchedEffect(Unit) {
+        persistenceFlow
+            .debounce(800L) // Wait for user to stop typing
+            .collectLatest { sets ->
+                if (sets != null) {
+                    onUpdateActiveSets(sets)
+                }
+            }
+    }
+
     LaunchedEffect(setsByExercise, sessionExercises, isInitialized) {
         if (isInitialized) {
             val allSets = sessionExercises.flatMap { ex ->
                 val exerciseSets = setsByExercise[ex.id].orEmpty()
                 if (exerciseSets.isEmpty()) {
-                    // Send a dummy placeholder set so the DB knows this exercise belongs to the active session
                     listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false))
                 } else {
                     exerciseSets
                 }
             }
-            onUpdateActiveSets(allSets)
+            persistenceFlow.value = allSets
         }
     }
 
@@ -110,7 +125,9 @@ fun ActiveSessionScreen(
     LaunchedEffect(currentExerciseIds) {
         currentExerciseIds.forEach { exId ->
             if (!exerciseHistoryMap.containsKey(exId)) {
-                exerciseHistoryMap[exId] = getExerciseHistory(exId)
+                launch {
+                    exerciseHistoryMap[exId] = getExerciseHistory(exId)
+                }
             }
         }
     }
@@ -308,7 +325,9 @@ fun ActiveSessionScreen(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        pageSpacing = 12.dp
+                        pageSpacing = 12.dp,
+                        beyondViewportPageCount = 1,
+                        key = { page -> if (page < sessionExercises.size) "ex_${sessionExercises[page].id}" else "summary" }
                     ) { page ->
                         if (page >= sessionExercises.size) {
                             WorkoutSummaryStep(
@@ -359,7 +378,6 @@ fun ActiveSessionScreen(
                     if (timerActive) {
                         Box(modifier = Modifier.align(Alignment.BottomCenter)) {
                             RestTimerOverlay(
-                                timeLeft = timeLeft,
                                 onAdjust = { d -> RestTimerService.adjustTimer(context, d) },
                                 onStop = { RestTimerService.stopTimer(context) }
                             )
@@ -440,10 +458,11 @@ private fun ActiveWorkoutProgressCard(
 
 @Composable
 private fun RestTimerOverlay(
-    timeLeft: Long,
     onAdjust: (Long) -> Unit,
     onStop: () -> Unit
 ) {
+    val timeLeft by RestTimerService.timeLeft.collectAsState()
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()

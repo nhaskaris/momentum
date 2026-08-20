@@ -3,8 +3,8 @@ package com.eliteonetube.momentum.ui.workout
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -136,8 +136,13 @@ fun ExerciseSetLogger(
                 Spacer(modifier = Modifier.width(88.dp))
             }
 
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                itemsIndexed(sets, key = { _, s -> s.setNumber }) { _, set ->
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                sets.forEach { set ->
                     SetInputRow(exercise, set, unitSystem, { upd -> onSetUpdated(set.setNumber, upd) }, { onSetRemoved(set.setNumber) })
                 }
             }

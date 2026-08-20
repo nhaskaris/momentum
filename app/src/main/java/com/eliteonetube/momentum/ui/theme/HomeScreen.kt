@@ -105,7 +105,6 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
 
-    // Auto-switch to Workouts tab if a session is recovered from DB
     var hasAutoSwitched by remember { mutableStateOf(false) }
     LaunchedEffect(activeSets, hasActiveWorkout) {
         if ((activeSets.isNotEmpty() || hasActiveWorkout) && !hasAutoSwitched) {
@@ -114,7 +113,6 @@ fun HomeScreen(
         }
     }
 
-    // A rest-timer notification explicitly requests the active workout.
     LaunchedEffect(openWorkoutRequest) {
         if (openWorkoutRequest > 0) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
@@ -135,7 +133,6 @@ fun HomeScreen(
     var itemToLogAfterScan by remember { mutableStateOf<FoodItem?>(null) }
     var logToEdit by remember { mutableStateOf<FoodLogWithItem?>(null) }
 
-    // Mascot logic
     var mascotMood by remember(savedProfile.checkInDue) {
         mutableStateOf(if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE)
     }
@@ -143,7 +140,6 @@ fun HomeScreen(
     var isAskMode by remember { mutableStateOf(false) }
     var userQuestion by remember { mutableStateOf("") }
 
-    // Auto-dismiss helper messages after 6 seconds
     LaunchedEffect(helperMessage, isAskMode) {
         if (helperMessage != null && !isAskMode) {
             delay(6000)
@@ -151,7 +147,6 @@ fun HomeScreen(
         }
     }
     
-    // Update mascot mood based on tab
     val currentTab = AppTab.entries[pagerState.currentPage]
     LaunchedEffect(currentTab, hasActiveWorkout, savedProfile.checkInDue) {
         mascotMood = when {
@@ -161,12 +156,10 @@ fun HomeScreen(
         }
     }
 
-    // State for tracking if a session is currently being logged (to hide navigation)
     var isSessionActive by remember(activeSets, hasActiveWorkout) {
         mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
     }
 
-    // Live Step Update from Health Connect
     val healthConnectManager = remember { HealthConnectManager(context) }
     LaunchedEffect(savedProfile.useHealthConnect) {
         if (savedProfile.useHealthConnect) {
@@ -242,7 +235,6 @@ fun HomeScreen(
                 onNewFoodItemCreated(item)
                 scannedResult = null
                 pendingBarcode = null
-                
                 itemToLogAfterScan = item
                 coroutineScope.launch {
                     pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
@@ -262,14 +254,8 @@ fun HomeScreen(
                     } else {
                         item.id
                     }
-                    
-                    if (finalId != 0L) {
-                        onFoodLogged(finalId, multiplier)
-                        itemToLogAfterScan = null
-                    } else {
-                        onFoodLogged(item.id, multiplier)
-                        itemToLogAfterScan = null
-                    }
+                    onFoodLogged(finalId, multiplier)
+                    itemToLogAfterScan = null
                 }
             }
         )
@@ -277,14 +263,7 @@ fun HomeScreen(
 
     logToEdit?.let { log ->
         LogQuantityDialog(
-            foodItem = FoodItem(
-                id = log.foodItemId,
-                name = log.name,
-                calories = log.calories,
-                protein = log.protein,
-                fat = log.fat,
-                carbs = log.carbs
-            ),
+            foodItem = FoodItem(id = log.foodItemId, name = log.name, calories = log.calories, protein = log.protein, fat = log.fat, carbs = log.carbs),
             initialQuantity = log.quantity,
             onDismiss = { logToEdit = null },
             onConfirm = { multiplier ->
@@ -314,13 +293,10 @@ fun HomeScreen(
                     onWeightSubmitted = { enteredWeight ->
                         coroutineScope.launch {
                             onWeightSubmitted(enteredWeight)
-                            // Mascot feedback
                             mascotMood = MascotMood.HAPPY
                             helperMessage = "Logged! Great job keeping the momentum."
                             delay(3000)
                             mascotMood = if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
-                            
-                            // Update widget after logging weight
                             WidgetUpdater.refresh(context)
                         }
                     },
@@ -385,17 +361,15 @@ fun HomeScreen(
                     getSetsForSession = getSetsForSession,
                     getExercisesForTemplate = getExercisesForTemplate,
                     getSetsForTemplateExercise = getSetsForTemplateExercise,
-                    onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long? ->
+                    onSessionSaved = { date, sets, tid, sid ->
                         onClearActiveWorkout()
                         isSessionActive = false
-                        onSessionSaved(date, sets, templateId, sessionId)
+                        onSessionSaved(date, sets, tid, sid)
                     },
                     onSessionDeleted = onSessionDeleted,
                     onTemplateCreated = onTemplateCreated,
                     onTemplateDeleted = onTemplateDeleted,
-                    onSessionStateChanged = { active ->
-                        isSessionActive = active
-                    },
+                    onSessionStateChanged = { isSessionActive = it },
                     onUpdateActiveWorkout = onUpdateActiveWorkout,
                     onClearActiveWorkout = onClearActiveWorkout,
                     onCreateExercise = onCreateExercise
@@ -417,179 +391,42 @@ fun HomeScreen(
             }
         }
 
-        // Floating Navigation Bar
         val isOnWorkoutsTab = currentTab == AppTab.WORKOUTS
-        val isOnStatsTab = currentTab == AppTab.STATISTICS
         val shouldShowNav = !isSessionActive || !isOnWorkoutsTab
         
         if (shouldShowNav) {
-            // Floating Mascot + Speech Bubble
-            // Hide global mascot on stats tab because it has its own interactive hero mascot
-            if (!isOnStatsTab) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 12.dp, end = 16.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    // Helper Message Bubble
-                    AnimatedVisibility(
-                        visible = helperMessage != null || isAskMode,
-                        enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End) + scaleIn(transformOrigin = TransformOrigin(1f, 0.5f)),
-                        exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End) + scaleOut(transformOrigin = TransformOrigin(1f, 0.5f))
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
-                            shadowElevation = 8.dp,
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = 0.5.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier
-                                .padding(end = 12.dp)
-                                .widthIn(max = 240.dp)
-                        ) {
-                            AnimatedContent(
-                                targetState = isAskMode,
-                                transitionSpec = {
-                                    (fadeIn() + scaleIn(initialScale = 0.92f))
-                                        .togetherWith(fadeOut() + scaleOut(targetScale = 0.92f))
-                                },
-                                label = "AskModeTransition"
-                            ) { askMode ->
-                                if (askMode) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(8.dp)
-                                    ) {
-                                        OutlinedTextField(
-                                            value = userQuestion,
-                                            onValueChange = { userQuestion = it },
-                                            placeholder = { Text("Ask me...", style = MaterialTheme.typography.bodySmall) },
-                                            modifier = Modifier.weight(1f),
-                                            textStyle = MaterialTheme.typography.bodySmall,
-                                            singleLine = true,
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                                focusedBorderColor = MaterialTheme.colorScheme.primary
-                                            )
-                                        )
-                                        IconButton(
-                                            onClick = {
-                                                if (userQuestion.isNotBlank()) {
-                                                    helperMessage = HelperAssistant.ask(userQuestion)
-                                                    userQuestion = ""
-                                                    isAskMode = false
-                                                }
-                                            },
-                                            enabled = userQuestion.isNotBlank()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Send,
-                                                contentDescription = "Send",
-                                                tint = if (userQuestion.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .clickable { helperMessage = null }
-                                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    ) {
-                                        Text(
-                                            text = helperMessage ?: "",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.weight(1f),
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        IconButton(
-                                            onClick = { isAskMode = true },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Chat,
-                                                contentDescription = "Ask Assistant",
-                                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            MascotAndNavigation(
+                currentTab = currentTab,
+                mascotMood = mascotMood,
+                helperMessage = helperMessage,
+                isAskMode = isAskMode,
+                userQuestion = userQuestion,
+                currentStreak = currentStreak,
+                recentWeights = recentWeights,
+                todayFoodLogs = todayFoodLogs,
+                hasActiveWorkout = hasActiveWorkout,
+                onTabSelected = { tab ->
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
                     }
-
-                    // The Mascot
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .bounceClick {
-                                if (helperMessage != null || isAskMode) {
-                                    helperMessage = null
-                                    isAskMode = false
-                                } else {
-                                    helperMessage = when (currentTab) {
-                                        AppTab.DASHBOARD -> {
-                                            if (currentStreak > 0) "You've got a $currentStreak day streak! Keep it going!"
-                                            else "Let's log your weight to start a new streak!"
-                                        }
-                                        AppTab.STATISTICS -> {
-                                            val recent = recentWeights.take(2)
-                                            if (recent.size >= 2) {
-                                                val change = recent[0].weight - recent[1].weight
-                                                if (change < 0) "Weight is trending down—I'm watching the curve!"
-                                                else if (change > 0) "Weight shifted up slightly, likely water—tracking the average."
-                                                else "Holding steady! Perfect for maintenance."
-                                            } else "Log more weights so I can analyze your metabolic trends!"
-                                        }
-                                        AppTab.NUTRITION -> {
-                                            val protein = todayFoodLogs.sumOf { it.protein * it.quantity }
-                                            if (protein < 50) "Make sure you're hitting your protein today!"
-                                            else "Great job on the protein intake! Your muscles will thank me."
-                                        }
-                                        AppTab.WORKOUTS -> {
-                                            if (hasActiveWorkout) "You're in the zone! Focus on every rep."
-                                            else "Ready to Train? Pick a routine and let's get it."
-                                        }
-                                        AppTab.PROFILE -> "Everything is private. Your data never leaves this phone!"
-                                        else -> "I'm here to help!"
-                                    }
-                                }
-                            }
-                    ) {
-                        MomentumMascot(
-                            mood = mascotMood,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                },
+                onHelperDismiss = { helperMessage = null; isAskMode = false },
+                onAskModeToggle = { isAskMode = true },
+                onUserQuestionChange = { userQuestion = it },
+                onSendQuestion = { 
+                    helperMessage = HelperAssistant.ask(userQuestion)
+                    userQuestion = ""
+                    isAskMode = false
+                },
+                onMascotClick = {
+                    if (helperMessage != null || isAskMode) {
+                        helperMessage = null
+                        isAskMode = false
+                    } else {
+                        helperMessage = getMascotMessage(currentTab, currentStreak, recentWeights, todayFoodLogs, hasActiveWorkout)
                     }
                 }
-            }
-        }
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-            ) {
-                BottomNavBar(
-                    currentTab = currentTab,
-                    onTabSelected = { tab ->
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
-                        }
-                    }
-                )
-            }
+            )
         }
     }
 
@@ -601,5 +438,115 @@ fun HomeScreen(
             onPastWeightSubmitted = onPastWeightSubmitted,
             onWeightDeleted = onWeightDeleted
         )
+    }
+}
+
+@Composable
+private fun MascotAndNavigation(
+    currentTab: AppTab,
+    mascotMood: MascotMood,
+    helperMessage: String?,
+    isAskMode: Boolean,
+    userQuestion: String,
+    currentStreak: Int,
+    recentWeights: List<WeightEntry>,
+    todayFoodLogs: List<FoodLogWithItem>,
+    hasActiveWorkout: Boolean,
+    onTabSelected: (AppTab) -> Unit,
+    onHelperDismiss: () -> Unit,
+    onAskModeToggle: () -> Unit,
+    onUserQuestionChange: (String) -> Unit,
+    onSendQuestion: () -> Unit,
+    onMascotClick: () -> Unit
+) {
+    val isOnStatsTab = currentTab == AppTab.STATISTICS
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (!isOnStatsTab) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp, end = 16.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                    AnimatedVisibility(
+                        visible = helperMessage != null || isAskMode,
+                        enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End) + scaleIn(transformOrigin = TransformOrigin(1f, 0.5f)),
+                        exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End) + scaleOut(transformOrigin = TransformOrigin(1f, 0.5f))
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
+                            shadowElevation = 8.dp,
+                            border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                            modifier = Modifier.padding(end = 12.dp).widthIn(max = 240.dp)
+                        ) {
+                            AnimatedContent(targetState = isAskMode, label = "AskMode") { askMode ->
+                                if (askMode) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
+                                        OutlinedTextField(
+                                            value = userQuestion,
+                                            onValueChange = onUserQuestionChange,
+                                            placeholder = { Text("Ask me...", style = MaterialTheme.typography.bodySmall) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = MaterialTheme.typography.bodySmall,
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), focusedBorderColor = MaterialTheme.colorScheme.primary)
+                                        )
+                                        IconButton(onClick = onSendQuestion, enabled = userQuestion.isNotBlank()) {
+                                            Icon(Icons.Default.Send, null, tint = if (userQuestion.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                } else {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onHelperDismiss() }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                        Text(text = helperMessage ?: "", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                                        IconButton(onClick = onAskModeToggle, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Default.Chat, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.size(56.dp).bounceClick(onMascotClick)) {
+                        MomentumMascot(mood = mascotMood, modifier = Modifier.fillMaxSize())
+                    }
+                }
+            }
+        }
+
+        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            BottomNavBar(currentTab = currentTab, onTabSelected = onTabSelected)
+        }
+    }
+}
+
+private fun getMascotMessage(
+    currentTab: AppTab,
+    currentStreak: Int,
+    recentWeights: List<WeightEntry>,
+    todayFoodLogs: List<FoodLogWithItem>,
+    hasActiveWorkout: Boolean
+): String {
+    return when (currentTab) {
+        AppTab.DASHBOARD -> if (currentStreak > 0) "You've got a $currentStreak day streak! Keep it going!" else "Let's log your weight to start a new streak!"
+        AppTab.STATISTICS -> {
+            val recent = recentWeights.take(2)
+            if (recent.size >= 2) {
+                val change = recent[0].weight - recent[1].weight
+                if (change < 0) "Weight is trending down—I'm watching the curve!"
+                else if (change > 0) "Weight shifted up slightly, likely water—tracking the average."
+                else "Holding steady! Perfect for maintenance."
+            } else "Log more weights so I can analyze your metabolic trends!"
+        }
+        AppTab.NUTRITION -> {
+            val protein = todayFoodLogs.sumOf { it.protein * it.quantity }
+            if (protein < 50) "Make sure you're hitting your protein today!" else "Great job on the protein intake! Your muscles will thank me."
+        }
+        AppTab.WORKOUTS -> if (hasActiveWorkout) "You're in the zone! Focus on every rep." else "Ready to Train? Pick a routine and let's get it."
+        AppTab.PROFILE -> "Everything is private. Your data never leaves this phone!"
     }
 }

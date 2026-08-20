@@ -54,7 +54,6 @@ fun NutritionScreen(
         recentWeights.firstOrNull()?.weight ?: profile.height 
     }
 
-    // Consumed stats (wrapped in remember to avoid repeated calculations)
     val caloriesConsumed by remember(todayLogs) { 
         derivedStateOf { todayLogs.sumOf { it.calories * it.quantity } } 
     }
@@ -68,7 +67,6 @@ fun NutritionScreen(
         derivedStateOf { todayLogs.sumOf { it.carbs * it.quantity } } 
     }
 
-    // Targets
     val proteinGramsTarget = remember(currentWeightKg) { (currentWeightKg * 2.0).roundToInt() }
     val fatGramsTarget = remember(currentWeightKg) { (currentWeightKg * 0.8).roundToInt() }
     val carbGramsTarget = remember(calorieTarget, proteinGramsTarget, fatGramsTarget) { 
@@ -97,118 +95,115 @@ fun NutritionScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 120.dp)
     ) {
         // Hero Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            MaterialTheme.colorScheme.background
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.background
+                            )
                         )
                     )
-                )
-                .padding(top = 48.dp, bottom = 32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
-                Text(
-                    text = "${(calorieTarget - caloriesConsumed).roundToInt()}",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 72.sp,
-                        letterSpacing = (-4).sp
-                    ),
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "kcal remaining",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
+                    .padding(top = 48.dp, bottom = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text(
+                        text = "${(calorieTarget - caloriesConsumed).roundToInt()}",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = 72.sp,
+                            letterSpacing = (-4).sp
+                        ),
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "kcal remaining",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(bottom = 32.dp)
+                    )
 
-                // Macro Bars
-                MacroBar("Protein", proteinConsumed.roundToInt(), proteinGramsTarget, ProteinBlue)
-                Spacer(modifier = Modifier.height(12.dp))
-                MacroBar("Fats", fatConsumed.roundToInt(), fatGramsTarget, FatYellow)
-                Spacer(modifier = Modifier.height(12.dp))
-                MacroBar("Carbs", carbsConsumed.roundToInt(), carbGramsTarget, CarbGreen)
+                    MacroBar("Protein", proteinConsumed.roundToInt(), proteinGramsTarget, ProteinBlue)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    MacroBar("Fats", fatConsumed.roundToInt(), fatGramsTarget, FatYellow)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    MacroBar("Carbs", carbsConsumed.roundToInt(), carbGramsTarget, CarbGreen)
+                }
             }
         }
 
-        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            Button(
-                onClick = { showAddFood = true },
-                modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Add Food", fontWeight = FontWeight.Black, fontSize = 18.sp)
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Today's Logs
-            SectionHeader("Today's Log", Icons.Default.Restaurant)
-            
-            if (todayLogs.isEmpty()) {
-                EmptyState("No food logged yet. Use the scanner to start tracking.")
-            } else {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        item {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                Button(
+                    onClick = { showAddFood = true },
+                    modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        todayLogs.forEachIndexed { index, log ->
-                            FoodLogItem(
-                                log = log, 
-                                onDelete = { onDeleteLog(log.id, log.isMeal) },
-                                onClick = { onEditLog(log) }
-                            )
-                            if (index < todayLogs.size - 1) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-                            }
-                        }
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Add Food", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+                SectionHeader("Today's Log", Icons.Default.Restaurant)
+            }
+        }
+        
+        if (todayLogs.isEmpty()) {
+            item {
+                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    EmptyState("No food logged yet. Use the scanner to start tracking.")
+                }
+            }
+        } else {
+            items(todayLogs, key = { it.id }) { log ->
+                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        FoodLogItem(
+                            log = log, 
+                            onDelete = { onDeleteLog(log.id, log.isMeal) },
+                            onClick = { onEditLog(log) }
+                        )
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Info Section
-            SectionHeader("Coaching", Icons.Default.Info)
-            MacroExplanationCard(
-                title = "Protein: The Builder",
-                description = "Crucial for repairing and building muscle tissue. Target: 2.0g/kg.",
-                color = ProteinBlue
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            MacroExplanationCard(
-                title = "Fats: The Regulator",
-                description = "Essential for hormones and brain health. Target: 0.8g/kg.",
-                color = FatYellow
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            MacroExplanationCard(
-                title = "Carbs: The Fuel",
-                description = "Primary energy source for intense training.",
-                color = CarbGreen
-            )
-
-            Spacer(modifier = Modifier.height(120.dp)) // Space for floating nav bar
+        item {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
+                SectionHeader("Coaching", Icons.Default.Info)
+                MacroExplanationCard(
+                    title = "Protein: The Builder",
+                    description = "Crucial for repairing and building muscle tissue. Target: 2.0g/kg.",
+                    color = ProteinBlue
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                MacroExplanationCard(
+                    title = "Fats: The Regulator",
+                    description = "Essential for hormones and brain health. Target: 0.8g/kg.",
+                    color = FatYellow
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                MacroExplanationCard(
+                    title = "Carbs: The Fuel",
+                    description = "Primary energy source for intense training.",
+                    color = CarbGreen
+                )
+            }
         }
     }
 }

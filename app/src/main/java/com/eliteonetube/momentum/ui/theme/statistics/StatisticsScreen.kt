@@ -2,9 +2,9 @@ package com.eliteonetube.momentum.ui.statistics
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -37,176 +37,174 @@ fun StatisticsScreen(
     recentSessions: List<WorkoutSession>,
     unitSystem: UnitSystem
 ) {
-    val scrollState = rememberScrollState()
     var mascotMood by remember { mutableStateOf(MascotMood.IDLE) }
     var scrubText by remember { mutableStateOf<String?>(null) }
     var helperMessage by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 120.dp)
     ) {
         // Hero Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            MaterialTheme.colorScheme.background
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.background
+                            )
                         )
                     )
-                )
-                .padding(top = 48.dp, bottom = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
-                ) {
-                    // Helper Message Bubble
-                    AnimatedVisibility(
-                        visible = helperMessage != null,
-                        enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End) + scaleIn(transformOrigin = TransformOrigin(1f, 0.5f)),
-                        exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End) + scaleOut(transformOrigin = TransformOrigin(1f, 0.5f)),
-                        modifier = Modifier.weight(1f)
+                    .padding(top = 48.dp, bottom = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
                     ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
-                            shadowElevation = 8.dp,
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = 0.5.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.padding(end = 12.dp)
+                        AnimatedVisibility(
+                            visible = helperMessage != null,
+                            enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End) + scaleIn(transformOrigin = TransformOrigin(1f, 0.5f)),
+                            exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End) + scaleOut(transformOrigin = TransformOrigin(1f, 0.5f)),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = helperMessage ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
+                                shadowElevation = 8.dp,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier.padding(end = 12.dp)
+                            ) {
+                                Text(
+                                    text = helperMessage ?: "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Box(modifier = Modifier.size(100.dp)) {
+                            MomentumMascot(mood = mascotMood, modifier = Modifier.fillMaxSize())
                         }
                     }
-
-                    // Interactive Mascot
-                    Box(modifier = Modifier.size(100.dp)) {
-                        MomentumMascot(mood = mascotMood, modifier = Modifier.fillMaxSize())
+                    
+                    scrubText?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp),
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    } ?: run {
+                        Text(
+                            text = "Analytics",
+                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp),
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     }
-                }
-                
-                scrubText?.let {
+                    
                     Text(
-                        text = it,
-                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp),
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                } ?: run {
-                    Text(
-                        text = "Analytics",
-                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp),
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground
+                        text = if (scrubText != null) "" else "Track your long-term evolution",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-                
-                Text(
-                    text = if (scrubText != null) "" else "Track your long-term evolution",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    letterSpacing = 1.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Weight Trends Section
-            StatsSection("Weight Trends", Icons.Default.MonitorWeight) {
-                WeightTrendChart(
-                    entries = weights,
-                    unitSystem = unitSystem,
-                    onScrub = { entry ->
-                        if (entry != null) {
-                            val index = weights.indexOf(entry)
-                            val nextEntry = weights.getOrNull(index + 1)
-                            
-                            val comment = if (nextEntry != null) {
-                                val diff = entry.weight - nextEntry.weight
-                                when {
-                                    diff < -0.2 -> "Scale moved down! Persistence pays off."
-                                    diff > 0.2 -> "Don't sweat a daily shift—it's usually just water."
-                                    else -> "Holding steady. Consistency is our secret weapon."
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Weight Trends Section
+                StatsSection("Weight Trends", Icons.Default.MonitorWeight) {
+                    WeightTrendChart(
+                        entries = weights,
+                        unitSystem = unitSystem,
+                        onScrub = { entry ->
+                            if (entry != null) {
+                                val index = weights.indexOf(entry)
+                                val nextEntry = weights.getOrNull(index + 1)
+                                
+                                val comment = if (nextEntry != null) {
+                                    val diff = entry.weight - nextEntry.weight
+                                    when {
+                                        diff < -0.2 -> "Scale moved down! Persistence pays off."
+                                        diff > 0.2 -> "Don't sweat a daily shift—it's usually just water."
+                                        else -> "Holding steady. Consistency is our secret weapon."
+                                    }
+                                } else {
+                                    "Every data point helps me optimize your plan."
                                 }
+                                
+                                mascotMood = if (nextEntry != null && entry.weight < nextEntry.weight) MascotMood.HAPPY else MascotMood.IDLE
+                                scrubText = Units.displayWeight(entry.weight, unitSystem)
+                                helperMessage = comment
                             } else {
-                                "Every data point helps me optimize your plan."
+                                mascotMood = MascotMood.IDLE
+                                scrubText = null
+                                helperMessage = null
                             }
-                            
-                            mascotMood = if (nextEntry != null && entry.weight < nextEntry.weight) MascotMood.HAPPY else MascotMood.IDLE
-                            scrubText = Units.displayWeight(entry.weight, unitSystem)
-                            helperMessage = comment
-                        } else {
-                            mascotMood = MascotMood.IDLE
-                            scrubText = null
-                            helperMessage = null
                         }
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                WeightStatsContent(weights, unitSystem)
-            }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    WeightStatsContent(weights, unitSystem)
+                }
 
-            // Workout Trends Section
-            StatsSection("Training Volume", Icons.Default.FitnessCenter) {
-                val avgVolume = remember(recentSessions) { 
-                    if (recentSessions.isNotEmpty()) recentSessions.map { it.totalVolumeKg }.average() else 0.0 
+                // Workout Trends Section
+                StatsSection("Training Volume", Icons.Default.FitnessCenter) {
+                    val avgVolume = remember(recentSessions) { 
+                        if (recentSessions.isNotEmpty()) recentSessions.map { it.totalVolumeKg }.average() else 0.0 
+                    }
+                    
+                    VolumeTrendChart(
+                        sessions = recentSessions,
+                        unitSystem = unitSystem,
+                        onScrub = { session ->
+                            if (session != null) {
+                                val comment = when {
+                                    session.totalVolumeKg > avgVolume * 1.2 -> "Incredible session! You're building serious strength."
+                                    session.totalVolumeKg < avgVolume * 0.8 -> "Every bit of movement counts toward the goal."
+                                    else -> "Solid training day. Great job showing up!"
+                                }
+                                
+                                mascotMood = if (session.totalVolumeKg >= avgVolume) MascotMood.HAPPY else MascotMood.IDLE
+                                val vol = if (unitSystem == UnitSystem.IMPERIAL) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
+                                val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
+                                scrubText = "$vol $unit"
+                                helperMessage = comment
+                            } else {
+                                mascotMood = MascotMood.IDLE
+                                scrubText = null
+                                helperMessage = null
+                            }
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    WorkoutStatsContent(recentSessions, unitSystem)
                 }
                 
-                VolumeTrendChart(
-                    sessions = recentSessions,
-                    unitSystem = unitSystem,
-                    onScrub = { session ->
-                        if (session != null) {
-                            val comment = when {
-                                session.totalVolumeKg > avgVolume * 1.2 -> "Incredible session! You're building serious strength."
-                                session.totalVolumeKg < avgVolume * 0.8 -> "Every bit of movement counts toward the goal."
-                                else -> "Solid training day. Great job showing up!"
-                            }
-                            
-                            mascotMood = if (session.totalVolumeKg >= avgVolume) MascotMood.HAPPY else MascotMood.IDLE
-                            val vol = if (unitSystem == UnitSystem.IMPERIAL) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
-                            val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
-                            scrubText = "$vol $unit"
-                            helperMessage = comment
-                        } else {
-                            mascotMood = MascotMood.IDLE
-                            scrubText = null
-                            helperMessage = null
-                        }
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                WorkoutStatsContent(recentSessions, unitSystem)
+                // Progression Block
+                StatsSection("Performance", Icons.Default.TrendingUp) {
+                    PerformanceContent(recentSessions, unitSystem)
+                }
             }
-            
-            // Progression Block
-            StatsSection("Performance", Icons.Default.TrendingUp) {
-                PerformanceContent(recentSessions, unitSystem)
-            }
-
-            Spacer(modifier = Modifier.height(120.dp)) // Nav bar space
         }
     }
 }

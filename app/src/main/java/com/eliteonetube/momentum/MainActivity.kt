@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity() {
             openWeightEntryRequests.value++
         }
 
-        // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -74,7 +73,6 @@ class MainActivity : ComponentActivity() {
         WorkScheduler.scheduleWeeklyRecalculation(applicationContext)
 
         val database = WeightDatabase.getInstance(applicationContext)
-
         val weightDao = database.weightDao()
         val workoutDao = database.workoutDao()
         val foodDao = database.foodDao()
@@ -89,548 +87,270 @@ class MainActivity : ComponentActivity() {
             val savedProfile by weightDao.getUserProfile().collectAsState(initial = null)
             
             WeeklyCoachTheme(appTheme = savedProfile?.theme ?: AppTheme.SYSTEM) {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val coroutineScope = rememberCoroutineScope()
+                MomentumAppContent(
+                    weightDao = weightDao,
+                    workoutDao = workoutDao,
+                    foodDao = foodDao,
+                    algorithm = algorithm,
+                    savedProfile = savedProfile,
+                    openWorkoutRequests = openWorkoutRequests,
+                    openWeightEntryRequests = openWeightEntryRequests
+                )
+            }
+        }
+    }
+}
 
-                    val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
-                    val allWeights by weightDao.getAllWeights().collectAsState(initial = emptyList())
-                    val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
-                    val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
-                    val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
-                    val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
-                    val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
-                    val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
+@Composable
+fun MomentumAppContent(
+    weightDao: WeightDao,
+    workoutDao: WorkoutDao,
+    foodDao: FoodDao,
+    algorithm: CoachAlgorithm,
+    savedProfile: UserProfile?,
+    openWorkoutRequests: MutableStateFlow<Int>,
+    openWeightEntryRequests: MutableStateFlow<Int>
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-                    val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
-                    val openWorkoutRequest by openWorkoutRequests.collectAsState()
-                    val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
+    // 1. Core State Collection
+    val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
+    val allWeights by weightDao.getAllWeights().collectAsState(initial = emptyList())
+    val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
+    val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
+    val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
+    val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
+    val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
+    val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
 
-                    val today = remember { LocalDate.now().toString() }
-                    
-                    val todayFoodLogsFlow = remember(today) {
-                        combine(
-                            foodDao.getFoodLogsForDate(today),
-                            foodDao.getDailyMealLogsForDate(today)
-                        ) { items, meals ->
-                            val mappedMeals = meals.map { meal ->
-                                FoodLogWithItem(
-                                    id = meal.id,
-                                    foodItemId = meal.mealId,
-                                    quantity = 1.0,
-                                    name = meal.name,
-                                    calories = meal.calories,
-                                    protein = meal.protein,
-                                    fat = meal.fat,
-                                    carbs = meal.carbs,
-                                    isMeal = true
-                                )
-                            }
-                            items + mappedMeals
-                        }
+    val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
+    val openWorkoutRequest by openWorkoutRequests.collectAsState()
+    val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
+
+    val today = remember { LocalDate.now().toString() }
+    val todayFoodLogsFlow = remember(today) {
+        combine(
+            foodDao.getFoodLogsForDate(today),
+            foodDao.getDailyMealLogsForDate(today)
+        ) { items, meals ->
+            val mappedMeals = meals.map { meal ->
+                FoodLogWithItem(
+                    id = meal.id,
+                    foodItemId = meal.mealId,
+                    quantity = 1.0,
+                    name = meal.name,
+                    calories = meal.calories,
+                    protein = meal.protein,
+                    fat = meal.fat,
+                    carbs = meal.carbs,
+                    isMeal = true
+                )
+            }
+            items + mappedMeals
+        }
+    }
+    val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
+    val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
+
+    // 2. High-Frequency Logic (Remembered/Isolated)
+    var isProfileLoaded by remember { mutableStateOf(false) }
+    var currentCalorieTarget by remember { mutableIntStateOf(2000) }
+
+    val currentStreak = remember(allWeightDates) { StreakCalculator.currentStreak(allWeightDates) }
+    val loggedDates = remember(allWeightDates) {
+        allWeightDates.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet()
+    }
+
+    LaunchedEffect(Unit) {
+        weightDao.getUserProfile().collect { isProfileLoaded = true }
+    }
+
+    LaunchedEffect(savedProfile) {
+        savedProfile?.let { 
+            currentCalorieTarget = it.currentCalorieTarget
+            WorkScheduler.scheduleDailyReminders(context.applicationContext, it)
+        }
+    }
+
+    if (!isProfileLoaded) {
+        LoadingScreen()
+    } else {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            HomeScreen(
+                currentCalorieTarget = currentCalorieTarget,
+                savedProfile = savedProfile,
+                recentWeights = recentWeights,
+                allWeights = allWeights,
+                recentSessions = recentSessions,
+                allExercises = allExercises,
+                allTemplates = allTemplates,
+                allCheckIns = allCheckIns,
+                todayFoodLogs = todayFoodLogs,
+                allFoodItems = allFoodItems,
+                allMeals = allMeals,
+                activeSets = activeSets,
+                hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
+                openWorkoutRequest = openWorkoutRequest,
+                openWeightEntryRequest = openWeightEntryRequest,
+                currentStreak = currentStreak,
+                totalDaysLogged = allWeightDates.size,
+                loggedDates = loggedDates,
+                onWeightSubmitted = { enteredWeight ->
+                    coroutineScope.launch {
+                        val now = LocalDate.now().toString()
+                        weightDao.insertWeight(WeightEntry(date = now, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
+                        NotificationHelper.cancelWeighInReminder(context.applicationContext)
                     }
-                    val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
-                    val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
-
-                    var isProfileLoaded by remember { mutableStateOf(false) }
-                    var currentCalorieTarget by remember { mutableIntStateOf(2000) }
-
-                    val currentStreak = remember(allWeightDates) { StreakCalculator.currentStreak(allWeightDates) }
-                    val loggedDates = remember(allWeightDates) {
-                        allWeightDates.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet()
+                },
+                onPastWeightSubmitted = { date, enteredWeight ->
+                    coroutineScope.launch {
+                        weightDao.insertWeight(WeightEntry(date = date, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
+                        if (date == LocalDate.now().toString()) NotificationHelper.cancelWeighInReminder(context.applicationContext)
                     }
-
-                    LaunchedEffect(Unit) {
-                        weightDao.getUserProfile().collect { isProfileLoaded = true }
-                    }
-
-                    LaunchedEffect(savedProfile) {
-                        savedProfile?.let { 
-                            currentCalorieTarget = it.currentCalorieTarget
-                            WorkScheduler.scheduleDailyReminders(applicationContext, it)
-                        }
-                    }
-
-                    if (!isProfileLoaded) {
-                        LoadingScreen()
-                    } else {
-                        HomeScreen(
-                            currentCalorieTarget = currentCalorieTarget,
-                            savedProfile = savedProfile,
-                            recentWeights = recentWeights,
-                            allWeights = allWeights,
-                            recentSessions = recentSessions,
-                            allExercises = allExercises,
-                            allTemplates = allTemplates,
-                            allCheckIns = allCheckIns,
-                            todayFoodLogs = todayFoodLogs,
-                            allFoodItems = allFoodItems,
-                            allMeals = allMeals,
-                            activeSets = activeSets,
-                            hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
-                            openWorkoutRequest = openWorkoutRequest,
-                            openWeightEntryRequest = openWeightEntryRequest,
-                            currentStreak = currentStreak,
-                            totalDaysLogged = allWeightDates.size,
-                            loggedDates = loggedDates,
-                            onWeightSubmitted = { enteredWeight ->
-                                coroutineScope.launch {
-                                    val today = LocalDate.now().toString()
-                                    weightDao.insertWeight(
-                                        WeightEntry(
-                                            date = today,
-                                            weight = enteredWeight,
-                                            calorieTargetAtEntry = currentCalorieTarget
-                                        )
-                                    )
-                                    NotificationHelper.cancelWeighInReminder(applicationContext)
-                                }
-                            },
-                            onPastWeightSubmitted = { date, enteredWeight ->
-                                coroutineScope.launch {
-                                    weightDao.insertWeight(
-                                        WeightEntry(
-                                            date = date,
-                                            weight = enteredWeight,
-                                            calorieTargetAtEntry = currentCalorieTarget
-                                        )
-                                    )
-                                    if (date == LocalDate.now().toString()) {
-                                        NotificationHelper.cancelWeighInReminder(applicationContext)
-                                    }
-                                }
-                            },
-                            onProfileUpdated = { updatedProfile ->
-                                coroutineScope.launch {
-                                    val recalculated = algorithm.calculateInitialMaintenance(
-                                        weightKg = recentWeights.firstOrNull()?.weight ?: updatedProfile.height,
-                                        heightCm = updatedProfile.height,
-                                        age = updatedProfile.age,
-                                        isMale = updatedProfile.isMale,
-                                        averageDailySteps = updatedProfile.averageDailySteps,
-                                        bodyFatPercentage = updatedProfile.bodyFatPercentage
-                                    )
-                                    
-                                    var finalProfile = updatedProfile.copy(estimatedMaintenanceCalories = recalculated)
-                                    if (finalProfile.goal == Goal.MAINTAIN) {
-                                        finalProfile = finalProfile.copy(currentCalorieTarget = recalculated)
-                                    }
-                                    
-                                    weightDao.saveProfile(finalProfile)
-                                }
-                            },
-                            onGoalChanged = { newGoal ->
-                                savedProfile?.let { profile ->
-                                    coroutineScope.launch {
-                                        val transition = algorithm.calculateGoalTransition(
-                                            previousGoal = profile.goal,
-                                            newGoal = newGoal,
-                                            currentCalorieTarget = profile.currentCalorieTarget,
-                                            estimatedMaintenance = profile.estimatedMaintenanceCalories
-                                        )
-                                        weightDao.saveProfile(
-                                            profile.copy(
-                                                goal = newGoal,
-                                                currentCalorieTarget = transition.newTarget,
-                                                pendingCalorieTarget = null,
-                                                pendingAdjustmentReason = null
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            getSetsForSession = { sessionId ->
-                                workoutDao.getSetsForSession(sessionId).first()
-                            },
-                            onSessionDeleted = { sessionId ->
-                                coroutineScope.launch {
-                                    workoutDao.deleteSession(sessionId)
-                                }
-                            },
-                            onCreateExercise = { name, muscleGroup, type, onCreated ->
-                                coroutineScope.launch {
-                                    val newExercise = Exercise(name = name, muscleGroup = muscleGroup, exerciseType = type)
-                                    val newId = workoutDao.insertExercise(newExercise)
-                                    onCreated(newExercise.copy(id = newId))
-                                }
-                            },
-                            onTemplateCreated = { name, notes, exercises ->
-                                coroutineScope.launch {
-                                    val templateId = workoutDao.insertTemplate(
-                                        WorkoutTemplate(name = name, notes = notes)
-                                    )
-                                    exercises.forEachIndexed { index, input ->
-                                        workoutDao.insertTemplateExercise(
-                                            TemplateExercise(
-                                                templateId = templateId,
-                                                exerciseId = input.exercise.id,
-                                                targetSets = input.targetSets,
-                                                targetReps = input.targetReps,
-                                                targetWeightKg = input.targetWeightKg,
-                                                orderIndex = index
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onTemplateDeleted = { templateId ->
-                                coroutineScope.launch {
-                                    workoutDao.deleteTemplate(templateId)
-                                }
-                            },
-                            getExercisesForTemplate = { templateId ->
-                                workoutDao.getExercisesForTemplate(templateId).first()
-                            },
-                            getSetsForTemplateExercise = { templateExerciseId ->
-                                workoutDao.getSetsForTemplateExercise(templateExerciseId)
-                            },
-                            onAdjustmentAccepted = {
-                                savedProfile?.let { profile ->
-                                    coroutineScope.launch {
-                                        weightDao.saveProfile(
-                                            profile.copy(
-                                                currentCalorieTarget = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
-                                                pendingCalorieTarget = null,
-                                                pendingAdjustmentReason = null
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onAdjustmentDismissed = {
-                                savedProfile?.let { profile ->
-                                    coroutineScope.launch {
-                                        weightDao.saveProfile(
-                                            profile.copy(
-                                                pendingCalorieTarget = null,
-                                                pendingAdjustmentReason = null
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onFoodLogged = { foodId, qty ->
-                                coroutineScope.launch {
-                                    foodDao.insertFoodLog(
-                                        DailyFoodLog(
-                                            date = LocalDate.now().toString(),
-                                            foodItemId = foodId,
-                                            quantity = qty
-                                        )
-                                    )
-                                }
-                            },
-                            onFoodLogDeleted = { logId, isMeal ->
-                                coroutineScope.launch {
-                                    if (isMeal) {
-                                        foodDao.deleteDailyMealLog(logId)
-                                    } else {
-                                        foodDao.deleteFoodLog(logId)
-                                    }
-                                }
-                            },
-                            onFoodLogUpdated = { logId, foodId, qty ->
-                                coroutineScope.launch {
-                                    foodDao.updateFoodLog(
-                                        DailyFoodLog(
-                                            id = logId,
-                                            date = LocalDate.now().toString(),
-                                            foodItemId = foodId,
-                                            quantity = qty
-                                        )
-                                    )
-                                }
-                            },
-                            onLogMeal = { mealId ->
-                                coroutineScope.launch {
-                                    val meal = foodDao.getAllMeals().first().find { it.id == mealId } ?: return@launch
-                                    val items = foodDao.getItemsForMeal(mealId).first()
-                                    
-                                    val totalCals = items.sumOf { it.calories * it.quantity }
-                                    val totalProt = items.sumOf { it.protein * it.quantity }
-                                    val totalFat = items.sumOf { it.fat * it.quantity }
-                                    val totalCarb = items.sumOf { it.carbs * it.quantity }
-
-                                    foodDao.insertDailyMealLog(
-                                        DailyMealLog(
-                                            date = LocalDate.now().toString(),
-                                            mealId = mealId,
-                                            name = meal.name,
-                                            calories = totalCals,
-                                            protein = totalProt,
-                                            fat = totalFat,
-                                            carbs = totalCarb
-                                        )
-                                    )
-                                }
-                            },
-                            onMealCreated = { name, items ->
-                                coroutineScope.launch {
-                                    val mealId = foodDao.insertMeal(Meal(name = name))
-                                    items.forEach { (food, qty) ->
-                                        foodDao.insertMealFoodItem(
-                                            MealFoodItem(
-                                                mealId = mealId,
-                                                foodItemId = food.id,
-                                                quantity = qty
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onFoodCreated = { item ->
-                                coroutineScope.launch {
-                                    foodDao.insertFoodItem(item)
-                                }
-                            },
-                            onQuickLog = { item ->
-                                coroutineScope.launch {
-                                    val id = foodDao.insertFoodItem(item)
-                                    foodDao.insertFoodLog(
-                                        DailyFoodLog(
-                                            date = LocalDate.now().toString(),
-                                            foodItemId = id,
-                                            quantity = 1.0
-                                        )
-                                    )
-                                }
-                            },
-                            onNewFoodItemCreated = { item ->
-                                coroutineScope.launch {
-                                    foodDao.insertFoodItem(item)
-                                }
-                            },
-                            onGetFoodByBarcode = { barcode ->
-                                foodDao.getFoodItemByBarcode(barcode)
-                            },
-                            onUpdateActiveWorkout = { templateId, sets ->
-                                coroutineScope.launch {
-                                    weightDao.saveProfile(
-                                        savedProfile!!.copy(
-                                            activeWorkoutTemplateId = templateId,
-                                            hasActiveWorkout = true
-                                        )
-                                    )
-                                    val activeSets = sets.map { pendingSet ->
-                                        ActiveWorkoutSet(
-                                            exerciseId = pendingSet.exerciseId,
-                                            setNumber = pendingSet.setNumber,
-                                            weightKg = pendingSet.weightKg,
-                                            reps = pendingSet.reps,
-                                            notes = pendingSet.notes,
-                                            isCompleted = pendingSet.isCompleted,
-                                            durationSeconds = pendingSet.durationSeconds,
-                                            distanceKm = pendingSet.distanceKm
-                                        )
-                                    }
-                                    workoutDao.replaceActiveSets(activeSets)
-                                }
-                            },
-                            onClearActiveWorkout = {
-                                coroutineScope.launch {
-                                    weightDao.saveProfile(
-                                        savedProfile!!.copy(
-                                            activeWorkoutTemplateId = null,
-                                            hasActiveWorkout = false
-                                        )
-                                    )
-                                    workoutDao.clearActiveSets()
-                                }
-                            },
-                            onCheckInCompleted = { weight, photos ->
-                                savedProfile?.let { profile ->
-                                    coroutineScope.launch {
-                                        val today = LocalDate.now().toString()
-                                        weightDao.insertWeight(
-                                            WeightEntry(
-                                                date = today,
-                                                weight = weight,
-                                                calorieTargetAtEntry = profile.pendingCalorieTarget ?: profile.currentCalorieTarget
-                                            )
-                                        )
-                                        weightDao.insertCheckIn(
-                                            CheckIn(
-                                                date = today,
-                                                weight = weight,
-                                                frontPhotoPath = photos.getOrNull(0)?.toString(),
-                                                backPhotoPath = photos.getOrNull(1)?.toString(),
-                                                sidePhotoPath = photos.getOrNull(2)?.toString(),
-                                                calorieTargetBefore = profile.currentCalorieTarget,
-                                                calorieTargetAfter = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
-                                                adjustmentReason = profile.pendingAdjustmentReason ?: "Weekly Check-in"
-                                            )
-                                        )
-                                        weightDao.saveProfile(
-                                            profile.copy(
-                                                currentCalorieTarget = profile.pendingCalorieTarget ?: profile.currentCalorieTarget,
-                                                pendingCalorieTarget = null,
-                                                pendingAdjustmentReason = null,
-                                                checkInDue = false,
-                                                lastCheckInDate = today
-                                            )
-                                        )
-                                        NotificationHelper.cancelWeighInReminder(applicationContext)
-                                    }
-                                }
-                            },
-                            onWeightDeleted = { date ->
-                                coroutineScope.launch {
-                                    weightDao.deleteWeight(date)
-                                }
-                            },
-                            onSessionSaved = { date: String, sets: List<PendingSet>, templateId: Long?, existingSessionId: Long? ->
-                                coroutineScope.launch {
-                                    val completedSets = sets.filter { it.isCompleted || it.weightKg > 0 || it.reps > 0 }
-                                    if (completedSets.isEmpty()) return@launch
-
-                                    val totalVolume = completedSets.sumOf { it.weightKg * it.reps }
-                                    val exerciseCount = completedSets.map { it.exerciseId }.distinct().size
-                                    val setCount = completedSets.size
-
-                                    val sessionId = if (existingSessionId != null) {
-                                        workoutDao.updateSession(
-                                            WorkoutSession(
-                                                id = existingSessionId,
-                                                date = date,
-                                                templateId = templateId,
-                                                totalVolumeKg = totalVolume,
-                                                exerciseCount = exerciseCount,
-                                                setCount = setCount
-                                            )
-                                        )
-                                        workoutDao.deleteSetsBySessionId(existingSessionId)
-                                        existingSessionId
-                                    } else {
-                                        workoutDao.insertSession(
-                                            WorkoutSession(
-                                                date = date,
-                                                templateId = templateId,
-                                                totalVolumeKg = totalVolume,
-                                                exerciseCount = exerciseCount,
-                                                setCount = setCount
-                                            )
-                                        )
-                                    }
-
-                                    completedSets.forEach { pendingSet ->
-                                        workoutDao.insertSet(
-                                            LoggedSet(
-                                                sessionId = sessionId,
-                                                exerciseId = pendingSet.exerciseId,
-                                                setNumber = pendingSet.setNumber,
-                                                weightKg = pendingSet.weightKg,
-                                                reps = pendingSet.reps,
-                                                notes = pendingSet.notes,
-                                                durationSeconds = pendingSet.durationSeconds,
-                                                distanceKm = pendingSet.distanceKm
-                                            )
-                                        )
-                                    }
-
-                                    templateId?.let { tid: Long ->
-                                        // "Save on top": Update template structure and targets
-                                        workoutDao.deleteTemplateSetsByTemplateId(tid)
-                                        workoutDao.deleteTemplateExercises(tid)
-                                        
-                                        // Use ALL exercises that were in the session (including new ones added)
-                                        val allSessionExerciseIds = sets.map { it.exerciseId }.distinct()
-                                        
-                                        allSessionExerciseIds.forEachIndexed { index, exId ->
-                                            val exerciseSets = sets.filter { it.exerciseId == exId }
-                                            val validSets = exerciseSets.filter { it.setNumber > 0 && (it.reps > 0 || it.weightKg > 0) }
-                                            
-                                            if (validSets.isNotEmpty()) {
-                                                // Create the template exercise entry
-                                                val templateExerciseId = workoutDao.insertTemplateExercise(
-                                                    TemplateExercise(
-                                                        templateId = tid,
-                                                        exerciseId = exId,
-                                                        targetSets = validSets.size,
-                                                        // Main targets for fallback, but we'll save per-set data too
-                                                        targetReps = validSets.first().reps,
-                                                        targetWeightKg = validSets.first().weightKg,
-                                                        orderIndex = index
-                                                    )
-                                                )
-                                                
-                                                // Save EVERY set specifically to the template
-                                                validSets.forEach { ps ->
-                                                    workoutDao.insertTemplateSet(
-                                                        TemplateSet(
-                                                            templateExerciseId = templateExerciseId,
-                                                            setNumber = ps.setNumber,
-                                                            targetReps = ps.reps,
-                                                            targetWeightKg = ps.weightKg,
-                                                            targetDurationSeconds = ps.durationSeconds,
-                                                            targetDistanceKm = ps.distanceKm
-                                                        )
-                                                    )
-                                                }
-                                            } else {
-                                                // Default entry for added but untouched exercises
-                                                val templateExerciseId = workoutDao.insertTemplateExercise(
-                                                    TemplateExercise(
-                                                        templateId = tid,
-                                                        exerciseId = exId,
-                                                        targetSets = 3,
-                                                        targetReps = 10,
-                                                        targetWeightKg = 0.0,
-                                                        orderIndex = index
-                                                    )
-                                                )
-                                                // Optional: add default sets for these too
-                                                repeat(3) { sn ->
-                                                    workoutDao.insertTemplateSet(
-                                                        TemplateSet(
-                                                            templateExerciseId = templateExerciseId,
-                                                            setNumber = sn + 1,
-                                                            targetReps = 10,
-                                                            targetWeightKg = 0.0
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            onOnboardingCompleted = { w: Double, h: Double, a: Int, male: Boolean, stepCount: Int, goal: Goal, customCalories: Int?, unitSystem: UnitSystem, bf: Double?, useHC: Boolean ->
-                                val maintenance = algorithm.calculateInitialMaintenance(w, h, a, male, stepCount, bf)
-                                val initialTarget = customCalories ?: when (goal) {
-                                    Goal.CUT -> maintenance - 500
-                                    Goal.BULK -> maintenance + 300
-                                    Goal.MAINTAIN -> maintenance
-                                    Goal.REVERSE -> maintenance - 300
-                                }
-
-                                coroutineScope.launch {
-                                    weightDao.saveProfile(
-                                        UserProfile(
-                                            height = h,
-                                            age = a,
-                                            isMale = male,
-                                            averageDailySteps = stepCount,
-                                            estimatedMaintenanceCalories = maintenance,
-                                            goal = goal,
-                                            currentCalorieTarget = initialTarget,
-                                            unitSystem = unitSystem,
-                                            bodyFatPercentage = bf,
-                                            useHealthConnect = useHC,
-                                            useExternalApi = false
-                                        )
-                                    )
-                                    weightDao.insertWeight(
-                                        WeightEntry(
-                                            date = LocalDate.now().toString(),
-                                            weight = w,
-                                            calorieTargetAtEntry = initialTarget
-                                        )
-                                    )
-                                }
-                            }
+                },
+                onWeightDeleted = { date -> coroutineScope.launch { weightDao.deleteWeight(date) } },
+                onProfileUpdated = { updatedProfile ->
+                    coroutineScope.launch {
+                        val recalculated = algorithm.calculateInitialMaintenance(
+                            recentWeights.firstOrNull()?.weight ?: updatedProfile.height,
+                            updatedProfile.height, updatedProfile.age, updatedProfile.isMale,
+                            updatedProfile.averageDailySteps, updatedProfile.bodyFatPercentage
                         )
+                        var final = updatedProfile.copy(estimatedMaintenanceCalories = recalculated)
+                        if (final.goal == Goal.MAINTAIN) final = final.copy(currentCalorieTarget = recalculated)
+                        weightDao.saveProfile(final)
+                    }
+                },
+                onGoalChanged = { newGoal ->
+                    savedProfile?.let { profile ->
+                        coroutineScope.launch {
+                            val trans = algorithm.calculateGoalTransition(profile.goal, newGoal, profile.currentCalorieTarget, profile.estimatedMaintenanceCalories)
+                            weightDao.saveProfile(profile.copy(goal = newGoal, currentCalorieTarget = trans.newTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null))
+                        }
+                    }
+                },
+                onAdjustmentAccepted = {
+                    savedProfile?.let { p ->
+                        coroutineScope.launch {
+                            weightDao.saveProfile(p.copy(currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null))
+                        }
+                    }
+                },
+                onAdjustmentDismissed = {
+                    savedProfile?.let { p ->
+                        coroutineScope.launch { weightDao.saveProfile(p.copy(pendingCalorieTarget = null, pendingAdjustmentReason = null)) }
+                    }
+                },
+                onFoodLogged = { foodId, qty ->
+                    coroutineScope.launch { foodDao.insertFoodLog(DailyFoodLog(date = LocalDate.now().toString(), foodItemId = foodId, quantity = qty)) }
+                },
+                onFoodLogDeleted = { id, isMeal ->
+                    coroutineScope.launch { if (isMeal) foodDao.deleteDailyMealLog(id) else foodDao.deleteFoodLog(id) }
+                },
+                onFoodLogUpdated = { id, fId, q ->
+                    coroutineScope.launch { foodDao.updateFoodLog(DailyFoodLog(id = id, date = LocalDate.now().toString(), foodItemId = fId, quantity = q)) }
+                },
+                onLogMeal = { mealId ->
+                    coroutineScope.launch {
+                        val meal = foodDao.getAllMeals().first().find { it.id == mealId } ?: return@launch
+                        val items = foodDao.getItemsForMeal(mealId).first()
+                        foodDao.insertDailyMealLog(DailyMealLog(
+                            date = LocalDate.now().toString(), mealId = mealId, name = meal.name,
+                            calories = items.sumOf { it.calories * it.quantity },
+                            protein = items.sumOf { it.protein * it.quantity },
+                            fat = items.sumOf { it.fat * it.quantity },
+                            carbs = items.sumOf { it.carbs * it.quantity }
+                        ))
+                    }
+                },
+                onMealCreated = { name, items ->
+                    coroutineScope.launch {
+                        val mid = foodDao.insertMeal(Meal(name = name))
+                        items.forEach { (f, q) -> foodDao.insertMealFoodItem(MealFoodItem(mealId = mid, foodItemId = f.id, quantity = q)) }
+                    }
+                },
+                onFoodCreated = { item -> coroutineScope.launch { foodDao.insertFoodItem(item) } },
+                onQuickLog = { item ->
+                    coroutineScope.launch {
+                        val fid = foodDao.insertFoodItem(item)
+                        foodDao.insertFoodLog(DailyFoodLog(date = LocalDate.now().toString(), foodItemId = fid, quantity = 1.0))
+                    }
+                },
+                onNewFoodItemCreated = { item -> coroutineScope.launch { foodDao.insertFoodItem(item) } },
+                onGetFoodByBarcode = { bc -> foodDao.getFoodItemByBarcode(bc) },
+                onUpdateActiveWorkout = { tid, sets ->
+                    coroutineScope.launch {
+                        weightDao.saveProfile(savedProfile!!.copy(activeWorkoutTemplateId = tid, hasActiveWorkout = true))
+                        workoutDao.replaceActiveSets(sets.map { ps ->
+                            ActiveWorkoutSet(exerciseId = ps.exerciseId, setNumber = ps.setNumber, weightKg = ps.weightKg, reps = ps.reps, notes = ps.notes, isCompleted = ps.isCompleted, durationSeconds = ps.durationSeconds, distanceKm = ps.distanceKm)
+                        })
+                    }
+                },
+                onClearActiveWorkout = {
+                    coroutineScope.launch {
+                        weightDao.saveProfile(savedProfile!!.copy(activeWorkoutTemplateId = null, hasActiveWorkout = false))
+                        workoutDao.clearActiveSets()
+                    }
+                },
+                onCheckInCompleted = { w, ph ->
+                    savedProfile?.let { p ->
+                        coroutineScope.launch {
+                            val now = LocalDate.now().toString()
+                            weightDao.insertWeight(WeightEntry(date = now, weight = w, calorieTargetAtEntry = p.pendingCalorieTarget ?: p.currentCalorieTarget))
+                            weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = ph.getOrNull(0)?.toString(), backPhotoPath = ph.getOrNull(1)?.toString(), sidePhotoPath = ph.getOrNull(2)?.toString(), calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = p.pendingCalorieTarget ?: p.currentCalorieTarget, adjustmentReason = p.pendingAdjustmentReason ?: "Weekly Review"))
+                            weightDao.saveProfile(p.copy(currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null, checkInDue = false, lastCheckInDate = now))
+                            NotificationHelper.cancelWeighInReminder(context.applicationContext)
+                        }
+                    }
+                },
+                getSetsForSession = { sid -> workoutDao.getSetsForSession(sid).first() },
+                getExercisesForTemplate = { tid -> workoutDao.getExercisesForTemplate(tid).first() },
+                getSetsForTemplateExercise = { teid -> workoutDao.getSetsForTemplateExercise(teid) },
+                onSessionSaved = { date, setsList, tid, exSid ->
+                    coroutineScope.launch {
+                        val valid = setsList.filter { it.isCompleted || it.weightKg > 0 || it.reps > 0 }
+                        if (valid.isEmpty()) return@launch
+                        val sid = if (exSid != null) {
+                            workoutDao.updateSession(WorkoutSession(id = exSid, date = date, templateId = tid, totalVolumeKg = valid.sumOf { it.weightKg * it.reps }, exerciseCount = valid.map { it.exerciseId }.distinct().size, setCount = valid.size))
+                            workoutDao.deleteSetsBySessionId(exSid); exSid
+                        } else {
+                            workoutDao.insertSession(WorkoutSession(date = date, templateId = tid, totalVolumeKg = valid.sumOf { it.weightKg * it.reps }, exerciseCount = valid.map { it.exerciseId }.distinct().size, setCount = valid.size))
+                        }
+                        valid.forEach { ps -> workoutDao.insertSet(LoggedSet(sessionId = sid, exerciseId = ps.exerciseId, setNumber = ps.setNumber, weightKg = ps.weightKg, reps = ps.reps, notes = ps.notes, durationSeconds = ps.durationSeconds, distanceKm = ps.distanceKm)) }
+                        tid?.let { id ->
+                            workoutDao.deleteTemplateSetsByTemplateId(id); workoutDao.deleteTemplateExercises(id)
+                            setsList.map { it.exerciseId }.distinct().forEachIndexed { idx, eid ->
+                                val exs = setsList.filter { it.exerciseId == eid }
+                                val vxs = exs.filter { it.setNumber > 0 && (it.reps > 0 || it.weightKg > 0) }
+                                val teid = workoutDao.insertTemplateExercise(TemplateExercise(templateId = id, exerciseId = eid, targetSets = if (vxs.isNotEmpty()) vxs.size else 3, targetReps = if (vxs.isNotEmpty()) vxs.first().reps else 10, targetWeightKg = if (vxs.isNotEmpty()) vxs.first().weightKg else 0.0, orderIndex = idx))
+                                if (vxs.isNotEmpty()) vxs.forEach { ps -> workoutDao.insertTemplateSet(TemplateSet(templateExerciseId = teid, setNumber = ps.setNumber, targetReps = ps.reps, targetWeightKg = ps.weightKg, targetDurationSeconds = ps.durationSeconds, targetDistanceKm = ps.distanceKm)) }
+                                else repeat(3) { sn -> workoutDao.insertTemplateSet(TemplateSet(templateExerciseId = teid, setNumber = sn + 1, targetReps = 10, targetWeightKg = 0.0)) }
+                            }
+                        }
+                    }
+                },
+                onSessionDeleted = { sid -> coroutineScope.launch { workoutDao.deleteSession(sid) } },
+                onCreateExercise = { n, m, t, oc -> coroutineScope.launch { val ex = Exercise(name = n, muscleGroup = m, exerciseType = t); val nid = workoutDao.insertExercise(ex); oc(ex.copy(id = nid)) } },
+                onTemplateCreated = { n, nt, exs ->
+                    coroutineScope.launch {
+                        val tid = workoutDao.insertTemplate(WorkoutTemplate(name = n, notes = nt))
+                        exs.forEachIndexed { i, input ->
+                            val teid = workoutDao.insertTemplateExercise(TemplateExercise(templateId = tid, exerciseId = input.exercise.id, targetSets = input.targetSets, targetReps = input.targetReps, targetWeightKg = input.targetWeightKg, orderIndex = i))
+                            repeat(input.targetSets) { sn -> workoutDao.insertTemplateSet(TemplateSet(templateExerciseId = teid, setNumber = sn + 1, targetReps = input.targetReps, targetWeightKg = input.targetWeightKg)) }
+                        }
+                    }
+                },
+                onTemplateDeleted = { tid -> coroutineScope.launch { workoutDao.deleteTemplate(tid) } },
+                onOnboardingCompleted = { w, h, a, m, s, g, cc, us, bf, hc ->
+                    val main = algorithm.calculateInitialMaintenance(w, h, a, m, s, bf)
+                    val init = cc ?: when (g) { Goal.CUT -> main - 500; Goal.BULK -> main + 300; Goal.MAINTAIN -> main; Goal.REVERSE -> main - 300 }
+                    coroutineScope.launch {
+                        weightDao.saveProfile(UserProfile(height = h, age = a, isMale = m, averageDailySteps = s, estimatedMaintenanceCalories = main, goal = g, currentCalorieTarget = init, unitSystem = us, bodyFatPercentage = bf, useHealthConnect = hc, useExternalApi = false))
+                        weightDao.insertWeight(WeightEntry(date = LocalDate.now().toString(), weight = w, calorieTargetAtEntry = init))
                     }
                 }
-            }
+            )
         }
     }
 }
