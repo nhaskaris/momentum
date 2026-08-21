@@ -48,6 +48,7 @@ fun HomeScreen(
     recentWeights: List<WeightEntry>,
     allWeights: List<WeightEntry> = emptyList(),
     recentSessions: List<WorkoutSession>,
+    recentNutrition: List<DailyNutrition> = emptyList(),
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
     allCheckIns: List<CheckIn> = emptyList(),
@@ -312,6 +313,7 @@ fun HomeScreen(
                 AppTab.STATISTICS -> StatisticsScreen(
                     weights = allWeights,
                     recentSessions = recentSessions,
+                    recentNutrition = recentNutrition,
                     unitSystem = savedProfile.unitSystem
                 )
                 AppTab.NUTRITION -> NutritionScreen(

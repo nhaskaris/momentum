@@ -124,6 +124,40 @@ fun MomentumAppContent(
     val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
 
+    val thirtyDaysAgo = remember { LocalDate.now().minusDays(30).toString() }
+    val recentNutritionFlow = remember(thirtyDaysAgo) {
+        combine(
+            foodDao.getRecentFoodLogs(thirtyDaysAgo),
+            foodDao.getRecentMealLogs(thirtyDaysAgo)
+        ) { items, meals ->
+            val allLogs = items + meals.map { meal ->
+                FoodLogWithItem(
+                    id = meal.id,
+                    date = meal.date,
+                    foodItemId = meal.mealId,
+                    quantity = 1.0,
+                    name = meal.name,
+                    calories = meal.calories,
+                    protein = meal.protein,
+                    fat = meal.fat,
+                    carbs = meal.carbs,
+                    isMeal = true
+                )
+            }
+            
+            allLogs.groupBy { it.date }.map { (date, logs) ->
+                DailyNutrition(
+                    date = date,
+                    totalCalories = logs.sumOf { it.calories * it.quantity },
+                    totalProtein = logs.sumOf { it.protein * it.quantity },
+                    totalCarbs = logs.sumOf { it.carbs * it.quantity },
+                    totalFat = logs.sumOf { it.fat * it.quantity }
+                )
+            }.sortedByDescending { it.date }
+        }
+    }
+    val recentNutrition by recentNutritionFlow.collectAsState(initial = emptyList())
+
     val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
     val openWorkoutRequest by openWorkoutRequests.collectAsState()
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
@@ -183,6 +217,7 @@ fun MomentumAppContent(
                 recentWeights = recentWeights,
                 allWeights = allWeights,
                 recentSessions = recentSessions,
+                recentNutrition = recentNutrition,
                 allExercises = allExercises,
                 allTemplates = allTemplates,
                 allCheckIns = allCheckIns,

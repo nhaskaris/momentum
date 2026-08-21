@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.data.WorkoutSession
+import com.eliteonetube.momentum.data.DailyNutrition
 import com.eliteonetube.momentum.logic.Units
 import com.eliteonetube.momentum.ui.WeightTrendChart
 import com.eliteonetube.momentum.ui.VolumeTrendChart
@@ -35,6 +36,7 @@ import androidx.compose.animation.*
 fun StatisticsScreen(
     weights: List<WeightEntry>,
     recentSessions: List<WorkoutSession>,
+    recentNutrition: List<DailyNutrition> = emptyList(),
     unitSystem: UnitSystem
 ) {
     var mascotMood by remember { mutableStateOf(MascotMood.IDLE) }
@@ -168,37 +170,42 @@ fun StatisticsScreen(
                 }
 
                 // Workout Trends Section
-                StatsSection("Training Volume", Icons.Default.FitnessCenter) {
-                    val avgVolume = remember(recentSessions) { 
-                        if (recentSessions.isNotEmpty()) recentSessions.map { it.totalVolumeKg }.average() else 0.0 
-                    }
-                    
-                    VolumeTrendChart(
-                        sessions = recentSessions,
-                        unitSystem = unitSystem,
-                        onScrub = { session ->
-                            if (session != null) {
-                                val comment = when {
-                                    session.totalVolumeKg > avgVolume * 1.2 -> "Incredible session! You're building serious strength."
-                                    session.totalVolumeKg < avgVolume * 0.8 -> "Every bit of movement counts toward the goal."
-                                    else -> "Solid training day. Great job showing up!"
-                                }
-                                
-                                mascotMood = if (session.totalVolumeKg >= avgVolume) MascotMood.HAPPY else MascotMood.IDLE
-                                val vol = if (unitSystem == UnitSystem.IMPERIAL) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
-                                val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
-                                scrubText = "$vol $unit"
-                                helperMessage = comment
-                            } else {
-                                mascotMood = MascotMood.IDLE
-                                scrubText = null
-                                helperMessage = null
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    WorkoutStatsContent(recentSessions, unitSystem)
+            StatsSection("Training Volume", Icons.Default.FitnessCenter) {
+                val avgVolume = remember(recentSessions) { 
+                    if (recentSessions.isNotEmpty()) recentSessions.map { it.totalVolumeKg }.average() else 0.0 
                 }
+                
+                VolumeTrendChart(
+                    sessions = recentSessions,
+                    unitSystem = unitSystem,
+                    onScrub = { session ->
+                        if (session != null) {
+                            val comment = when {
+                                session.totalVolumeKg > avgVolume * 1.2 -> "Incredible session! You're building serious strength."
+                                session.totalVolumeKg < avgVolume * 0.8 -> "Every bit of movement counts toward the goal."
+                                else -> "Solid training day. Great job showing up!"
+                            }
+                            
+                            mascotMood = if (session.totalVolumeKg >= avgVolume) MascotMood.HAPPY else MascotMood.IDLE
+                            val vol = if (unitSystem == UnitSystem.IMPERIAL) (session.totalVolumeKg * 2.20462).toInt() else session.totalVolumeKg.toInt()
+                            val unit = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
+                            scrubText = "$vol $unit"
+                            helperMessage = comment
+                        } else {
+                            mascotMood = MascotMood.IDLE
+                            scrubText = null
+                            helperMessage = null
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                WorkoutStatsContent(recentSessions, unitSystem)
+            }
+
+            // Nutrition Trends Section
+            StatsSection("Nutrition History", Icons.Default.Restaurant) {
+                NutritionStatsContent(recentNutrition)
+            }
                 
                 // Progression Block
                 StatsSection("Performance", Icons.Default.TrendingUp) {
@@ -418,6 +425,79 @@ private fun PerformanceRow(
         }
         Spacer(modifier = Modifier.weight(1f))
         Text(date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+@Composable
+private fun NutritionStatsContent(recentNutrition: List<DailyNutrition>) {
+    if (recentNutrition.isEmpty()) {
+        EmptyStatsCard("No nutrition data logged yet.")
+        return
+    }
+
+    val past7Days = recentNutrition.take(7)
+    val avgCalories = past7Days.map { it.totalCalories }.average().toInt()
+    val avgProtein = past7Days.map { it.totalProtein }.average().toInt()
+    val avgCarbs = past7Days.map { it.totalCarbs }.average().toInt()
+    val avgFat = past7Days.map { it.totalFat }.average().toInt()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text("Past 7 Days Average", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StatItem(
+                    label = "Calories",
+                    value = "$avgCalories",
+                    modifier = Modifier.weight(1f)
+                )
+                StatItem(
+                    label = "Protein",
+                    value = "${avgProtein}g",
+                    modifier = Modifier.weight(1f)
+                )
+                StatItem(
+                    label = "Carbs",
+                    value = "${avgCarbs}g",
+                    modifier = Modifier.weight(1f)
+                )
+                StatItem(
+                    label = "Fats",
+                    value = "${avgFat}g",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 20.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            
+            Text("Daily Breakdown", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            recentNutrition.take(14).forEach { daily ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(daily.date.takeLast(5), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${daily.totalCalories.toInt()} kcal", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "${daily.totalProtein.toInt()}P ${daily.totalCarbs.toInt()}C ${daily.totalFat.toInt()}F",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            }
+        }
     }
 }
 

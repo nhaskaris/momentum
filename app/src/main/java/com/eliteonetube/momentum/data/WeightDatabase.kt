@@ -157,6 +157,14 @@ data class FoodLogWithItem(
     val isMeal: Boolean = false
 )
 
+data class DailyNutrition(
+    val date: String,
+    val totalCalories: Double,
+    val totalProtein: Double,
+    val totalCarbs: Double,
+    val totalFat: Double
+)
+
 @Entity(tableName = "exercise_table")
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -429,6 +437,18 @@ interface FoodDao {
 
     @Query("SELECT * FROM daily_meal_log_table WHERE date = :date")
     fun getDailyMealLogsForDate(date: String): Flow<List<DailyMealLog>>
+
+    @Query("""
+        SELECT daily_food_log_table.*, food_item_table.name, food_item_table.calories, 
+               food_item_table.protein, food_item_table.fat, food_item_table.carbs
+        FROM daily_food_log_table
+        INNER JOIN food_item_table ON daily_food_log_table.foodItemId = food_item_table.id
+        WHERE daily_food_log_table.date >= :startDate
+    """)
+    fun getRecentFoodLogs(startDate: String): Flow<List<FoodLogWithItem>>
+
+    @Query("SELECT * FROM daily_meal_log_table WHERE date >= :startDate")
+    fun getRecentMealLogs(startDate: String): Flow<List<DailyMealLog>>
 
     @Query("DELETE FROM daily_meal_log_table WHERE id = :logId")
     suspend fun deleteDailyMealLog(logId: Long)
