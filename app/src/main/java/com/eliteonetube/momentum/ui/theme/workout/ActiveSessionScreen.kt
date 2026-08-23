@@ -3,6 +3,7 @@ package com.eliteonetube.momentum.ui.workout
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
@@ -15,6 +16,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Reorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,6 +64,7 @@ fun ActiveSessionScreen(
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     var showExercisePicker by remember { mutableStateOf(false) }
+    var showReorderDialog by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var exerciseToSwapId by remember { mutableStateOf<Long?>(null) }
     
@@ -143,7 +148,14 @@ fun ActiveSessionScreen(
     val isFinishStep = pageCount > 0 && currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
 
     val allSets = remember(setsByExercise, sessionExercises) { 
-        sessionExercises.flatMap { setsByExercise[it.id].orEmpty() } 
+        sessionExercises.flatMap { ex ->
+            val exerciseSets = setsByExercise[ex.id].orEmpty()
+            if (exerciseSets.isEmpty()) {
+                listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false))
+            } else {
+                exerciseSets
+            }
+        }
     }
     val totalVolumeKg by remember(allSets) { 
         derivedStateOf { allSets.sumOf { it.weightKg * it.reps } } 
@@ -218,6 +230,21 @@ fun ActiveSessionScreen(
         )
     }
 
+    if (showReorderDialog) {
+        ReorderExercisesDialog(
+            exercises = sessionExercises,
+            onDismiss = { showReorderDialog = false },
+            onReorder = { newList ->
+                sessionExercises = newList
+                // We don't need to update setsByExercise map structure, just the order of keys for pager
+                // Pager uses sessionExercises.size and indices
+                coroutineScope.launch {
+                    pagerState.scrollToPage(0) // Reset to first exercise after reorder to avoid confusion
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -248,6 +275,9 @@ fun ActiveSessionScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showReorderDialog = true }) {
+                        Icon(Icons.Default.Reorder, "Reorder exercises", modifier = Modifier.size(22.dp))
+                    }
                     TextButton(onClick = { showExercisePicker = true }) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
@@ -387,6 +417,85 @@ fun ActiveSessionScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ReorderExercisesDialog(
+    exercises: List<Exercise>,
+    onDismiss: () -> Unit,
+    onReorder: (List<Exercise>) -> Unit
+) {
+    var currentList by remember { mutableStateOf(exercises) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reorder Exercises", fontWeight = FontWeight.Black) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    itemsIndexed(currentList) { index, exercise ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "${index + 1}. ${exercise.name}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Row {
+                                    IconButton(
+                                        onClick = {
+                                            if (index > 0) {
+                                                val newList = currentList.toMutableList()
+                                                val item = newList.removeAt(index)
+                                                newList.add(index - 1, item)
+                                                currentList = newList
+                                            }
+                                        },
+                                        enabled = index > 0,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.ArrowUpward, null)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (index < currentList.size - 1) {
+                                                val newList = currentList.toMutableList()
+                                                val item = newList.removeAt(index)
+                                                newList.add(index + 1, item)
+                                                currentList = newList
+                                            }
+                                        },
+                                        enabled = index < currentList.size - 1,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.ArrowDownward, null)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onReorder(currentList); onDismiss() }) {
+                Text("Done")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
