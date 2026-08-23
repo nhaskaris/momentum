@@ -318,7 +318,17 @@ fun MomentumAppContent(
                     coroutineScope.launch {
                         weightDao.saveProfile(savedProfile!!.copy(activeWorkoutTemplateId = tid, hasActiveWorkout = true))
                         workoutDao.replaceActiveSets(sets.map { ps ->
-                            ActiveWorkoutSet(exerciseId = ps.exerciseId, setNumber = ps.setNumber, weightKg = ps.weightKg, reps = ps.reps, notes = ps.notes, isCompleted = ps.isCompleted, durationSeconds = ps.durationSeconds, distanceKm = ps.distanceKm)
+                            ActiveWorkoutSet(
+                                exerciseId = ps.exerciseId,
+                                setNumber = ps.setNumber,
+                                weightKg = ps.weightKg,
+                                reps = ps.reps,
+                                notes = ps.notes,
+                                isCompleted = ps.isCompleted,
+                                durationSeconds = ps.durationSeconds,
+                                distanceKm = ps.distanceKm,
+                                orderIndex = ps.orderIndex
+                            )
                         })
                     }
                 },

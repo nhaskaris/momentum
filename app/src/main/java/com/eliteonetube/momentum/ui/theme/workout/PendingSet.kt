@@ -12,5 +12,6 @@ data class PendingSet(
     val notes: String? = null,
     val isCompleted: Boolean = false,
     val durationSeconds: Int? = null,
-    val distanceKm: Double? = null
+    val distanceKm: Double? = null,
+    val orderIndex: Int = 0
 )

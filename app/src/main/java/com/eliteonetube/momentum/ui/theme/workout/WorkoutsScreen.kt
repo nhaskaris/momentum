@@ -74,7 +74,8 @@ fun WorkoutsScreen(
                     weightKg = it.weightKg,
                     reps = it.reps,
                     notes = it.notes,
-                    isCompleted = it.isCompleted
+                    isCompleted = it.isCompleted,
+                    orderIndex = it.orderIndex
                 )
             }
         )
@@ -139,14 +140,15 @@ fun WorkoutsScreen(
                     editingSessionId = session.id
                     currentActiveTemplateId = session.templateId
                     initialSessionExercises = sets.mapNotNull { exerciseMap[it.exerciseId] }.distinctBy { it.id }
-                    initialPendingSets = sets.map { set ->
+                    initialPendingSets = sets.mapIndexed { index, set ->
                         PendingSet(
                             exerciseId = set.exerciseId,
                             setNumber = set.setNumber,
                             weightKg = set.weightKg,
                             reps = set.reps,
                             notes = set.notes,
-                            isCompleted = true
+                            isCompleted = true,
+                            orderIndex = index
                         )
                     }
                     onUpdateActiveWorkout(currentActiveTemplateId, initialPendingSets)

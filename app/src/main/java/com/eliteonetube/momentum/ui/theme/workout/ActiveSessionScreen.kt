@@ -45,6 +45,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.eliteonetube.momentum.ui.theme.MomentumGlass
 import com.eliteonetube.momentum.ui.theme.bounceClick
 
@@ -109,17 +112,39 @@ fun ActiveSessionScreen(
             }
     }
 
-    LaunchedEffect(setsByExercise, sessionExercises, isInitialized) {
-        if (isInitialized) {
-            val allSets = sessionExercises.flatMap { ex ->
+    // Function to capture current state for persistence
+    val getCurrentSets = remember(setsByExercise, sessionExercises) {
+        {
+            sessionExercises.flatMapIndexed { index, ex ->
                 val exerciseSets = setsByExercise[ex.id].orEmpty()
                 if (exerciseSets.isEmpty()) {
-                    listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false))
+                    listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false, orderIndex = index))
                 } else {
-                    exerciseSets
+                    exerciseSets.map { it.copy(orderIndex = index) }
                 }
             }
-            persistenceFlow.value = allSets
+        }
+    }
+
+    LaunchedEffect(setsByExercise, sessionExercises, isInitialized) {
+        if (isInitialized) {
+            persistenceFlow.value = getCurrentSets()
+        }
+    }
+
+    // Flush to DB immediately when app is backgrounded
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                if (isInitialized) {
+                    onUpdateActiveSets(getCurrentSets())
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -148,12 +173,12 @@ fun ActiveSessionScreen(
     val isFinishStep = pageCount > 0 && currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
 
     val allSets = remember(setsByExercise, sessionExercises) { 
-        sessionExercises.flatMap { ex ->
+        sessionExercises.flatMapIndexed { index, ex ->
             val exerciseSets = setsByExercise[ex.id].orEmpty()
             if (exerciseSets.isEmpty()) {
-                listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false))
+                listOf(PendingSet(exerciseId = ex.id, setNumber = 0, isCompleted = false, orderIndex = index))
             } else {
-                exerciseSets
+                exerciseSets.map { it.copy(orderIndex = index) }
             }
         }
     }

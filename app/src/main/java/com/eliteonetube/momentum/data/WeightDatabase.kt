@@ -277,7 +277,8 @@ data class ActiveWorkoutSet(
     val notes: String? = null,
     val isCompleted: Boolean = false,
     val durationSeconds: Int? = null,
-    val distanceKm: Double? = null
+    val distanceKm: Double? = null,
+    val orderIndex: Int = 0
 )
 
 @Dao
@@ -492,7 +493,7 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActiveSet(activeSet: ActiveWorkoutSet)
 
-    @Query("SELECT * FROM active_workout_set_table ORDER BY id ASC")
+    @Query("SELECT * FROM active_workout_set_table ORDER BY orderIndex ASC, id ASC")
     fun getActiveSets(): Flow<List<ActiveWorkoutSet>>
 
     @Query("DELETE FROM active_workout_set_table")
@@ -613,7 +614,7 @@ interface WorkoutDao {
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 29
+    version = 30
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -637,7 +638,7 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                     MIGRATION_24_25, MIGRATION_25_26,
                     MIGRATION_26_27, MIGRATION_27_28,
-                    MIGRATION_28_29
+                    MIGRATION_28_29, MIGRATION_29_30
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -859,6 +860,12 @@ abstract class WeightDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_template_set_table_templateExerciseId ON template_set_table (templateExerciseId)")
+            }
+        }
+
+        val MIGRATION_29_30 = object : Migration(29, 30) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN orderIndex INTEGER NOT NULL DEFAULT 0")
             }
         }
     }
