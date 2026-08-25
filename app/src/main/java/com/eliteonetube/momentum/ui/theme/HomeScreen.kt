@@ -107,7 +107,7 @@ fun HomeScreen(
     val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
 
     var hasAutoSwitched by remember { mutableStateOf(false) }
-    LaunchedEffect(activeSets, hasActiveWorkout) {
+    LaunchedEffect(activeSets.isNotEmpty(), hasActiveWorkout) {
         if ((activeSets.isNotEmpty() || hasActiveWorkout) && !hasAutoSwitched) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
             hasAutoSwitched = true
@@ -157,8 +157,11 @@ fun HomeScreen(
         }
     }
 
-    var isSessionActive by remember(activeSets, hasActiveWorkout) {
-        mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
+    var isSessionActive by remember { mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout) }
+    LaunchedEffect(activeSets.isNotEmpty(), hasActiveWorkout) {
+        if (activeSets.isNotEmpty() || hasActiveWorkout) {
+            isSessionActive = true
+        }
     }
 
     val healthConnectManager = remember { HealthConnectManager(context) }
@@ -280,7 +283,7 @@ fun HomeScreen(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !(isSessionActive && currentTab == AppTab.WORKOUTS),
-            beyondViewportPageCount = 1,
+            beyondViewportPageCount = 0,
             modifier = Modifier.fillMaxSize()
         ) { page ->
             when (AppTab.entries[page]) {

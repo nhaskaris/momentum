@@ -21,12 +21,12 @@ import com.eliteonetube.momentum.logic.*
 import com.eliteonetube.momentum.ui.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
-import com.eliteonetube.momentum.ui.workout.PendingSet
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class MainActivity : ComponentActivity() {
 
@@ -158,7 +158,9 @@ fun MomentumAppContent(
     }
     val recentNutrition by recentNutritionFlow.collectAsState(initial = emptyList())
 
-    val activeSets by workoutDao.getActiveSets().collectAsState(initial = emptyList())
+    val activeSetsFlow = remember(workoutDao) { workoutDao.getActiveSets().distinctUntilChanged() }
+    val activeSets by activeSetsFlow.collectAsState(initial = emptyList())
+
     val openWorkoutRequest by openWorkoutRequests.collectAsState()
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
 
