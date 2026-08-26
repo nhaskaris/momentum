@@ -44,6 +44,7 @@ import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.CoachAlgorithm
+import com.eliteonetube.momentum.logic.CrashHandler
 import com.eliteonetube.momentum.logic.HealthConnectManager
 import com.eliteonetube.momentum.logic.Units
 import com.eliteonetube.momentum.logic.WeightHistoryParser
@@ -84,6 +85,7 @@ fun ProfileScreen(
     var showRestartDialog by remember { mutableStateOf(false) }
     var detectedWeights by remember { mutableStateOf<List<WeightEntry>?>(null) }
     var isProcessingImage by remember { mutableStateOf(false) }
+    var crashReport by remember { mutableStateOf(CrashHandler.getCrashReport(context)) }
 
     // Reconcile in case the user revoked access from Health Connect settings directly
     LaunchedEffect(Unit) {
@@ -527,6 +529,32 @@ fun ProfileScreen(
                             ) {
                                 Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
                             }
+                        }
+                    }
+
+                    if (crashReport != null) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        
+                        Button(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "Momentum Crash Report")
+                                    putExtra(Intent.EXTRA_TEXT, crashReport)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Send Crash Report"))
+                                CrashHandler.clearCrashReport(context)
+                                crashReport = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(Icons.Default.BugReport, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Send Crash Report")
                         }
                     }
                 }
