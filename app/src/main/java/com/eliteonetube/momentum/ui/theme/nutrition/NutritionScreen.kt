@@ -312,9 +312,11 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
                         }
                     }
                 }
+                val logQty = log.quantity * log.servingAmount
+                val displayQty = if (logQty % 1.0 == 0.0) logQty.toInt().toString() else "%.1f".format(logQty)
                 Text(
                     text = if (log.isMeal) "${log.calories.roundToInt()} kcal • Bundle"
-                           else "${(log.calories * log.quantity).roundToInt()} kcal • ${if (log.quantity >= 1.0) log.quantity.roundToInt() else log.quantity} qty",
+                           else "${(log.calories * log.quantity).roundToInt()} kcal • $displayQty ${log.servingUnit}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -33,13 +33,11 @@ fun LogQuantityDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit
 ) {
-    val isPer100g = foodItem.servingSize?.lowercase()?.contains("100") == true
-    
     val initialText = remember(initialQuantity) {
         if (initialQuantity != null) {
-            if (isPer100g) (initialQuantity * 100).roundToInt().toString()
-            else initialQuantity.let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) }
-        } else "100"
+            val value = initialQuantity * foodItem.servingAmount
+            if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
+        } else foodItem.servingAmount.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
     }
     
     var quantityInput by remember { 
@@ -47,7 +45,7 @@ fun LogQuantityDialog(
     }
     
     val qty = quantityInput.text.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val multiplier = if (isPer100g) qty / 100.0 else qty
+    val multiplier = if (foodItem.servingAmount > 0) qty / foodItem.servingAmount else 1.0
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -92,7 +90,7 @@ fun LogQuantityDialog(
                 FilledTonalIconButton(
                     onClick = { 
                         val current = quantityInput.text.toDoubleOrNull() ?: 0.0
-                        val step = if (isPer100g) 10.0 else 1.0
+                        val step = if (foodItem.servingUnit.lowercase() in listOf("g", "ml")) 10.0 else 1.0
                         val newVal = (current - step).coerceAtLeast(0.0).let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) }
                         quantityInput = TextFieldValue(newVal, selection = TextRange(newVal.length))
                     },
@@ -129,7 +127,7 @@ fun LogQuantityDialog(
                         singleLine = true
                     )
                     Text(
-                        text = if (isPer100g) "grams eaten" else "servings eaten",
+                        text = "${foodItem.servingUnit} eaten",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold,
@@ -140,7 +138,7 @@ fun LogQuantityDialog(
                 FilledTonalIconButton(
                     onClick = { 
                         val current = quantityInput.text.toDoubleOrNull() ?: 0.0
-                        val step = if (isPer100g) 10.0 else 1.0
+                        val step = if (foodItem.servingUnit.lowercase() in listOf("g", "ml")) 10.0 else 1.0
                         val newVal = (current + step).let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) }
                         quantityInput = TextFieldValue(newVal, selection = TextRange(newVal.length))
                     },

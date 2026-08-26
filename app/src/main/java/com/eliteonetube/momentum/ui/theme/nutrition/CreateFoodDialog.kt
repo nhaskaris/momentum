@@ -28,13 +28,18 @@ fun CreateFoodDialog(
     var protein by remember { mutableStateOf("") }
     var carbs by remember { mutableStateOf("") }
     var fat by remember { mutableStateOf("") }
-    var servingSize by remember { mutableStateOf("100g") }
+    var servingAmount by remember { mutableStateOf("100") }
+    var servingUnit by remember { mutableStateOf("g") }
 
     val isValid = name.isNotBlank() && 
                  calories.toDoubleOrNull() != null &&
                  protein.toDoubleOrNull() != null &&
                  carbs.toDoubleOrNull() != null &&
-                 fat.toDoubleOrNull() != null
+                 fat.toDoubleOrNull() != null &&
+                 servingAmount.toDoubleOrNull() != null &&
+                 servingUnit.isNotBlank()
+
+    val units = listOf("g", "ml", "serving", "piece", "unit", "egg", "banana", "scoop")
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -64,7 +69,9 @@ fun CreateFoodDialog(
                                     protein = protein.toDoubleOrNull() ?: 0.0,
                                     fat = fat.toDoubleOrNull() ?: 0.0,
                                     carbs = carbs.toDoubleOrNull() ?: 0.0,
-                                    servingSize = servingSize.trim(),
+                                    servingSize = "$servingAmount $servingUnit",
+                                    servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                    servingUnit = servingUnit.trim(),
                                     isCustom = true
                                 )
                             )
@@ -88,14 +95,23 @@ fun CreateFoodDialog(
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    OutlinedTextField(
-                        value = servingSize,
-                        onValueChange = { servingSize = it },
-                        label = { Text("Serving Size") },
-                        placeholder = { Text("e.g. 1 slice, 100g") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = servingAmount,
+                            onValueChange = { servingAmount = it },
+                            label = { Text("Serving Amount") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = servingUnit,
+                            onValueChange = { servingUnit = it },
+                            label = { Text("Unit (e.g. g, ml, piece)") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(

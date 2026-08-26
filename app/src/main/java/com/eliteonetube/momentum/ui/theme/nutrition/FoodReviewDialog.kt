@@ -37,7 +37,8 @@ fun FoodReviewDialog(
     var protein by remember { mutableStateOf(scanned.protein?.let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) } ?: "") }
     var fat by remember { mutableStateOf(scanned.fat?.let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) } ?: "") }
     var carbs by remember { mutableStateOf(scanned.carbs?.let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) } ?: "") }
-    var servingSize by remember { mutableStateOf("100g") }
+    var servingAmount by remember { mutableStateOf(scanned.servingAmount?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "100") }
+    var servingUnit by remember { mutableStateOf(scanned.servingUnit ?: "g") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -108,9 +109,16 @@ fun FoodReviewDialog(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             NutritionInput(
-                                label = "Serving",
-                                value = servingSize,
-                                onValueChange = { servingSize = it },
+                                label = "Amount",
+                                value = servingAmount,
+                                onValueChange = { servingAmount = it },
+                                modifier = Modifier.weight(1f),
+                                keyboardType = KeyboardType.Number
+                            )
+                            NutritionInput(
+                                label = "Unit",
+                                value = servingUnit,
+                                onValueChange = { servingUnit = it },
                                 modifier = Modifier.weight(1f),
                                 keyboardType = KeyboardType.Text
                             )
@@ -138,7 +146,9 @@ fun FoodReviewDialog(
                                 protein = protein.toDoubleOrNull() ?: 0.0,
                                 fat = fat.toDoubleOrNull() ?: 0.0,
                                 carbs = carbs.toDoubleOrNull() ?: 0.0,
-                                servingSize = servingSize,
+                                servingSize = "$servingAmount $servingUnit",
+                                servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                servingUnit = servingUnit.trim(),
                                 isCustom = true,
                                 barcode = barcode
                             )

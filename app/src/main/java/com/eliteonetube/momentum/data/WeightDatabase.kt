@@ -109,6 +109,8 @@ data class FoodItem(
     val fat: Double,
     val carbs: Double,
     val servingSize: String? = "100g",
+    val servingAmount: Double = 100.0,
+    val servingUnit: String = "g",
     val isCustom: Boolean = false,
     val barcode: String? = null
 )
@@ -154,6 +156,8 @@ data class FoodLogWithItem(
     val protein: Double,
     val fat: Double,
     val carbs: Double,
+    val servingAmount: Double = 100.0,
+    val servingUnit: String = "g",
     val isMeal: Boolean = false
 )
 
@@ -395,7 +399,8 @@ interface FoodDao {
 
     @Query("""
         SELECT daily_food_log_table.*, food_item_table.name, food_item_table.calories, 
-               food_item_table.protein, food_item_table.fat, food_item_table.carbs
+               food_item_table.protein, food_item_table.fat, food_item_table.carbs,
+               food_item_table.servingAmount, food_item_table.servingUnit
         FROM daily_food_log_table
         INNER JOIN food_item_table ON daily_food_log_table.foodItemId = food_item_table.id
         WHERE daily_food_log_table.date = :date
@@ -421,7 +426,8 @@ interface FoodDao {
 
     @Query("""
         SELECT meal_food_item_table.*, food_item_table.name, food_item_table.calories, 
-               food_item_table.protein, food_item_table.fat, food_item_table.carbs
+               food_item_table.protein, food_item_table.fat, food_item_table.carbs,
+               food_item_table.servingAmount, food_item_table.servingUnit
         FROM meal_food_item_table
         INNER JOIN food_item_table ON meal_food_item_table.foodItemId = food_item_table.id
         WHERE meal_food_item_table.mealId = :mealId
@@ -441,7 +447,8 @@ interface FoodDao {
 
     @Query("""
         SELECT daily_food_log_table.*, food_item_table.name, food_item_table.calories, 
-               food_item_table.protein, food_item_table.fat, food_item_table.carbs
+               food_item_table.protein, food_item_table.fat, food_item_table.carbs,
+               food_item_table.servingAmount, food_item_table.servingUnit
         FROM daily_food_log_table
         INNER JOIN food_item_table ON daily_food_log_table.foodItemId = food_item_table.id
         WHERE daily_food_log_table.date >= :startDate
@@ -614,7 +621,7 @@ interface WorkoutDao {
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 30
+    version = 31
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -638,7 +645,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                     MIGRATION_24_25, MIGRATION_25_26,
                     MIGRATION_26_27, MIGRATION_27_28,
-                    MIGRATION_28_29, MIGRATION_29_30
+                    MIGRATION_28_29, MIGRATION_29_30,
+                    MIGRATION_30_31
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -866,6 +874,13 @@ abstract class WeightDatabase : RoomDatabase() {
         val MIGRATION_29_30 = object : Migration(29, 30) {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN orderIndex INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_30_31 = object : Migration(30, 31) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE food_item_table ADD COLUMN servingAmount REAL NOT NULL DEFAULT 100.0")
+                connection.execSQL("ALTER TABLE food_item_table ADD COLUMN servingUnit TEXT NOT NULL DEFAULT 'g'")
             }
         }
     }

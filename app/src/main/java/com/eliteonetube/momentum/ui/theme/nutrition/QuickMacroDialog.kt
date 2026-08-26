@@ -156,6 +156,9 @@ fun QuickMacroDialog(
                             protein = if (selectedTab == 0) protein else 0.0,
                             fat = if (selectedTab == 0) fat else 0.0,
                             carbs = if (selectedTab == 0) carbs else 0.0,
+                            servingSize = "1 serving",
+                            servingAmount = 1.0,
+                            servingUnit = "serving",
                             isCustom = true
                         )
                     )

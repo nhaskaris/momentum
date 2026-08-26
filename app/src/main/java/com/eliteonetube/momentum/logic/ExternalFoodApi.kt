@@ -44,6 +44,8 @@ object ExternalFoodApi {
                     fat = fat,
                     carbs = carbs,
                     servingSize = "100g",
+                    servingAmount = 100.0,
+                    servingUnit = "g",
                     barcode = barcode,
                     isCustom = true
                 )

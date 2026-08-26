@@ -8,7 +8,9 @@ data class ScannedNutrition(
     val calories: Double? = null,
     val protein: Double? = null,
     val fat: Double? = null,
-    val carbs: Double? = null
+    val carbs: Double? = null,
+    val servingAmount: Double? = 100.0,
+    val servingUnit: String? = "g"
 )
 
 /**
