@@ -26,3 +26,4 @@ local.properties
 .kotlin/
 *.jks
 *.keystore
+/.artifacts/f0372806-a02a-42cd-bc36-061d1085e14f/walkthrough_nutrition_metrics.artifact.md

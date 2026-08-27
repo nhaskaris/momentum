@@ -42,6 +42,7 @@ fun AddFoodDialog(
     var showQuickMacro by remember { mutableStateOf(false) }
     var showCreateMeal by remember { mutableStateOf(false) }
     var showCreateFood by remember { mutableStateOf(false) }
+    var selectedFoodForEdit by remember { mutableStateOf<FoodItem?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val filteredItems = remember(searchQuery, foodItems) {
@@ -83,12 +84,17 @@ fun AddFoodDialog(
         )
     }
 
-    if (showCreateFood) {
+    if (showCreateFood || selectedFoodForEdit != null) {
         CreateFoodDialog(
-            onDismiss = { showCreateFood = false },
+            initialFood = selectedFoodForEdit,
+            onDismiss = { 
+                showCreateFood = false
+                selectedFoodForEdit = null
+            },
             onSave = {
                 onFoodCreated(it)
                 showCreateFood = false
+                selectedFoodForEdit = null
             }
         )
     }
@@ -230,7 +236,14 @@ fun AddFoodDialog(
                                     }
                                 },
                                 trailingContent = {
-                                    Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (item.isCustom) {
+                                            IconButton(onClick = { selectedFoodForEdit = item }) {
+                                                Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                                            }
+                                        }
+                                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                                    }
                                 },
                                 modifier = Modifier
                                     .clickable { onFoodSelected(item.id, 1.0) }

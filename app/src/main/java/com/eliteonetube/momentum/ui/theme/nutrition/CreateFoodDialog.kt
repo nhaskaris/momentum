@@ -20,16 +20,17 @@ import androidx.compose.material.icons.filled.Close
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateFoodDialog(
+    initialFood: FoodItem? = null,
     onDismiss: () -> Unit,
     onSave: (FoodItem) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var calories by remember { mutableStateOf("") }
-    var protein by remember { mutableStateOf("") }
-    var carbs by remember { mutableStateOf("") }
-    var fat by remember { mutableStateOf("") }
-    var servingAmount by remember { mutableStateOf("100") }
-    var servingUnit by remember { mutableStateOf("g") }
+    var name by remember { mutableStateOf(initialFood?.name ?: "") }
+    var calories by remember { mutableStateOf(initialFood?.calories?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+    var protein by remember { mutableStateOf(initialFood?.protein?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+    var carbs by remember { mutableStateOf(initialFood?.carbs?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+    var fat by remember { mutableStateOf(initialFood?.fat?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
+    var servingAmount by remember { mutableStateOf(initialFood?.servingAmount?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "100") }
+    var servingUnit by remember { mutableStateOf(initialFood?.servingUnit ?: "g") }
 
     val isValid = name.isNotBlank() && 
                  calories.toDoubleOrNull() != null &&
@@ -59,10 +60,22 @@ fun CreateFoodDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, null)
                     }
-                    Text("Create Custom Food", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(if (initialFood == null) "Create Custom Food" else "Edit Food", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     TextButton(
                         onClick = {
-                            onSave(
+                            val newItem = if (initialFood != null) {
+                                initialFood.copy(
+                                    name = name.trim(),
+                                    calories = calories.toDoubleOrNull() ?: 0.0,
+                                    protein = protein.toDoubleOrNull() ?: 0.0,
+                                    fat = fat.toDoubleOrNull() ?: 0.0,
+                                    carbs = carbs.toDoubleOrNull() ?: 0.0,
+                                    servingSize = "$servingAmount $servingUnit",
+                                    servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                    servingUnit = servingUnit.trim(),
+                                    isCustom = true
+                                )
+                            } else {
                                 FoodItem(
                                     name = name.trim(),
                                     calories = calories.toDoubleOrNull() ?: 0.0,
@@ -74,7 +87,8 @@ fun CreateFoodDialog(
                                     servingUnit = servingUnit.trim(),
                                     isCustom = true
                                 )
-                            )
+                            }
+                            onSave(newItem)
                         },
                         enabled = isValid
                     ) {

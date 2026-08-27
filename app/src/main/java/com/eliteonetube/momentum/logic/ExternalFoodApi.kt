@@ -16,7 +16,10 @@ object ExternalFoodApi {
      */
     suspend fun fetchByBarcode(barcode: String): FoodItem? = withContext(Dispatchers.IO) {
         val url = "https://world.openfoodfacts.org/api/v2/product/$barcode.json"
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Momentum - Android - https://github.com/nhaskaris/momentum/issues")
+            .build()
 
         try {
             client.newCall(request).execute().use { response ->
