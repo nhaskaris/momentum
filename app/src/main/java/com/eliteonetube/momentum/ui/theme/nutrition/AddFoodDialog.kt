@@ -43,6 +43,7 @@ fun AddFoodDialog(
     var showCreateMeal by remember { mutableStateOf(false) }
     var showCreateFood by remember { mutableStateOf(false) }
     var selectedFoodForEdit by remember { mutableStateOf<FoodItem?>(null) }
+    var selectedFoodForQuantity by remember { mutableStateOf<FoodItem?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val filteredItems = remember(searchQuery, foodItems) {
@@ -95,6 +96,18 @@ fun AddFoodDialog(
                 onFoodCreated(it)
                 showCreateFood = false
                 selectedFoodForEdit = null
+            }
+        )
+    }
+
+    if (selectedFoodForQuantity != null) {
+        LogQuantityDialog(
+            foodItem = selectedFoodForQuantity!!,
+            onDismiss = { selectedFoodForQuantity = null },
+            onConfirm = { qty ->
+                onFoodSelected(selectedFoodForQuantity!!.id, qty)
+                selectedFoodForQuantity = null
+                onDismiss()
             }
         )
     }
@@ -246,7 +259,7 @@ fun AddFoodDialog(
                                     }
                                 },
                                 modifier = Modifier
-                                    .clickable { onFoodSelected(item.id, 1.0) }
+                                    .clickable { selectedFoodForQuantity = item }
                                     .padding(horizontal = 8.dp)
                             )
                             HorizontalDivider(

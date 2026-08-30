@@ -28,7 +28,19 @@ fun FoodSearchDialog(
     onFoodSelected: (Long, Double) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedFoodForQuantity by remember { mutableStateOf<FoodItem?>(null) }
     val filteredItems = foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+
+    if (selectedFoodForQuantity != null) {
+        LogQuantityDialog(
+            foodItem = selectedFoodForQuantity!!,
+            onDismiss = { selectedFoodForQuantity = null },
+            onConfirm = { qty ->
+                onFoodSelected(selectedFoodForQuantity!!.id, qty)
+                selectedFoodForQuantity = null
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -85,7 +97,7 @@ fun FoodSearchDialog(
                                 }
                             },
                             modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { 
-                                onFoodSelected(item.id, 1.0)
+                                selectedFoodForQuantity = item
                             }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

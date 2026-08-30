@@ -36,10 +36,10 @@ fun CreateMealDialog(
         FoodSearchDialog(
             foodItems = allFoodItems,
             onDismiss = { showSearch = false },
-            onFoodSelected = { foodId, _ ->
+            onFoodSelected = { foodId, qty ->
                 val food = allFoodItems.find { it.id == foodId }
                 if (food != null) {
-                    selectedItems = selectedItems + (food to 1.0)
+                    selectedItems = selectedItems + (food to qty)
                 }
                 showSearch = false
             }
@@ -131,8 +131,12 @@ fun CreateMealDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
+                                    val totalCals = (item.calories * qty).toInt()
+                                    val logQty = qty * item.servingAmount
+                                    val displayQty = if (logQty % 1.0 == 0.0) logQty.toInt().toString() else "%.1f".format(logQty)
+                                    
                                     Text(item.name, fontWeight = FontWeight.Bold)
-                                    Text("${item.calories.toInt()} kcal per ${item.servingSize}", style = MaterialTheme.typography.bodySmall)
+                                    Text("$totalCals kcal • $displayQty ${item.servingUnit}", style = MaterialTheme.typography.bodySmall)
                                 }
                                 IconButton(onClick = { 
                                     selectedItems = selectedItems.filter { it.first.id != item.id }

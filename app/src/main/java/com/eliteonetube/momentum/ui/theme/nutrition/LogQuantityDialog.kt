@@ -3,6 +3,7 @@ package com.eliteonetube.momentum.ui.theme.nutrition
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -111,6 +112,11 @@ fun LogQuantityDialog(
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Decimal,
                             imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (qty > 0) onConfirm(multiplier)
+                            }
                         ),
                         textStyle = MaterialTheme.typography.displaySmall.copy(
                             fontWeight = FontWeight.Bold, 

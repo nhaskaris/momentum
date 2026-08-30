@@ -267,7 +267,16 @@ fun HomeScreen(
 
     logToEdit?.let { log ->
         LogQuantityDialog(
-            foodItem = FoodItem(id = log.foodItemId, name = log.name, calories = log.calories, protein = log.protein, fat = log.fat, carbs = log.carbs),
+            foodItem = FoodItem(
+                id = log.foodItemId, 
+                name = log.name, 
+                calories = log.calories, 
+                protein = log.protein, 
+                fat = log.fat, 
+                carbs = log.carbs,
+                servingAmount = log.servingAmount,
+                servingUnit = log.servingUnit
+            ),
             initialQuantity = log.quantity,
             onDismiss = { logToEdit = null },
             onConfirm = { multiplier ->
