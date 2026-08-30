@@ -382,6 +382,9 @@ interface FoodDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFoodItem(foodItem: FoodItem): Long
 
+    @Query("SELECT name FROM food_item_table WHERE isCustom = 0")
+    suspend fun getOfficialFoodNames(): List<String>
+
     @Query("SELECT * FROM food_item_table ORDER BY name ASC")
     fun getAllFoodItems(): Flow<List<FoodItem>>
 
@@ -526,6 +529,9 @@ interface WorkoutDao {
 
     @Query("SELECT COUNT(*) FROM exercise_table")
     suspend fun exerciseCount(): Int
+
+    @Query("SELECT name FROM exercise_table")
+    suspend fun getExerciseNames(): List<String>
 
     // --- TEMPLATE DAO QUERIES ---
 

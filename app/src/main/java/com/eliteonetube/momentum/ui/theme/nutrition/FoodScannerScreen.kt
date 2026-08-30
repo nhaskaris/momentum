@@ -63,9 +63,15 @@ fun FoodScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val coroutineScope = rememberCoroutineScope()
+    val barcodeScanner = remember { BarcodeScanning.getClient() }
+    val textRecognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     DisposableEffect(Unit) {
-        onDispose { cameraExecutor.shutdown() }
+        onDispose { 
+            cameraExecutor.shutdown()
+            barcodeScanner.close()
+            textRecognizer.close()
+        }
     }
 
     var scannerMode by remember { mutableStateOf(ScannerMode.BARCODE) }
@@ -157,29 +163,40 @@ fun FoodScannerScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
             AndroidView(
                 factory = { ctx ->
-                    val previewView = PreviewView(ctx)
-                    previewViewRef = previewView
-                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                    PreviewView(ctx).apply {
+                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        previewViewRef = this
+                    }
+                },
+                modifier = Modifier.fillMaxSize().pointerInput(scannerMode) {
+                    detectTapGestures { offset ->
+                        val previewView = previewViewRef ?: return@detectTapGestures
+                        val cam = camera ?: return@detectTapGestures
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(offset.x, offset.y)
+                        val action = FocusMeteringAction.Builder(point).build()
+                        cam.cameraControl.startFocusAndMetering(action)
+                    }
+                },
+                update = { _ -> }
+            )
 
+            LaunchedEffect(hasCameraPermission, previewViewRef) {
+                if (hasCameraPermission && previewViewRef != null) {
+                    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                     cameraProviderFuture.addListener({
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder()
-                            .setResolutionSelector(
-                                ResolutionSelector.Builder()
-                                    .setResolutionStrategy(ResolutionStrategy(Size(1080, 1920), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
-                                    .build()
-                            )
-                            .build().also { it.surfaceProvider = previewView.surfaceProvider }
+                        val cameraProvider = try {
+                            cameraProviderFuture.get()
+                        } catch (_: Exception) {
+                            return@addListener
+                        }
 
-                        val barcodeScanner = BarcodeScanning.getClient()
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewViewRef!!.surfaceProvider)
+                        }
 
                         val imageAnalysis = ImageAnalysis.Builder()
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .setResolutionSelector(
-                                ResolutionSelector.Builder()
-                                    .setResolutionStrategy(ResolutionStrategy(Size(1080, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
-                                    .build()
-                            )
                             .build()
                             .also {
                                 it.setAnalyzer(cameraExecutor) { imageProxy ->
@@ -216,21 +233,14 @@ fun FoodScannerScreen(
                                 CameraSelector.DEFAULT_BACK_CAMERA,
                                 preview, imageAnalysis, imageCapture
                             )
-                        } catch (_: Exception) {}
-                    }, ContextCompat.getMainExecutor(ctx))
-                    previewView
-                },
-                modifier = Modifier.fillMaxSize().pointerInput(scannerMode) {
-                    detectTapGestures { offset ->
-                        val previewView = previewViewRef ?: return@detectTapGestures
-                        val cam = camera ?: return@detectTapGestures
-                        val factory = previewView.meteringPointFactory
-                        val point = factory.createPoint(offset.x, offset.y)
-                        val action = FocusMeteringAction.Builder(point).build()
-                        cam.cameraControl.startFocusAndMetering(action)
-                    }
+                        } catch (e: Exception) {
+                            android.util.Log.e("FoodScanner", "Binding failed", e)
+                        }
+                    }, ContextCompat.getMainExecutor(context))
                 }
-            )
+            }
+
+
 
             // High-tech Overlay
             Box(modifier = Modifier.fillMaxSize().padding(48.dp), contentAlignment = Alignment.Center) {
@@ -302,8 +312,7 @@ fun FoodScannerScreen(
                                                 val processed = preprocessBitmap(cropped)
 
                                                 val inputImage = InputImage.fromBitmap(processed, 0)
-                                                val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-                                                recognizer.process(inputImage).addOnSuccessListener { visionText ->
+                                                textRecognizer.process(inputImage).addOnSuccessListener { visionText ->
                                                     if (scannerMode == ScannerMode.FRONT_PACKAGE) {
                                                         detectedName = NutritionScanner.parseName(visionText)
                                                         scannerMode = ScannerMode.NUTRITION
