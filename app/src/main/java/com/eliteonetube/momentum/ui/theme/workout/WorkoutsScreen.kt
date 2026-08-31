@@ -322,22 +322,21 @@ fun WorkoutsScreen(
                                             PendingSet(
                                                 exerciseId = te.exerciseId,
                                                 setNumber = ts.setNumber,
-                                                weightKg = ts.targetWeightKg,
-                                                reps = ts.targetReps,
-                                                durationSeconds = ts.targetDurationSeconds,
-                                                distanceKm = ts.targetDistanceKm
+                                                weightKg = 0.0, // Start empty to use history placeholders
+                                                reps = 0,
+                                                durationSeconds = null,
+                                                distanceKm = null
                                             )
                                         }
                                     } else {
-                                        val ex = exerciseMap[te.exerciseId]
                                         (1..te.targetSets.coerceAtLeast(1)).map { sn ->
                                             PendingSet(
                                                 exerciseId = te.exerciseId,
                                                 setNumber = sn,
-                                                weightKg = te.targetWeightKg,
-                                                reps = te.targetReps,
-                                                durationSeconds = te.targetDurationSeconds ?: if (ex?.exerciseType == ExerciseType.CARDIO) 600 else null,
-                                                distanceKm = te.targetDistanceKm ?: if (ex?.exerciseType == ExerciseType.CARDIO) 0.0 else null
+                                                weightKg = 0.0,
+                                                reps = 0,
+                                                durationSeconds = null,
+                                                distanceKm = null
                                             )
                                         }
                                     }

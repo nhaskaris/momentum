@@ -142,12 +142,12 @@ fun FoodReviewDialog(
                         onSave(
                             FoodItem(
                                 name = name.ifBlank { "Scanned Item" },
-                                calories = calories.toDoubleOrNull() ?: 0.0,
-                                protein = protein.toDoubleOrNull() ?: 0.0,
-                                fat = fat.toDoubleOrNull() ?: 0.0,
-                                carbs = carbs.toDoubleOrNull() ?: 0.0,
+                                calories = calories.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                protein = protein.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                fat = fat.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                carbs = carbs.replace(',', '.').toDoubleOrNull() ?: 0.0,
                                 servingSize = "$servingAmount $servingUnit",
-                                servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                servingAmount = servingAmount.replace(',', '.').toDoubleOrNull() ?: 100.0,
                                 servingUnit = servingUnit.trim(),
                                 isCustom = true,
                                 barcode = barcode

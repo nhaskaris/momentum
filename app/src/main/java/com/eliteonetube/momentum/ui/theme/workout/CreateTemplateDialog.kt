@@ -501,7 +501,7 @@ private fun RoutineExerciseItem(
                 CompactInput(
                     label = "KG",
                     value = if (item.targetWeightKg % 1.0 == 0.0) item.targetWeightKg.toInt().toString() else item.targetWeightKg.toString(),
-                    onValueChange = { it.toDoubleOrNull()?.let { v -> onUpdate(item.copy(targetWeightKg = v)) } },
+                    onValueChange = { it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(item.copy(targetWeightKg = v)) } },
                     modifier = Modifier.weight(1.2f)
                 )
             }

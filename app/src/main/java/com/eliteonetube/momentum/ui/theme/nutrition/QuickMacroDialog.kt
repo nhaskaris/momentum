@@ -27,10 +27,10 @@ fun QuickMacroDialog(
     var fatInput by remember { mutableStateOf("") }
     var calorieInput by remember { mutableStateOf("") }
 
-    val protein = proteinInput.toDoubleOrNull() ?: 0.0
-    val carbs = carbsInput.toDoubleOrNull() ?: 0.0
-    val fat = fatInput.toDoubleOrNull() ?: 0.0
-    val manualCalories = calorieInput.toDoubleOrNull() ?: 0.0
+    val protein = proteinInput.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val carbs = carbsInput.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val fat = fatInput.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val manualCalories = calorieInput.replace(',', '.').toDoubleOrNull() ?: 0.0
 
     val calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9)
     val totalCalories = if (selectedTab == 0) calculatedCalories else manualCalories

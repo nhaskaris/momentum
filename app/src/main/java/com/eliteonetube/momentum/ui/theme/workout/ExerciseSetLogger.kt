@@ -143,7 +143,15 @@ fun ExerciseSetLogger(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 sets.forEach { set ->
-                    SetInputRow(exercise, set, unitSystem, { upd -> onSetUpdated(set.setNumber, upd) }, { onSetRemoved(set.setNumber) })
+                    val historySet = historySets.find { it.setNumber == set.setNumber } ?: historySets.lastOrNull()
+                    SetInputRow(
+                        exercise = exercise,
+                        set = set,
+                        historySet = historySet,
+                        unitSystem = unitSystem,
+                        onUpdate = { upd -> onSetUpdated(set.setNumber, upd) },
+                        onRemove = { onSetRemoved(set.setNumber) }
+                    )
                 }
             }
 
@@ -179,22 +187,38 @@ fun ExerciseSetLogger(
 private fun SetInputRow(
     exercise: Exercise,
     set: PendingSet,
+    historySet: LoggedSet?,
     unitSystem: UnitSystem,
     onUpdate: (PendingSet) -> Unit,
     onRemove: () -> Unit
 ) {
     val displayWeight = remember(set.weightKg, unitSystem) {
-        if (unitSystem == UnitSystem.IMPERIAL) {
+        if (set.weightKg == 0.0) "" 
+        else if (unitSystem == UnitSystem.IMPERIAL) {
             (set.weightKg * 2.20462).let { if (it % 1.0 == 0.0) it.toInt().toString() else String.format("%.1f", it) }
         } else {
             if (set.weightKg % 1.0 == 0.0) set.weightKg.toInt().toString() else set.weightKg.toString()
         }
     }
 
-    var weightInput by remember(set.setNumber) { mutableStateOf(displayWeight) }
-    var repsInput by remember(set.setNumber) { mutableStateOf(set.reps.toString()) }
-    var durationInput by remember(set.setNumber) { mutableStateOf(formatSeconds(set.durationSeconds ?: 0)) }
-    var distanceInput by remember(set.setNumber) { mutableStateOf(set.distanceKm?.toString() ?: "") }
+    val placeholderWeight = remember(historySet, unitSystem) {
+        historySet?.let {
+            if (unitSystem == UnitSystem.IMPERIAL) {
+                (it.weightKg * 2.20462).let { w -> if (w % 1.0 == 0.0) w.toInt().toString() else String.format("%.1f", w) }
+            } else {
+                if (it.weightKg % 1.0 == 0.0) it.weightKg.toInt().toString() else it.weightKg.toString()
+            }
+        } ?: "0"
+    }
+
+    val placeholderReps = historySet?.reps?.toString() ?: "10"
+    val placeholderDuration = formatSeconds(historySet?.durationSeconds ?: 600)
+    val placeholderDistance = historySet?.distanceKm?.toString() ?: "0"
+
+    var weightInput by remember(set.setNumber, set.weightKg) { mutableStateOf(displayWeight) }
+    var repsInput by remember(set.setNumber, set.reps) { mutableStateOf(if (set.reps == 0) "" else set.reps.toString()) }
+    var durationInput by remember(set.setNumber, set.durationSeconds) { mutableStateOf(if (set.durationSeconds == null) "" else formatSeconds(set.durationSeconds)) }
+    var distanceInput by remember(set.setNumber, set.distanceKm) { mutableStateOf(set.distanceKm?.toString() ?: "") }
     var showNotes by remember { mutableStateOf(set.notes?.isNotBlank() == true) }
     var notesInput by remember(set.setNumber) { mutableStateOf(set.notes ?: "") }
 
@@ -202,7 +226,23 @@ private fun SetInputRow(
 
     Column(modifier = Modifier.fillMaxWidth().animateContentSize().background(bgColor, RoundedCornerShape(16.dp)).padding(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onUpdate(set.copy(isCompleted = !set.isCompleted)) }, modifier = Modifier.size(40.dp)) {
+            IconButton(
+                onClick = { 
+                    var updatedSet = set.copy(isCompleted = !set.isCompleted)
+                    if (updatedSet.isCompleted) {
+                        // If values are still default/empty, fill from history
+                        if (exercise.exerciseType == ExerciseType.CARDIO) {
+                            if (updatedSet.durationSeconds == null) updatedSet = updatedSet.copy(durationSeconds = historySet?.durationSeconds ?: 600)
+                            if (updatedSet.distanceKm == null) updatedSet = updatedSet.copy(distanceKm = historySet?.distanceKm ?: 0.0)
+                        } else {
+                            if (updatedSet.weightKg == 0.0) updatedSet = updatedSet.copy(weightKg = historySet?.weightKg ?: 0.0)
+                            if (updatedSet.reps == 0) updatedSet = updatedSet.copy(reps = historySet?.reps ?: 10)
+                        }
+                    }
+                    onUpdate(updatedSet)
+                }, 
+                modifier = Modifier.size(40.dp)
+            ) {
                 Icon(
                     if (set.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                     if (set.isCompleted) "Mark set ${set.setNumber} incomplete" else "Complete set ${set.setNumber}",
@@ -222,6 +262,7 @@ private fun SetInputRow(
                         val seconds = parseDuration(newValue)
                         onUpdate(set.copy(durationSeconds = seconds))
                     },
+                    placeholder = { Text(placeholderDuration, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     singleLine = true,
@@ -239,8 +280,9 @@ private fun SetInputRow(
                     value = distanceInput,
                     onValueChange = { newValue ->
                         distanceInput = newValue
-                        onUpdate(set.copy(distanceKm = newValue.toDoubleOrNull()))
+                        onUpdate(set.copy(distanceKm = newValue.replace(',', '.').toDoubleOrNull()))
                     },
+                    placeholder = { Text(placeholderDistance, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
@@ -256,7 +298,11 @@ private fun SetInputRow(
             } else {
                 OutlinedTextField(
                     value = weightInput,
-                    onValueChange = { weightInput = it; it.toDoubleOrNull()?.let { v -> onUpdate(set.copy(weightKg = if (unitSystem == UnitSystem.IMPERIAL) v / 2.20462 else v)) } },
+                    onValueChange = { 
+                        weightInput = it
+                        it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(set.copy(weightKg = if (unitSystem == UnitSystem.IMPERIAL) v / 2.20462 else v)) } 
+                    },
+                    placeholder = { Text(placeholderWeight, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
@@ -273,6 +319,7 @@ private fun SetInputRow(
                 OutlinedTextField(
                     value = repsInput,
                     onValueChange = { repsInput = it; it.toIntOrNull()?.let { r -> onUpdate(set.copy(reps = r)) } },
+                    placeholder = { Text(placeholderReps, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,

@@ -90,7 +90,7 @@ fun LogQuantityDialog(
             ) {
                 FilledTonalIconButton(
                     onClick = { 
-                        val current = quantityInput.text.toDoubleOrNull() ?: 0.0
+                        val current = quantityInput.text.replace(',', '.').toDoubleOrNull() ?: 0.0
                         val step = if (foodItem.servingUnit.lowercase() in listOf("g", "ml")) 10.0 else 1.0
                         val newVal = (current - step).coerceAtLeast(0.0).let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) }
                         quantityInput = TextFieldValue(newVal, selection = TextRange(newVal.length))
@@ -143,7 +143,7 @@ fun LogQuantityDialog(
 
                 FilledTonalIconButton(
                     onClick = { 
-                        val current = quantityInput.text.toDoubleOrNull() ?: 0.0
+                        val current = quantityInput.text.replace(',', '.').toDoubleOrNull() ?: 0.0
                         val step = if (foodItem.servingUnit.lowercase() in listOf("g", "ml")) 10.0 else 1.0
                         val newVal = (current + step).let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(it) }
                         quantityInput = TextFieldValue(newVal, selection = TextRange(newVal.length))

@@ -33,11 +33,11 @@ fun CreateFoodDialog(
     var servingUnit by remember { mutableStateOf(initialFood?.servingUnit ?: "g") }
 
     val isValid = name.isNotBlank() && 
-                 calories.toDoubleOrNull() != null &&
-                 protein.toDoubleOrNull() != null &&
-                 carbs.toDoubleOrNull() != null &&
-                 fat.toDoubleOrNull() != null &&
-                 servingAmount.toDoubleOrNull() != null &&
+                 calories.replace(',', '.').toDoubleOrNull() != null &&
+                 protein.replace(',', '.').toDoubleOrNull() != null &&
+                 carbs.replace(',', '.').toDoubleOrNull() != null &&
+                 fat.replace(',', '.').toDoubleOrNull() != null &&
+                 servingAmount.replace(',', '.').toDoubleOrNull() != null &&
                  servingUnit.isNotBlank()
 
     val units = listOf("g", "ml", "serving", "piece", "unit", "egg", "banana", "scoop")
@@ -66,24 +66,24 @@ fun CreateFoodDialog(
                             val newItem = if (initialFood != null) {
                                 initialFood.copy(
                                     name = name.trim(),
-                                    calories = calories.toDoubleOrNull() ?: 0.0,
-                                    protein = protein.toDoubleOrNull() ?: 0.0,
-                                    fat = fat.toDoubleOrNull() ?: 0.0,
-                                    carbs = carbs.toDoubleOrNull() ?: 0.0,
+                                    calories = calories.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    protein = protein.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    fat = fat.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    carbs = carbs.replace(',', '.').toDoubleOrNull() ?: 0.0,
                                     servingSize = "$servingAmount $servingUnit",
-                                    servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                    servingAmount = servingAmount.replace(',', '.').toDoubleOrNull() ?: 100.0,
                                     servingUnit = servingUnit.trim(),
                                     isCustom = true
                                 )
                             } else {
                                 FoodItem(
                                     name = name.trim(),
-                                    calories = calories.toDoubleOrNull() ?: 0.0,
-                                    protein = protein.toDoubleOrNull() ?: 0.0,
-                                    fat = fat.toDoubleOrNull() ?: 0.0,
-                                    carbs = carbs.toDoubleOrNull() ?: 0.0,
+                                    calories = calories.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    protein = protein.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    fat = fat.replace(',', '.').toDoubleOrNull() ?: 0.0,
+                                    carbs = carbs.replace(',', '.').toDoubleOrNull() ?: 0.0,
                                     servingSize = "$servingAmount $servingUnit",
-                                    servingAmount = servingAmount.toDoubleOrNull() ?: 100.0,
+                                    servingAmount = servingAmount.replace(',', '.').toDoubleOrNull() ?: 100.0,
                                     servingUnit = servingUnit.trim(),
                                     isCustom = true
                                 )
