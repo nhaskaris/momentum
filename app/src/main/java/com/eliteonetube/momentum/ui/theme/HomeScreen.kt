@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -62,7 +61,6 @@ fun HomeScreen(
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
-    onIntentReceived: (((android.content.Intent) -> Unit) -> Unit)? = null,
     onWeightSubmitted: (Double) -> Unit,
     onPastWeightSubmitted: (date: String, weight: Double) -> Unit,
     onWeightDeleted: (String) -> Unit,
@@ -81,6 +79,7 @@ fun HomeScreen(
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
     onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
+    getExerciseHistory: suspend (Long) -> List<LoggedSet>,
     onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
@@ -373,6 +372,7 @@ fun HomeScreen(
                     activeTemplateId = savedProfile.activeWorkoutTemplateId,
                     unitSystem = savedProfile.unitSystem,
                     getSetsForSession = getSetsForSession,
+                    getExerciseHistory = getExerciseHistory,
                     getExercisesForTemplate = getExercisesForTemplate,
                     getSetsForTemplateExercise = getSetsForTemplateExercise,
                     onSessionSaved = { date, sets, tid, sid ->
@@ -415,10 +415,6 @@ fun HomeScreen(
                 helperMessage = helperMessage,
                 isAskMode = isAskMode,
                 userQuestion = userQuestion,
-                currentStreak = currentStreak,
-                recentWeights = recentWeights,
-                todayFoodLogs = todayFoodLogs,
-                hasActiveWorkout = hasActiveWorkout,
                 onTabSelected = { tab ->
                     coroutineScope.launch {
                         pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
@@ -462,10 +458,6 @@ private fun MascotAndNavigation(
     helperMessage: String?,
     isAskMode: Boolean,
     userQuestion: String,
-    currentStreak: Int,
-    recentWeights: List<WeightEntry>,
-    todayFoodLogs: List<FoodLogWithItem>,
-    hasActiveWorkout: Boolean,
     onTabSelected: (AppTab) -> Unit,
     onHelperDismiss: () -> Unit,
     onAskModeToggle: () -> Unit,

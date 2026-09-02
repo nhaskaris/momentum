@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,15 +28,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.rememberAsyncImagePainter
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
+import com.eliteonetube.momentum.logic.MediaUtils
 import com.eliteonetube.momentum.logic.Units
 import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
@@ -262,10 +267,83 @@ private fun PhotoStep(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PhotoPicker(label: String, uri: Uri?, onUriChange: (Uri?) -> Unit, modifier: Modifier = Modifier) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
-        onUriChange(it)
+    val context = LocalContext.current
+    var tempUri by remember { mutableStateOf<Uri?>(null) }
+    var showSheet by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
+        if (it != null) onUriChange(it)
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success && tempUri != null) {
+            onUriChange(tempUri)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            MediaUtils.createImageUri(context)?.let { uri ->
+                tempUri = uri
+                cameraLauncher.launch(uri)
+                showSheet = false
+            }
+        }
+    }
+
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+            ) {
+                Text("Select Photo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Button(
+                    onClick = {
+                        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        if (hasPermission) {
+                            MediaUtils.createImageUri(context)?.let { uri ->
+                                tempUri = uri
+                                cameraLauncher.launch(uri)
+                                showSheet = false
+                            }
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.PhotoCamera, null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Take Photo")
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedButton(
+                    onClick = {
+                        galleryLauncher.launch("image/*")
+                        showSheet = false
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Choose from Gallery")
+                }
+            }
+        }
     }
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -275,7 +353,7 @@ private fun PhotoPicker(label: String, uri: Uri?, onUriChange: (Uri?) -> Unit, m
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
-                .clickable { launcher.launch("image/*") },
+                .clickable { showSheet = true },
             contentAlignment = Alignment.Center
         ) {
             if (uri != null) {

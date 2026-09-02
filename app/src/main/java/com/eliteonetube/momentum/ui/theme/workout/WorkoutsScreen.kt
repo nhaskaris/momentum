@@ -54,7 +54,8 @@ fun WorkoutsScreen(
     onSessionStateChanged: (Boolean) -> Unit = {},
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit = { _, _ -> },
     onClearActiveWorkout: () -> Unit = {},
-    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> }
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
+    getExerciseHistory: suspend (Long) -> List<LoggedSet> = { emptyList() }
 ) {
     var isLoggingSession by remember(activeSets, hasActiveWorkout) {
         mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout)
@@ -75,6 +76,12 @@ fun WorkoutsScreen(
                     reps = it.reps,
                     notes = it.notes,
                     isCompleted = it.isCompleted,
+                    durationSeconds = it.durationSeconds,
+                    distanceKm = it.distanceKm,
+                    targetWeightKg = it.targetWeightKg,
+                    targetReps = it.targetReps,
+                    targetDurationSeconds = it.targetDurationSeconds,
+                    targetDistanceKm = it.targetDistanceKm,
                     orderIndex = it.orderIndex
                 )
             }
@@ -99,6 +106,7 @@ fun WorkoutsScreen(
             unitSystem = unitSystem,
             initialExercises = initialSessionExercises,
             initialSets = initialPendingSets,
+            getExerciseHistory = getExerciseHistory,
             onCreateExercise = onCreateExercise,
             onCancel = {
                 onClearActiveWorkout()
@@ -322,10 +330,14 @@ fun WorkoutsScreen(
                                             PendingSet(
                                                 exerciseId = te.exerciseId,
                                                 setNumber = ts.setNumber,
-                                                weightKg = 0.0, // Start empty to use history placeholders
+                                                weightKg = 0.0,
                                                 reps = 0,
                                                 durationSeconds = null,
-                                                distanceKm = null
+                                                distanceKm = null,
+                                                targetWeightKg = ts.targetWeightKg,
+                                                targetReps = ts.targetReps,
+                                                targetDurationSeconds = ts.targetDurationSeconds,
+                                                targetDistanceKm = ts.targetDistanceKm
                                             )
                                         }
                                     } else {
@@ -336,7 +348,11 @@ fun WorkoutsScreen(
                                                 weightKg = 0.0,
                                                 reps = 0,
                                                 durationSeconds = null,
-                                                distanceKm = null
+                                                distanceKm = null,
+                                                targetWeightKg = te.targetWeightKg,
+                                                targetReps = te.targetReps,
+                                                targetDurationSeconds = te.targetDurationSeconds,
+                                                targetDistanceKm = te.targetDistanceKm
                                             )
                                         }
                                     }

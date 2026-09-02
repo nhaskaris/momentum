@@ -329,6 +329,10 @@ fun MomentumAppContent(
                                 isCompleted = ps.isCompleted,
                                 durationSeconds = ps.durationSeconds,
                                 distanceKm = ps.distanceKm,
+                                targetWeightKg = ps.targetWeightKg,
+                                targetReps = ps.targetReps,
+                                targetDurationSeconds = ps.targetDurationSeconds,
+                                targetDistanceKm = ps.targetDistanceKm,
                                 orderIndex = ps.orderIndex
                             )
                         })
@@ -396,7 +400,8 @@ fun MomentumAppContent(
                         weightDao.saveProfile(UserProfile(height = h, age = a, isMale = m, averageDailySteps = s, estimatedMaintenanceCalories = main, goal = g, currentCalorieTarget = init, unitSystem = us, bodyFatPercentage = bf, useHealthConnect = hc, useExternalApi = false))
                         weightDao.insertWeight(WeightEntry(date = LocalDate.now().toString(), weight = w, calorieTargetAtEntry = init))
                     }
-                }
+                },
+                getExerciseHistory = { eid: Long -> workoutDao.getSetsForExercise(eid) }
             )
         }
     }

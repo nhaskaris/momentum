@@ -1,7 +1,6 @@
 package com.eliteonetube.momentum.logic
 
 import com.eliteonetube.momentum.data.Exercise
-import com.eliteonetube.momentum.ui.theme.workout.TemplateExerciseInput
 import com.google.mlkit.vision.text.Text
 import kotlin.math.abs
 

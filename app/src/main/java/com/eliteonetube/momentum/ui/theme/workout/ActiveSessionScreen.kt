@@ -23,9 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -521,73 +519,6 @@ private fun ReorderExercisesDialog(
             }
         }
     )
-}
-
-@Composable
-private fun ActiveWorkoutProgressCard(
-    currentStepIndex: Int,
-    exerciseCount: Int,
-    completedSets: Int,
-    volumeDisplay: String,
-    isFinishStep: Boolean
-) {
-    val progress = if (exerciseCount == 0) 0f else (currentStepIndex.coerceAtMost(exerciseCount).toFloat() / exerciseCount)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)),
-        tonalElevation = 1.dp
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        if (isFinishStep) "READY TO REVIEW" else "TRAINING SESSION",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.5.sp
-                    )
-                    Text(
-                        if (isFinishStep) "Review Workout" else "Exercise ${currentStepIndex + 1} of $exerciseCount",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1
-                    )
-                }
-                
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        "$completedSets sets",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                strokeCap = StrokeCap.Round
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "Cumulative Volume: $volumeDisplay",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
 }
 
 @Composable

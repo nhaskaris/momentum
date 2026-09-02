@@ -40,8 +40,6 @@ fun CreateFoodDialog(
                  servingAmount.replace(',', '.').toDoubleOrNull() != null &&
                  servingUnit.isNotBlank()
 
-    val units = listOf("g", "ml", "serving", "piece", "unit", "egg", "banana", "scoop")
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)

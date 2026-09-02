@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -93,36 +92,6 @@ fun ExerciseSetLogger(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (historySets.isNotEmpty()) {
-                val lastSets = remember(historySets) { historySets.take(3) }
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.History, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Last session  •  " + lastSets.joinToString(", ") { set ->
-                                if (exercise.exerciseType == ExerciseType.CARDIO) {
-                                    val time = formatSeconds(set.durationSeconds ?: 0)
-                                    val dist = set.distanceKm?.let { "${it}km" } ?: ""
-                                    if (dist.isNotEmpty()) "$time @ $dist" else time
-                                } else {
-                                    val w = if (unitSystem == UnitSystem.IMPERIAL) "${(set.weightKg * 2.20462).toInt()} lb" else "${set.weightKg.toInt()} kg"
-                                    "$w × ${set.reps}"
-                                }
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
             // Headers
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("SET", modifier = Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -167,7 +136,11 @@ fun ExerciseSetLogger(
                             weightKg = last?.weightKg ?: 0.0,
                             reps = last?.reps ?: 10,
                             durationSeconds = last?.durationSeconds ?: if (exercise.exerciseType == ExerciseType.CARDIO) 600 else null,
-                            distanceKm = last?.distanceKm ?: if (exercise.exerciseType == ExerciseType.CARDIO) 0.0 else null
+                            distanceKm = last?.distanceKm ?: if (exercise.exerciseType == ExerciseType.CARDIO) 0.0 else null,
+                            targetWeightKg = last?.targetWeightKg,
+                            targetReps = last?.targetReps,
+                            targetDurationSeconds = last?.targetDurationSeconds,
+                            targetDistanceKm = last?.targetDistanceKm
                         )
                     )
                 },
@@ -201,19 +174,18 @@ private fun SetInputRow(
         }
     }
 
-    val placeholderWeight = remember(historySet, unitSystem) {
-        historySet?.let {
-            if (unitSystem == UnitSystem.IMPERIAL) {
-                (it.weightKg * 2.20462).let { w -> if (w % 1.0 == 0.0) w.toInt().toString() else String.format("%.1f", w) }
-            } else {
-                if (it.weightKg % 1.0 == 0.0) it.weightKg.toInt().toString() else it.weightKg.toString()
-            }
-        } ?: "0"
+    val placeholderWeight = remember(set.targetWeightKg, historySet, unitSystem) {
+        val target = historySet?.weightKg ?: set.targetWeightKg ?: 0.0
+        if (unitSystem == UnitSystem.IMPERIAL) {
+            (target * 2.20462).let { w -> if (w % 1.0 == 0.0) w.toInt().toString() else String.format("%.1f", w) }
+        } else {
+            if (target % 1.0 == 0.0) target.toInt().toString() else target.toString()
+        }
     }
 
-    val placeholderReps = historySet?.reps?.toString() ?: "10"
-    val placeholderDuration = formatSeconds(historySet?.durationSeconds ?: 600)
-    val placeholderDistance = historySet?.distanceKm?.toString() ?: "0"
+    val placeholderReps = (historySet?.reps ?: set.targetReps ?: 10).toString()
+    val placeholderDuration = formatSeconds(historySet?.durationSeconds ?: set.targetDurationSeconds ?: 600)
+    val placeholderDistance = (historySet?.distanceKm ?: set.targetDistanceKm ?: 0.0).toString()
 
     var weightInput by remember(set.setNumber, set.weightKg) { mutableStateOf(displayWeight) }
     var repsInput by remember(set.setNumber, set.reps) { mutableStateOf(if (set.reps == 0) "" else set.reps.toString()) }
@@ -230,13 +202,13 @@ private fun SetInputRow(
                 onClick = { 
                     var updatedSet = set.copy(isCompleted = !set.isCompleted)
                     if (updatedSet.isCompleted) {
-                        // If values are still default/empty, fill from history
+                        // If values are still default/empty, fill from routine target OR history
                         if (exercise.exerciseType == ExerciseType.CARDIO) {
-                            if (updatedSet.durationSeconds == null) updatedSet = updatedSet.copy(durationSeconds = historySet?.durationSeconds ?: 600)
-                            if (updatedSet.distanceKm == null) updatedSet = updatedSet.copy(distanceKm = historySet?.distanceKm ?: 0.0)
+                            if (updatedSet.durationSeconds == null) updatedSet = updatedSet.copy(durationSeconds = set.targetDurationSeconds ?: historySet?.durationSeconds ?: 600)
+                            if (updatedSet.distanceKm == null) updatedSet = updatedSet.copy(distanceKm = set.targetDistanceKm ?: historySet?.distanceKm ?: 0.0)
                         } else {
-                            if (updatedSet.weightKg == 0.0) updatedSet = updatedSet.copy(weightKg = historySet?.weightKg ?: 0.0)
-                            if (updatedSet.reps == 0) updatedSet = updatedSet.copy(reps = historySet?.reps ?: 10)
+                            if (updatedSet.weightKg == 0.0) updatedSet = updatedSet.copy(weightKg = set.targetWeightKg ?: historySet?.weightKg ?: 0.0)
+                            if (updatedSet.reps == 0) updatedSet = updatedSet.copy(reps = set.targetReps ?: historySet?.reps ?: 10)
                         }
                     }
                     onUpdate(updatedSet)

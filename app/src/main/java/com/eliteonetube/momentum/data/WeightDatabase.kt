@@ -282,6 +282,10 @@ data class ActiveWorkoutSet(
     val isCompleted: Boolean = false,
     val durationSeconds: Int? = null,
     val distanceKm: Double? = null,
+    val targetWeightKg: Double? = null,
+    val targetReps: Int? = null,
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceKm: Double? = null,
     val orderIndex: Int = 0
 )
 
@@ -348,11 +352,6 @@ data class MealFoodItem(
     val mealId: Long,
     val foodItemId: Long,
     val quantity: Double
-)
-
-data class MealWithItems(
-    val meal: Meal,
-    val items: List<FoodLogWithItem> // Reuse FoodLogWithItem or similar structure
 )
 
 @Entity(
@@ -500,6 +499,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM logged_set_table WHERE sessionId = :sessionId ORDER BY id ASC")
     fun getSetsForSession(sessionId: Long): Flow<List<LoggedSet>>
 
+    @Query("SELECT * FROM logged_set_table WHERE exerciseId = :exerciseId ORDER BY id DESC LIMIT 20")
+    suspend fun getSetsForExercise(exerciseId: Long): List<LoggedSet>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActiveSet(activeSet: ActiveWorkoutSet)
 
@@ -627,7 +629,7 @@ interface WorkoutDao {
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 31
+    version = 32
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -652,7 +654,7 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_24_25, MIGRATION_25_26,
                     MIGRATION_26_27, MIGRATION_27_28,
                     MIGRATION_28_29, MIGRATION_29_30,
-                    MIGRATION_30_31
+                    MIGRATION_30_31, MIGRATION_31_32
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -887,6 +889,14 @@ abstract class WeightDatabase : RoomDatabase() {
             override suspend fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE food_item_table ADD COLUMN servingAmount REAL NOT NULL DEFAULT 100.0")
                 connection.execSQL("ALTER TABLE food_item_table ADD COLUMN servingUnit TEXT NOT NULL DEFAULT 'g'")
+            }
+        }
+        val MIGRATION_31_32 = object : Migration(31, 32) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetWeightKg REAL")
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetReps INTEGER")
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetDurationSeconds INTEGER")
+                connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetDistanceKm REAL")
             }
         }
     }

@@ -13,5 +13,9 @@ data class PendingSet(
     val isCompleted: Boolean = false,
     val durationSeconds: Int? = null,
     val distanceKm: Double? = null,
+    val targetWeightKg: Double? = null,
+    val targetReps: Int? = null,
+    val targetDurationSeconds: Int? = null,
+    val targetDistanceKm: Double? = null,
     val orderIndex: Int = 0
 )
