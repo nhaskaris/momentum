@@ -318,7 +318,15 @@ fun MomentumAppContent(
                 onGetFoodByBarcode = { bc -> foodDao.getFoodItemByBarcode(bc) },
                 onUpdateActiveWorkout = { tid, sets ->
                     coroutineScope.launch {
-                        weightDao.saveProfile(savedProfile!!.copy(activeWorkoutTemplateId = tid, hasActiveWorkout = true))
+                        val currentProfile = savedProfile!!
+                        val startTime = currentProfile.activeWorkoutStartTime ?: System.currentTimeMillis()
+                        
+                        weightDao.saveProfile(currentProfile.copy(
+                            activeWorkoutTemplateId = tid, 
+                            hasActiveWorkout = true,
+                            activeWorkoutStartTime = startTime
+                        ))
+                        
                         workoutDao.replaceActiveSets(sets.map { ps ->
                             ActiveWorkoutSet(
                                 exerciseId = ps.exerciseId,
@@ -340,7 +348,11 @@ fun MomentumAppContent(
                 },
                 onClearActiveWorkout = {
                     coroutineScope.launch {
-                        weightDao.saveProfile(savedProfile!!.copy(activeWorkoutTemplateId = null, hasActiveWorkout = false))
+                        weightDao.saveProfile(savedProfile!!.copy(
+                            activeWorkoutTemplateId = null, 
+                            hasActiveWorkout = false,
+                            activeWorkoutStartTime = null
+                        ))
                         workoutDao.clearActiveSets()
                     }
                 },
@@ -360,23 +372,97 @@ fun MomentumAppContent(
                 getSetsForTemplateExercise = { teid -> workoutDao.getSetsForTemplateExercise(teid) },
                 onSessionSaved = { date, setsList, tid, exSid ->
                     coroutineScope.launch {
-                        val valid = setsList.filter { it.isCompleted || it.weightKg > 0 || it.reps > 0 }
-                        if (valid.isEmpty()) return@launch
-                        val sid = if (exSid != null) {
-                            workoutDao.updateSession(WorkoutSession(id = exSid, date = date, templateId = tid, totalVolumeKg = valid.sumOf { it.weightKg * it.reps }, exerciseCount = valid.map { it.exerciseId }.distinct().size, setCount = valid.size))
-                            workoutDao.deleteSetsBySessionId(exSid); exSid
-                        } else {
-                            workoutDao.insertSession(WorkoutSession(date = date, templateId = tid, totalVolumeKg = valid.sumOf { it.weightKg * it.reps }, exerciseCount = valid.map { it.exerciseId }.distinct().size, setCount = valid.size))
+                        // 1. Pre-fill sets from placeholders if they are still at 0
+                        val finalizedSets = setsList.map { ps ->
+                            if (ps.weightKg == 0.0 && ps.reps == 0 && ps.durationSeconds == null) {
+                                ps.copy(
+                                    weightKg = ps.targetWeightKg ?: 0.0,
+                                    reps = ps.targetReps ?: (if (ps.targetDurationSeconds != null) 0 else 10),
+                                    durationSeconds = ps.targetDurationSeconds,
+                                    distanceKm = ps.targetDistanceKm,
+                                    isCompleted = true // Treat as completed if using placeholders
+                                )
+                            } else ps
                         }
-                        valid.forEach { ps -> workoutDao.insertSet(LoggedSet(sessionId = sid, exerciseId = ps.exerciseId, setNumber = ps.setNumber, weightKg = ps.weightKg, reps = ps.reps, notes = ps.notes, durationSeconds = ps.durationSeconds, distanceKm = ps.distanceKm)) }
+
+                        // 2. Filter for history: only those with some value or explicitly completed
+                        val historySets = finalizedSets.filter { 
+                            it.isCompleted || it.weightKg > 0 || it.reps > 0 || it.durationSeconds != null 
+                        }
+                        
+                        if (historySets.isEmpty() && tid == null) return@launch
+
+                        // 3. Save Session
+                        val sid = if (exSid != null) {
+                            workoutDao.updateSession(WorkoutSession(
+                                id = exSid, 
+                                date = date, 
+                                templateId = tid, 
+                                totalVolumeKg = historySets.sumOf { it.weightKg * it.reps }, 
+                                exerciseCount = historySets.map { it.exerciseId }.distinct().size, 
+                                setCount = historySets.size
+                            ))
+                            workoutDao.deleteSetsBySessionId(exSid)
+                            exSid
+                        } else {
+                            workoutDao.insertSession(WorkoutSession(
+                                date = date, 
+                                templateId = tid, 
+                                totalVolumeKg = historySets.sumOf { it.weightKg * it.reps }, 
+                                exerciseCount = historySets.map { it.exerciseId }.distinct().size, 
+                                setCount = historySets.size
+                            ))
+                        }
+                        
+                        // 4. Save Logged Sets (History)
+                        historySets.forEach { ps -> 
+                            workoutDao.insertSet(LoggedSet(
+                                sessionId = sid, 
+                                exerciseId = ps.exerciseId, 
+                                setNumber = ps.setNumber, 
+                                weightKg = ps.weightKg, 
+                                reps = ps.reps, 
+                                notes = ps.notes, 
+                                durationSeconds = ps.durationSeconds, 
+                                distanceKm = ps.distanceKm
+                            )) 
+                        }
+
+                        // 5. Update Routine (if this workout was based on a routine)
                         tid?.let { id ->
-                            workoutDao.deleteTemplateSetsByTemplateId(id); workoutDao.deleteTemplateExercises(id)
-                            setsList.map { it.exerciseId }.distinct().forEachIndexed { idx, eid ->
-                                val exs = setsList.filter { it.exerciseId == eid }
-                                val vxs = exs.filter { it.setNumber > 0 && (it.reps > 0 || it.weightKg > 0) }
-                                val teid = workoutDao.insertTemplateExercise(TemplateExercise(templateId = id, exerciseId = eid, targetSets = if (vxs.isNotEmpty()) vxs.size else 3, targetReps = if (vxs.isNotEmpty()) vxs.first().reps else 10, targetWeightKg = if (vxs.isNotEmpty()) vxs.first().weightKg else 0.0, orderIndex = idx))
-                                if (vxs.isNotEmpty()) vxs.forEach { ps -> workoutDao.insertTemplateSet(TemplateSet(templateExerciseId = teid, setNumber = ps.setNumber, targetReps = ps.reps, targetWeightKg = ps.weightKg, targetDurationSeconds = ps.durationSeconds, targetDistanceKm = ps.distanceKm)) }
-                                else repeat(3) { sn -> workoutDao.insertTemplateSet(TemplateSet(templateExerciseId = teid, setNumber = sn + 1, targetReps = 10, targetWeightKg = 0.0)) }
+                            workoutDao.deleteTemplateSetsByTemplateId(id)
+                            workoutDao.deleteTemplateExercises(id)
+                            
+                            finalizedSets.map { it.exerciseId }.distinct().forEachIndexed { idx, eid ->
+                                val exsForThisExercise = finalizedSets.filter { it.exerciseId == eid }
+                                val workSets = exsForThisExercise.filter { it.isCompleted || it.weightKg > 0 || it.reps > 0 || it.durationSeconds != null }
+                                
+                                // Decide what sets to put in the routine for next time
+                                // If any work was done, we update the routine with that work.
+                                // If NO work was done, we keep the original routine sets (those with setNumber > 0)
+                                val routineSets = if (workSets.isNotEmpty()) workSets else exsForThisExercise.filter { it.setNumber > 0 }
+                                
+                                if (routineSets.isNotEmpty()) {
+                                    val first = routineSets.first()
+                                    val teid = workoutDao.insertTemplateExercise(TemplateExercise(
+                                        templateId = id, 
+                                        exerciseId = eid, 
+                                        targetSets = routineSets.size, 
+                                        targetReps = if (first.reps > 0) first.reps else (first.targetReps ?: 10), 
+                                        targetWeightKg = if (first.weightKg > 0) first.weightKg else (first.targetWeightKg ?: 0.0), 
+                                        orderIndex = idx
+                                    ))
+                                    routineSets.forEach { rs ->
+                                        workoutDao.insertTemplateSet(TemplateSet(
+                                            templateExerciseId = teid,
+                                            setNumber = rs.setNumber,
+                                            targetReps = if (rs.reps > 0) rs.reps else (rs.targetReps ?: 10),
+                                            targetWeightKg = if (rs.weightKg > 0) rs.weightKg else (rs.targetWeightKg ?: 0.0),
+                                            targetDurationSeconds = rs.durationSeconds ?: rs.targetDurationSeconds,
+                                            targetDistanceKm = rs.distanceKm ?: rs.targetDistanceKm
+                                        ))
+                                    }
+                                }
                             }
                         }
                     }

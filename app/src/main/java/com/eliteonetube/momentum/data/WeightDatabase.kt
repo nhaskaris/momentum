@@ -82,6 +82,7 @@ data class UserProfile(
     val useExternalApi: Boolean = false,
     val activeWorkoutTemplateId: Long? = null,
     val hasActiveWorkout: Boolean = false,
+    val activeWorkoutStartTime: Long? = null,
     val remindersEnabled: Boolean = true,
     val morningReminderTime: String = "08:30",
     val eveningReminderTime: String = "20:00"
@@ -629,7 +630,7 @@ interface WorkoutDao {
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 32
+    version = 33
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -654,7 +655,8 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_24_25, MIGRATION_25_26,
                     MIGRATION_26_27, MIGRATION_27_28,
                     MIGRATION_28_29, MIGRATION_29_30,
-                    MIGRATION_30_31, MIGRATION_31_32
+                    MIGRATION_30_31, MIGRATION_31_32,
+                    MIGRATION_32_33
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
@@ -897,6 +899,11 @@ abstract class WeightDatabase : RoomDatabase() {
                 connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetReps INTEGER")
                 connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetDurationSeconds INTEGER")
                 connection.execSQL("ALTER TABLE active_workout_set_table ADD COLUMN targetDistanceKm REAL")
+            }
+        }
+        val MIGRATION_32_33 = object : Migration(32, 33) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN activeWorkoutStartTime INTEGER")
             }
         }
     }

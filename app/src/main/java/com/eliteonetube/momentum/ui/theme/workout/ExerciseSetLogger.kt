@@ -129,18 +129,20 @@ fun ExerciseSetLogger(
             FilledTonalButton(
                 onClick = {
                     val last = sets.lastOrNull()
+                    val historyTarget = historySets.find { it.setNumber == sets.size + 1 } ?: historySets.lastOrNull()
+                    
                     onSetAdded(
                         PendingSet(
                             exerciseId = exercise.id,
                             setNumber = sets.size + 1,
                             weightKg = last?.weightKg ?: 0.0,
-                            reps = last?.reps ?: 10,
-                            durationSeconds = last?.durationSeconds ?: if (exercise.exerciseType == ExerciseType.CARDIO) 600 else null,
-                            distanceKm = last?.distanceKm ?: if (exercise.exerciseType == ExerciseType.CARDIO) 0.0 else null,
-                            targetWeightKg = last?.targetWeightKg,
-                            targetReps = last?.targetReps,
-                            targetDurationSeconds = last?.targetDurationSeconds,
-                            targetDistanceKm = last?.targetDistanceKm
+                            reps = last?.reps ?: 0,
+                            durationSeconds = last?.durationSeconds ?: (if (exercise.exerciseType == ExerciseType.CARDIO) historyTarget?.durationSeconds else null),
+                            distanceKm = last?.distanceKm ?: (if (exercise.exerciseType == ExerciseType.CARDIO) historyTarget?.distanceKm else null),
+                            targetWeightKg = last?.targetWeightKg ?: historyTarget?.weightKg,
+                            targetReps = last?.targetReps ?: historyTarget?.reps,
+                            targetDurationSeconds = last?.targetDurationSeconds ?: historyTarget?.durationSeconds,
+                            targetDistanceKm = last?.targetDistanceKm ?: historyTarget?.distanceKm
                         )
                     )
                 },

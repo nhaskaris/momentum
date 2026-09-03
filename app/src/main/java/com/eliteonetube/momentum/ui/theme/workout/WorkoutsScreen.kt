@@ -43,6 +43,7 @@ fun WorkoutsScreen(
     activeSets: List<ActiveWorkoutSet> = emptyList(),
     activeTemplateId: Long? = null,
     hasActiveWorkout: Boolean = false,
+    activeWorkoutStartTime: Long? = null,
     unitSystem: UnitSystem,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
@@ -104,6 +105,7 @@ fun WorkoutsScreen(
         ActiveSessionScreen(
             allExercises = allExercises,
             unitSystem = unitSystem,
+            startTimeMillis = activeWorkoutStartTime,
             initialExercises = initialSessionExercises,
             initialSets = initialPendingSets,
             getExerciseHistory = getExerciseHistory,

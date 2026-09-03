@@ -54,6 +54,7 @@ import com.eliteonetube.momentum.ui.theme.bounceClick
 fun ActiveSessionScreen(
     allExercises: List<Exercise>,
     unitSystem: UnitSystem,
+    startTimeMillis: Long? = null,
     initialExercises: List<Exercise> = emptyList(),
     initialSets: List<PendingSet> = emptyList(),
     getExerciseHistory: suspend (Long) -> List<LoggedSet> = { emptyList() },
@@ -68,7 +69,20 @@ fun ActiveSessionScreen(
     var showReorderDialog by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var exerciseToSwapId by remember { mutableStateOf<Long?>(null) }
+
+    var workoutDurationSeconds by remember { mutableLongStateOf(0L) }
     
+    LaunchedEffect(startTimeMillis) {
+        if (startTimeMillis != null) {
+            while (true) {
+                val now = System.currentTimeMillis()
+                workoutDurationSeconds = (now - startTimeMillis) / 1000
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+    }
+
+
     val timerActive by RestTimerService.isActive.collectAsState()
     var restTimerSeconds by remember { mutableLongStateOf(120L) }
 
@@ -154,7 +168,23 @@ fun ActiveSessionScreen(
         currentExerciseIds.forEach { exId ->
             if (!exerciseHistoryMap.containsKey(exId)) {
                 launch {
-                    exerciseHistoryMap[exId] = getExerciseHistory(exId)
+                    val history = getExerciseHistory(exId)
+                    exerciseHistoryMap[exId] = history
+
+                    // Sync history values to placeholders so they can be saved if untouched
+                    if (history.isNotEmpty()) {
+                        val currentSets = setsByExercise[exId].orEmpty()
+                        val updatedSets = currentSets.map { ps ->
+                            val hSet = history.find { it.setNumber == ps.setNumber } ?: history.first()
+                            ps.copy(
+                                targetWeightKg = hSet.weightKg,
+                                targetReps = hSet.reps,
+                                targetDurationSeconds = hSet.durationSeconds,
+                                targetDistanceKm = hSet.distanceKm
+                            )
+                        }
+                        setsByExercise = setsByExercise + (exId to updatedSets)
+                    }
                 }
             }
         }
@@ -180,11 +210,29 @@ fun ActiveSessionScreen(
             }
         }
     }
-    val totalVolumeKg by remember(allSets) { 
-        derivedStateOf { allSets.sumOf { it.weightKg * it.reps } } 
+
+    val finalizedSets by remember(allSets) {
+        derivedStateOf {
+            allSets.map { ps ->
+                // If it's part of the original routine (setNumber > 0) and untouched, fill with placeholders
+                if (ps.setNumber > 0 && ps.weightKg == 0.0 && ps.reps == 0 && ps.durationSeconds == null) {
+                    ps.copy(
+                        weightKg = ps.targetWeightKg ?: 0.0,
+                        reps = ps.targetReps ?: (if (ps.targetDurationSeconds != null) 0 else 10),
+                        durationSeconds = ps.targetDurationSeconds,
+                        distanceKm = ps.targetDistanceKm,
+                        isCompleted = true
+                    )
+                } else ps
+            }
+        }
     }
-    val completedSets by remember(allSets) { 
-        derivedStateOf { allSets.count { it.isCompleted } } 
+
+    val totalVolumeKg by remember(finalizedSets) { 
+        derivedStateOf { finalizedSets.sumOf { it.weightKg * it.reps } } 
+    }
+    val completedSets by remember(finalizedSets) { 
+        derivedStateOf { finalizedSets.count { it.isCompleted } } 
     }
 
     val volumeDisplay = if (unitSystem == UnitSystem.IMPERIAL) {
@@ -283,7 +331,11 @@ fun ActiveSessionScreen(
                                 )
                                 Text(" • ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    volumeDisplay,
+                                    text = if (workoutDurationSeconds > 3600) {
+                                        "%d:%02d:%02d".format(workoutDurationSeconds / 3600, (workoutDurationSeconds % 3600) / 60, workoutDurationSeconds % 60)
+                                    } else {
+                                        "%02d:%02d".format(workoutDurationSeconds / 60, workoutDurationSeconds % 60)
+                                    },
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
@@ -384,11 +436,11 @@ fun ActiveSessionScreen(
                     ) { page ->
                         if (page >= sessionExercises.size) {
                             WorkoutSummaryStep(
-                                totalSets = allSets.size,
-                                totalReps = allSets.sumOf { it.reps },
+                                totalSets = finalizedSets.size,
+                                totalReps = finalizedSets.sumOf { it.reps },
                                 totalVolumeDisplay = volumeDisplay,
                                 exercises = sessionExercises,
-                                setsByExercise = setsByExercise,
+                                setsByExercise = finalizedSets.groupBy { it.exerciseId },
                                 onEditExerciseStep = { idx -> coroutineScope.launch { pagerState.animateScrollToPage(idx) } }
                             )
                         } else {

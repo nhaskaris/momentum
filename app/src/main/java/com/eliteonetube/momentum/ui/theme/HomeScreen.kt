@@ -370,6 +370,7 @@ fun HomeScreen(
                     activeSets = activeSets,
                     hasActiveWorkout = hasActiveWorkout,
                     activeTemplateId = savedProfile.activeWorkoutTemplateId,
+                    activeWorkoutStartTime = savedProfile.activeWorkoutStartTime,
                     unitSystem = savedProfile.unitSystem,
                     getSetsForSession = getSetsForSession,
                     getExerciseHistory = getExerciseHistory,
