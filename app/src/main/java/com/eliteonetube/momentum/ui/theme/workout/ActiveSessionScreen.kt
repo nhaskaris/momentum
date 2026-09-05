@@ -431,7 +431,7 @@ fun ActiveSessionScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         pageSpacing = 12.dp,
-                        beyondViewportPageCount = 1,
+                        beyondViewportPageCount = 2,
                         key = { page -> if (page < sessionExercises.size) "ex_${sessionExercises[page].id}" else "summary" }
                     ) { page ->
                         if (page >= sessionExercises.size) {

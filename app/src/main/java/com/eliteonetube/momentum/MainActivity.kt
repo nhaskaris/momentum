@@ -22,11 +22,13 @@ import com.eliteonetube.momentum.ui.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
 
 class MainActivity : ComponentActivity() {
 
@@ -154,7 +156,7 @@ fun MomentumAppContent(
                     totalFat = logs.sumOf { it.fat * it.quantity }
                 )
             }.sortedByDescending { it.date }
-        }
+        }.flowOn(Dispatchers.Default)
     }
     val recentNutrition by recentNutritionFlow.collectAsState(initial = emptyList())
 
@@ -184,7 +186,7 @@ fun MomentumAppContent(
                 )
             }
             items + mappedMeals
-        }
+        }.flowOn(Dispatchers.Default)
     }
     val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
     val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())

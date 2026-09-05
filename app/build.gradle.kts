@@ -16,8 +16,8 @@ android {
         applicationId = "com.eliteonetube.momentum"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "1.0.0-21"
+        versionCode = 27
+        versionName = "1.0.0-22"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

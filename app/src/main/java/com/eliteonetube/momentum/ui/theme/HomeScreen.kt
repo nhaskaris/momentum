@@ -291,7 +291,7 @@ fun HomeScreen(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !(isSessionActive && currentTab == AppTab.WORKOUTS),
-            beyondViewportPageCount = 0,
+            beyondViewportPageCount = AppTab.entries.size,
             modifier = Modifier.fillMaxSize()
         ) { page ->
             when (AppTab.entries[page]) {
@@ -417,8 +417,9 @@ fun HomeScreen(
                 isAskMode = isAskMode,
                 userQuestion = userQuestion,
                 onTabSelected = { tab ->
+                    val targetPage = AppTab.entries.indexOf(tab)
                     coroutineScope.launch {
-                        pagerState.animateScrollToPage(AppTab.entries.indexOf(tab))
+                        pagerState.animateScrollToPage(targetPage)
                     }
                 },
                 onHelperDismiss = { helperMessage = null; isAskMode = false },
