@@ -1,8 +1,8 @@
-package com.eliteonetube.momentum.ui
+package com.eliteonetube.momentum.ui.theme
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,15 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.eliteonetube.momentum.ui.theme.MomentumGlass
-import com.eliteonetube.momentum.ui.theme.bounceClick
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     DASHBOARD("Home", Icons.Default.Home),
@@ -53,7 +48,7 @@ fun BottomNavBar(
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             shape = RoundedCornerShape(24.dp),
             shadowElevation = 6.dp,
-            border = androidx.compose.foundation.BorderStroke(
+            border = BorderStroke(
                 width = 0.5.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             ),

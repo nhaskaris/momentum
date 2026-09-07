@@ -54,8 +54,18 @@ fun CheckInScreen(
     onComplete: (Double, List<Uri?>) -> Unit,
     onCancel: () -> Unit
 ) {
+    val today = remember { LocalDate.now().toString() }
+    val todayEntry = remember(recentWeights) { recentWeights.firstOrNull { it.date == today } }
+    
     var step by remember { mutableIntStateOf(0) } // 0: Intro, 1: Weight, 2: Photos, 3: Summary
-    var weightInput by remember { mutableStateOf("") }
+    var weightInput by remember { 
+        mutableStateOf(
+            todayEntry?.let { 
+                if (profile.unitSystem == UnitSystem.IMPERIAL) "%.1f".format(Units.kgToLb(it.weight)) 
+                else it.weight.toString()
+            } ?: ""
+        ) 
+    }
     var frontPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var backPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var sidePhotoUri by remember { mutableStateOf<Uri?>(null) }

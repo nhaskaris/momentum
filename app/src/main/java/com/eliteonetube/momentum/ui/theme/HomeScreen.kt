@@ -1,6 +1,8 @@
-package com.eliteonetube.momentum.ui
+package com.eliteonetube.momentum.ui.theme
 
+import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,8 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Send
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.nutrition.FoodScannerScreen
 import com.eliteonetube.momentum.ui.theme.nutrition.FoodReviewDialog
@@ -34,9 +34,13 @@ import com.eliteonetube.momentum.ui.theme.onboarding.IntroScreen
 import com.eliteonetube.momentum.ui.theme.onboarding.OnboardingScreen
 import com.eliteonetube.momentum.ui.theme.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.theme.dashboard.MomentumMascot
-import com.eliteonetube.momentum.ui.theme.MomentumDark
-import com.eliteonetube.momentum.ui.theme.bounceClick
 import com.eliteonetube.momentum.logic.HealthConnectManager
+import com.eliteonetube.momentum.ui.CheckInScreen
+import com.eliteonetube.momentum.ui.MainDashboard
+import com.eliteonetube.momentum.ui.NutritionScreen
+import com.eliteonetube.momentum.ui.ProfileScreen
+import com.eliteonetube.momentum.ui.ProgressGalleryScreen
+import com.eliteonetube.momentum.ui.WeightHistoryBottomSheet
 import com.eliteonetube.momentum.widget.WidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -61,6 +65,7 @@ fun HomeScreen(
     hasActiveWorkout: Boolean = false,
     openWorkoutRequest: Int = 0,
     openWeightEntryRequest: Int = 0,
+    openCheckInRequest: Int = 0,
     currentStreak: Int,
     totalDaysLogged: Int,
     loggedDates: Set<LocalDate>,
@@ -83,7 +88,7 @@ fun HomeScreen(
     onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
     getExerciseHistory: suspend (Long) -> List<LoggedSet>,
-    onCheckInCompleted: (Double, List<android.net.Uri?>) -> Unit,
+    onCheckInCompleted: (Double, List<Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
     getSetsForTemplateExercise: suspend (Long) -> List<TemplateSet> = { emptyList() },
@@ -131,6 +136,12 @@ fun HomeScreen(
     var showCheckIn by remember { mutableStateOf(false) }
     var showGallery by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(openCheckInRequest) {
+        if (openCheckInRequest > 0) {
+            showCheckIn = true
+        }
+    }
     var scannedResult by remember { mutableStateOf<ScannedNutrition?>(null) }
     var pendingBarcode by remember { mutableStateOf<String?>(null) }
     var itemToLogAfterScan by remember { mutableStateOf<FoodItem?>(null) }
@@ -311,7 +322,8 @@ fun HomeScreen(
                             mascotMood = MascotMood.HAPPY
                             helperMessage = "Logged! Great job keeping the momentum."
                             delay(3000.milliseconds)
-                            mascotMood = if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
+                            mascotMood =
+                                if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
                             WidgetUpdater.refresh(context)
                         }
                     },
@@ -491,7 +503,7 @@ private fun MascotAndNavigation(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                             shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp),
                             shadowElevation = 8.dp,
-                            border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                             modifier = Modifier.padding(end = 12.dp).widthIn(max = 240.dp)
                         ) {
                             AnimatedContent(targetState = isAskMode, label = "AskMode") { askMode ->

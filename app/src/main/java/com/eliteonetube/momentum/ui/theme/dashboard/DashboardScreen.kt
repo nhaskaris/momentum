@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.Units
 import com.eliteonetube.momentum.ui.theme.bounceClick
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 @Composable
@@ -44,6 +46,9 @@ fun MainDashboard(
     val today = remember { LocalDate.now().toString() }
     val todayEntry = remember(recentWeights, today) { recentWeights.firstOrNull { it.date == today } }
     val unitLabel = if (profile.unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
+    
+    val isMonday = remember { LocalDate.now().dayOfWeek == DayOfWeek.MONDAY }
+    val showCheckInAlert = profile.checkInDue || (isMonday && profile.lastCheckInDate != today)
 
     var weightInput by remember { mutableStateOf("") }
     var isEditingToday by remember { mutableStateOf(false) }
@@ -109,11 +114,11 @@ fun MainDashboard(
                     .padding(horizontal = 24.dp)
             ) {
                 // Notifications / Check-in Alerts
-                if (profile.checkInDue) {
+                if (showCheckInAlert) {
                     DashboardAlert(
-                        title = "Weekly Check-in Due",
-                        description = "Time to log your weight and progress photos.",
-                        actionText = "Start Now",
+                        title = "Weekly Review Ready",
+                        description = profile.pendingAdjustmentReason ?: "Time to analyze your progress from the past week and adjust your plan.",
+                        actionText = "Start Review",
                         onAction = onStartCheckIn,
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
@@ -162,18 +167,32 @@ fun MainDashboard(
                                     fontWeight = FontWeight.Black
                                 )
                             }
-                            IconButton(
-                                onClick = {
-                                    weightInput = if (profile.unitSystem == UnitSystem.IMPERIAL) {
-                                        "%.1f".format(Units.kgToLb(todayEntry.weight))
-                                    } else {
-                                        todayEntry.weight.toString()
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (showCheckInAlert) {
+                                    Button(
+                                        onClick = onStartCheckIn,
+                                        modifier = Modifier.height(40.dp).padding(end = 8.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Review", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
-                                    isEditingToday = true
-                                },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
-                            ) {
-                                Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        weightInput = if (profile.unitSystem == UnitSystem.IMPERIAL) {
+                                            "%.1f".format(Units.kgToLb(todayEntry.weight))
+                                        } else {
+                                            todayEntry.weight.toString()
+                                        }
+                                        isEditingToday = true
+                                    },
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
@@ -221,16 +240,21 @@ fun MainDashboard(
                                 Button(
                                 onClick = {
                                     parsedWeightKg?.let {
-                                        onWeightSubmitted(it)
-                                        weightInput = ""
-                                        isEditingToday = false
+                                        if (profile.checkInDue) {
+                                            onWeightSubmitted(it)
+                                            onStartCheckIn()
+                                        } else {
+                                            onWeightSubmitted(it)
+                                            weightInput = ""
+                                            isEditingToday = false
+                                        }
                                     }
                                 },
                                 enabled = parsedWeightKg != null,
                                 modifier = Modifier.weight(1.5f).height(50.dp).bounceClick(),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Save Weight", fontWeight = FontWeight.Bold)
+                                Text(if (profile.checkInDue) "Review & Save" else "Save Weight", fontWeight = FontWeight.Bold)
                             }
                             }
                         }
@@ -268,7 +292,7 @@ fun DashboardAlert(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = bgAlpha)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = borderAlpha))
+        border = BorderStroke(1.dp, containerColor.copy(alpha = borderAlpha))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

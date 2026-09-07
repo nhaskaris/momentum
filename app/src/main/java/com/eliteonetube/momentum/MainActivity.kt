@@ -18,7 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.logic.*
-import com.eliteonetube.momentum.ui.HomeScreen
+import com.eliteonetube.momentum.ui.theme.HomeScreen
 import com.eliteonetube.momentum.ui.LoadingScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import kotlinx.coroutines.flow.combine
@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_ACTIVE_WORKOUT = "com.eliteonetube.momentum.action.OPEN_ACTIVE_WORKOUT"
         const val ACTION_OPEN_WEIGHT_ENTRY = "com.eliteonetube.momentum.action.OPEN_WEIGHT_ENTRY"
+        const val ACTION_OPEN_CHECK_IN = "com.eliteonetube.momentum.action.OPEN_CHECK_IN"
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -43,28 +44,26 @@ class MainActivity : ComponentActivity() {
 
     private val openWorkoutRequests = MutableStateFlow(0)
     private val openWeightEntryRequests = MutableStateFlow(0)
+    private val openCheckInRequests = MutableStateFlow(0)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
-            openWorkoutRequests.value++
-        }
-        if (intent.action == ACTION_OPEN_WEIGHT_ENTRY) {
-            openWeightEntryRequests.value++
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        when (intent.action) {
+            ACTION_OPEN_ACTIVE_WORKOUT -> openWorkoutRequests.value++
+            ACTION_OPEN_WEIGHT_ENTRY -> openWeightEntryRequests.value++
+            ACTION_OPEN_CHECK_IN -> openCheckInRequests.value++
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        if (intent.action == ACTION_OPEN_ACTIVE_WORKOUT) {
-            openWorkoutRequests.value++
-        }
-        if (intent.action == ACTION_OPEN_WEIGHT_ENTRY) {
-            openWeightEntryRequests.value++
-        }
+        handleIntent(intent)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -96,7 +95,8 @@ class MainActivity : ComponentActivity() {
                     algorithm = algorithm,
                     savedProfile = savedProfile,
                     openWorkoutRequests = openWorkoutRequests,
-                    openWeightEntryRequests = openWeightEntryRequests
+                    openWeightEntryRequests = openWeightEntryRequests,
+                    openCheckInRequests = openCheckInRequests
                 )
             }
         }
@@ -111,7 +111,8 @@ fun MomentumAppContent(
     algorithm: CoachAlgorithm,
     savedProfile: UserProfile?,
     openWorkoutRequests: MutableStateFlow<Int>,
-    openWeightEntryRequests: MutableStateFlow<Int>
+    openWeightEntryRequests: MutableStateFlow<Int>,
+    openCheckInRequests: MutableStateFlow<Int>
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -165,6 +166,7 @@ fun MomentumAppContent(
 
     val openWorkoutRequest by openWorkoutRequests.collectAsState()
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
+    val openCheckInRequest by openCheckInRequests.collectAsState()
 
     val today = remember { LocalDate.now().toString() }
     val todayFoodLogsFlow = remember(today) {
@@ -232,6 +234,7 @@ fun MomentumAppContent(
                 hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
                 openWorkoutRequest = openWorkoutRequest,
                 openWeightEntryRequest = openWeightEntryRequest,
+                openCheckInRequest = openCheckInRequest,
                 currentStreak = currentStreak,
                 totalDaysLogged = allWeightDates.size,
                 loggedDates = loggedDates,
@@ -272,13 +275,24 @@ fun MomentumAppContent(
                 onAdjustmentAccepted = {
                     savedProfile?.let { p ->
                         coroutineScope.launch {
-                            weightDao.saveProfile(p.copy(currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null))
+                            weightDao.saveProfile(p.copy(
+                                currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, 
+                                pendingCalorieTarget = null, 
+                                pendingAdjustmentReason = null,
+                                checkInDue = false
+                            ))
                         }
                     }
                 },
                 onAdjustmentDismissed = {
                     savedProfile?.let { p ->
-                        coroutineScope.launch { weightDao.saveProfile(p.copy(pendingCalorieTarget = null, pendingAdjustmentReason = null)) }
+                        coroutineScope.launch { 
+                            weightDao.saveProfile(p.copy(
+                                pendingCalorieTarget = null, 
+                                pendingAdjustmentReason = null,
+                                checkInDue = false
+                            )) 
+                        }
                     }
                 },
                 onFoodLogged = { foodId, qty ->
