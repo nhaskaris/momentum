@@ -25,7 +25,7 @@ object ExternalFoodApi {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
                 
-                val body = response.body?.string() ?: return@withContext null
+                val body = response.body.string()
                 val json = JSONObject(body)
                 
                 if (json.getInt("status") != 1) return@withContext null
@@ -53,7 +53,7 @@ object ExternalFoodApi {
                     isCustom = true
                 )
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
