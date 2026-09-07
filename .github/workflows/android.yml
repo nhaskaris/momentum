@@ -45,7 +45,7 @@ jobs:
         if gh release view "$tag" >/dev/null 2>&1; then
           gh release upload "$tag" "$APK_PATH#momentum-debug.apk" --clobber
         else
-          gh release create "$tag" "$APK_PATH#momentum-debug.apk" \
+          gh release create "$tag" "$APK_PATH#momentum.apk" \
             --target "$GITHUB_SHA" \
             --title "Momentum build ${GITHUB_SHA::7}" \
             --generate-notes \

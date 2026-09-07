@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.eliteonetube.momentum"
     compileSdk {
-        version = release(36) {
+        version = release(37) {
             minorApiLevel = 1
         }
     }
@@ -16,7 +16,7 @@ android {
         applicationId = "com.eliteonetube.momentum"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
+        versionCode = 28
         versionName = "1.0.0-22"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
