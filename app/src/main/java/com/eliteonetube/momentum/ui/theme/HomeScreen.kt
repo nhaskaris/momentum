@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Send
 import com.eliteonetube.momentum.data.*
@@ -39,6 +41,7 @@ import com.eliteonetube.momentum.widget.WidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun HomeScreen(
@@ -142,7 +145,7 @@ fun HomeScreen(
 
     LaunchedEffect(helperMessage, isAskMode) {
         if (helperMessage != null && !isAskMode) {
-            delay(6000)
+            delay(6000.milliseconds)
             helperMessage = null
         }
     }
@@ -307,7 +310,7 @@ fun HomeScreen(
                             onWeightSubmitted(enteredWeight)
                             mascotMood = MascotMood.HAPPY
                             helperMessage = "Logged! Great job keeping the momentum."
-                            delay(3000)
+                            delay(3000.milliseconds)
                             mascotMood = if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
                             WidgetUpdater.refresh(context)
                         }
@@ -505,14 +508,14 @@ private fun MascotAndNavigation(
                                             colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), focusedBorderColor = MaterialTheme.colorScheme.primary)
                                         )
                                         IconButton(onClick = onSendQuestion, enabled = userQuestion.isNotBlank()) {
-                                            Icon(Icons.Default.Send, null, tint = if (userQuestion.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+                                            Icon(Icons.AutoMirrored.Filled.Send, null, tint = if (userQuestion.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
                                         }
                                     }
                                 } else {
                                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onHelperDismiss() }.padding(horizontal = 16.dp, vertical = 12.dp)) {
                                         Text(text = helperMessage ?: "", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
                                         IconButton(onClick = onAskModeToggle, modifier = Modifier.size(24.dp)) {
-                                            Icon(Icons.Default.Chat, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Filled.Chat, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 }

@@ -3,13 +3,10 @@ package com.eliteonetube.momentum.ui.theme.nutrition
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.*
-import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.core.Camera
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
@@ -30,7 +27,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.annotation.OptIn as AndroidxOptIn
 import androidx.core.content.ContextCompat
@@ -45,6 +41,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+import kotlin.time.Duration.Companion.milliseconds
 
 enum class ScannerMode { BARCODE, FRONT_PACKAGE, NUTRITION }
 
@@ -165,7 +162,6 @@ fun FoodScannerScreen(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
                         implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                        previewViewRef = this
                     }
                 },
                 modifier = Modifier.fillMaxSize().pointerInput(scannerMode) {
@@ -178,69 +174,122 @@ fun FoodScannerScreen(
                         cam.cameraControl.startFocusAndMetering(action)
                     }
                 },
-                update = { _ -> }
+                update = { view -> previewViewRef = view }
+            )
+
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).apply {
+                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    }
+                },
+                modifier = Modifier.fillMaxSize().pointerInput(scannerMode) {
+                    detectTapGestures { offset ->
+                        val previewView = previewViewRef ?: return@detectTapGestures
+                        val cam = camera ?: return@detectTapGestures
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(offset.x, offset.y)
+                        val action = FocusMeteringAction.Builder(point).build()
+                        cam.cameraControl.startFocusAndMetering(action)
+                    }
+                },
+                update = { view -> previewViewRef = view }
             )
 
             LaunchedEffect(hasCameraPermission, previewViewRef) {
-                if (hasCameraPermission && previewViewRef != null) {
+                if (!hasCameraPermission) return@LaunchedEffect
+
+                var attempts = 0
+                val maxAttempts = 5
+
+                while (attempts < maxAttempts) {
+                    val currentPreviewView = previewViewRef
+                    if (currentPreviewView == null) {
+                        attempts++
+                        kotlinx.coroutines.delay(150.milliseconds)
+                        continue
+                    }
+
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                    cameraProviderFuture.addListener({
-                        val cameraProvider = try {
-                            cameraProviderFuture.get()
-                        } catch (_: Exception) {
-                            return@addListener
-                        }
+                    val bound = kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { cont ->
+                        cameraProviderFuture.addListener({
+                            val cameraProvider = try {
+                                cameraProviderFuture.get()
+                            } catch (_: Exception) {
+                                cont.resume(false) {}
+                                return@addListener
+                            }
 
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewViewRef!!.surfaceProvider)
-                        }
+                            // Re-check right before binding — still the same defensive guard
+                            val previewView = previewViewRef
+                            if (previewView == null) {
+                                cont.resume(false) {}
+                                return@addListener
+                            }
 
-                        val imageAnalysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-                            .also {
-                                it.setAnalyzer(cameraExecutor) { imageProxy ->
-                                    val mediaImage = imageProxy.image
-                                    if (mediaImage != null && scannerMode == ScannerMode.BARCODE) {
-                                        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                                        barcodeScanner.process(image)
-                                            .addOnSuccessListener { barcodes: List<Barcode> ->
-                                                if (barcodes.isNotEmpty()) {
-                                                    val barcode = barcodes[0].rawValue
-                                                    if (barcode != null && barcode != currentBarcode) {
-                                                        currentBarcode = barcode
-                                                        coroutineScope.launch {
-                                                            statusMessage = "Searching barcode..."
-                                                            isSearchingBarcode = true
-                                                            onBarcodeScanned(barcode)
-                                                            isSearchingBarcode = false
-                                                            statusMessage = "Align barcode in frame"
+                            val preview = Preview.Builder().build().also {
+                                it.surfaceProvider = previewView.surfaceProvider
+                            }
+
+                            val imageAnalysis = ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+                                .also {
+                                    it.setAnalyzer(cameraExecutor) { imageProxy ->
+                                        val mediaImage = imageProxy.image
+                                        if (mediaImage != null && scannerMode == ScannerMode.BARCODE) {
+                                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                                            barcodeScanner.process(image)
+                                                .addOnSuccessListener { barcodes: List<Barcode> ->
+                                                    if (barcodes.isNotEmpty()) {
+                                                        val barcode = barcodes[0].rawValue
+                                                        if ((barcode != null) && (barcode != currentBarcode)) {
+                                                            currentBarcode = barcode
+                                                            coroutineScope.launch {
+                                                                statusMessage = "Searching barcode..."
+                                                                isSearchingBarcode = true
+                                                                onBarcodeScanned(barcode)
+                                                                isSearchingBarcode = false
+                                                                statusMessage = "Align barcode in frame"
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
-                                            .addOnCompleteListener { imageProxy.close() }
-                                    } else {
-                                        imageProxy.close()
+                                                .addOnCompleteListener { imageProxy.close() }
+                                        } else {
+                                            imageProxy.close()
+                                        }
                                     }
                                 }
+
+                            try {
+                                cameraProvider.unbindAll()
+                                camera = cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    preview, imageAnalysis, imageCapture
+                                )
+                                cont.resume(true) {}
+                            } catch (e: Exception) {
+                                android.util.Log.e("FoodScanner", "Binding failed", e)
+                                cont.resume(false) {}
                             }
+                        }, ContextCompat.getMainExecutor(context))
+                    }
 
-                        try {
-                            cameraProvider.unbindAll()
-                            camera = cameraProvider.bindToLifecycle(
-                                lifecycleOwner,
-                                CameraSelector.DEFAULT_BACK_CAMERA,
-                                preview, imageAnalysis, imageCapture
-                            )
-                        } catch (e: Exception) {
-                            android.util.Log.e("FoodScanner", "Binding failed", e)
-                        }
-                    }, ContextCompat.getMainExecutor(context))
+                    if (bound) {
+                        statusMessage = "Align barcode in frame"
+                        return@LaunchedEffect
+                    }
+
+                    attempts++
+                    statusMessage = "Reconnecting camera..."
+                    kotlinx.coroutines.delay(200.milliseconds)
                 }
+
+                // Exhausted retries — tell the user instead of leaving a silent black screen
+                statusMessage = "Couldn't start camera. Try going back and reopening."
             }
-
-
 
             // High-tech Overlay
             Box(modifier = Modifier.fillMaxSize().padding(48.dp), contentAlignment = Alignment.Center) {
