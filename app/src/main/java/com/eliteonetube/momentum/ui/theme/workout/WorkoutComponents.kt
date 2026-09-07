@@ -1,8 +1,10 @@
-package com.eliteonetube.momentum.ui.workout
+package com.eliteonetube.momentum.ui.theme.workout
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Exercise
+import com.eliteonetube.momentum.ui.workout.PendingSet
 
 /**
  * Prompted state card displayed when a user starts an active workout session
@@ -101,35 +104,41 @@ fun WorkoutSummaryStep(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Workout Summary",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Review your session before committing",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        LazyColumn(
+            modifier = Modifier
+                .padding(20.dp)
+                .heightIn(max = 400.dp)
+        ) {
+            item {
+                Text(
+                    text = "Workout Summary",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Review your session before committing",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            WorkoutStatsHeader(
-                totalSets = totalSets,
-                totalReps = totalReps,
-                totalVolumeDisplay = totalVolumeDisplay
-            )
+                WorkoutStatsHeader(
+                    totalSets = totalSets,
+                    totalReps = totalReps,
+                    totalVolumeDisplay = totalVolumeDisplay
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Logged Exercises",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Logged Exercises",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
-            exercises.forEachIndexed { index, exercise ->
+            itemsIndexed(exercises) { index, exercise ->
                 val sets = setsByExercise[exercise.id].orEmpty()
                 Row(
                     modifier = Modifier

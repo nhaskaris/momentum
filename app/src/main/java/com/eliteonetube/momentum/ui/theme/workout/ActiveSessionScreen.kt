@@ -48,6 +48,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.eliteonetube.momentum.ui.theme.MomentumGlass
 import com.eliteonetube.momentum.ui.theme.bounceClick
+import com.eliteonetube.momentum.ui.theme.workout.EmptyWorkoutStateCard
+import com.eliteonetube.momentum.ui.theme.workout.WorkoutSummaryStep
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +80,7 @@ fun ActiveSessionScreen(
             while (true) {
                 val now = System.currentTimeMillis()
                 workoutDurationSeconds = (now - startTimeMillis) / 1000
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(1000.milliseconds)
             }
         }
     }
@@ -116,7 +119,7 @@ fun ActiveSessionScreen(
     @OptIn(FlowPreview::class)
     LaunchedEffect(Unit) {
         persistenceFlow
-            .debounce(800L) // Wait for user to stop typing
+            .debounce(800L.milliseconds) // Wait for user to stop typing
             .collectLatest { sets ->
                 if (sets != null) {
                     onUpdateActiveSets(sets)
@@ -441,7 +444,13 @@ fun ActiveSessionScreen(
                                 totalVolumeDisplay = volumeDisplay,
                                 exercises = sessionExercises,
                                 setsByExercise = finalizedSets.groupBy { it.exerciseId },
-                                onEditExerciseStep = { idx -> coroutineScope.launch { pagerState.animateScrollToPage(idx) } }
+                                onEditExerciseStep = { idx ->
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            idx
+                                        )
+                                    }
+                                }
                             )
                         } else {
                             val currentExercise = sessionExercises[page]
