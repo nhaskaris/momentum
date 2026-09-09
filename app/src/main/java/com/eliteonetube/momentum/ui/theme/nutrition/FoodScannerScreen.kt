@@ -34,16 +34,22 @@ import androidx.core.graphics.createBitmap
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.eliteonetube.momentum.logic.NutritionScanner
 import com.eliteonetube.momentum.logic.ScannedNutrition
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class ScannerMode { BARCODE, FRONT_PACKAGE, NUTRITION }
+enum class ModuleState { CHECKING, INSTALLING, READY, FAILED }
 
 private const val NUTRITION_OVERLAY_ASPECT = 0.8f
 
@@ -60,24 +66,102 @@ fun FoodScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val coroutineScope = rememberCoroutineScope()
-    val barcodeScanner = remember { BarcodeScanning.getClient() }
-    val textRecognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+
+    // Barcode + text recognizer are no longer created eagerly.
+    // We first confirm (or trigger install of) their Play Services modules,
+    // then create the client only once it's actually ready.
+    var barcodeScanner by remember { mutableStateOf<BarcodeScanner?>(null) }
+    var textRecognizer by remember { mutableStateOf<TextRecognizer?>(null) }
+    var barcodeModuleState by remember { mutableStateOf(ModuleState.CHECKING) }
+    var textModuleState by remember { mutableStateOf(ModuleState.CHECKING) }
+
+    LaunchedEffect(Unit) {
+        val moduleInstallClient = ModuleInstall.getClient(context)
+
+        // --- Barcode scanning module ---
+        val barcodeOptionalModule = BarcodeScanning.getClient()
+        moduleInstallClient.areModulesAvailable(barcodeOptionalModule)
+            .addOnSuccessListener { response ->
+                if (response.areModulesAvailable()) {
+                    barcodeScanner = barcodeOptionalModule
+                    barcodeModuleState = ModuleState.READY
+                } else {
+                    barcodeModuleState = ModuleState.INSTALLING
+                    val installRequest = ModuleInstallRequest.newBuilder()
+                        .addApi(barcodeOptionalModule)
+                        .build()
+                    moduleInstallClient.installModules(installRequest)
+                        .addOnSuccessListener {
+                            barcodeScanner = barcodeOptionalModule
+                            barcodeModuleState = ModuleState.READY
+                        }
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("FoodScanner", "Barcode module install failed", e)
+                            barcodeModuleState = ModuleState.FAILED
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("FoodScanner", "Barcode module availability check failed", e)
+                barcodeModuleState = ModuleState.FAILED
+            }
+
+        // --- Text recognition module ---
+        val textOptionalModule = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        moduleInstallClient.areModulesAvailable(textOptionalModule)
+            .addOnSuccessListener { response ->
+                if (response.areModulesAvailable()) {
+                    textRecognizer = textOptionalModule
+                    textModuleState = ModuleState.READY
+                } else {
+                    textModuleState = ModuleState.INSTALLING
+                    val installRequest = ModuleInstallRequest.newBuilder()
+                        .addApi(textOptionalModule)
+                        .build()
+                    moduleInstallClient.installModules(installRequest)
+                        .addOnSuccessListener {
+                            textRecognizer = textOptionalModule
+                            textModuleState = ModuleState.READY
+                        }
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("FoodScanner", "Text module install failed", e)
+                            textModuleState = ModuleState.FAILED
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("FoodScanner", "Text module availability check failed", e)
+                textModuleState = ModuleState.FAILED
+            }
+    }
 
     DisposableEffect(Unit) {
-        onDispose { 
+        onDispose {
             cameraExecutor.shutdown()
-            barcodeScanner.close()
-            textRecognizer.close()
+            barcodeScanner?.close()
+            textRecognizer?.close()
         }
     }
 
     var scannerMode by remember { mutableStateOf(ScannerMode.BARCODE) }
     var currentBarcode by remember { mutableStateOf<String?>(null) }
     var detectedName by remember { mutableStateOf<String?>(null) }
-    var statusMessage by remember { mutableStateOf("Align barcode in frame") }
+    var statusMessage by remember { mutableStateOf("Preparing scanner...") }
     var isCapturing by remember { mutableStateOf(false) }
     var isSearchingBarcode by remember { mutableStateOf(false) }
     var capturedNutrition by remember { mutableStateOf<ScannedNutrition?>(null) }
+
+    // Reflect module readiness in the status message, but don't stomp on
+    // messages set by the capture/scan flow once things are ready.
+    LaunchedEffect(barcodeModuleState, textModuleState, scannerMode) {
+        val relevantState = if (scannerMode == ScannerMode.BARCODE) barcodeModuleState else textModuleState
+        statusMessage = when (relevantState) {
+            ModuleState.CHECKING -> "Preparing scanner..."
+            ModuleState.INSTALLING -> "Downloading scanner module..."
+            ModuleState.FAILED -> "Scanner unavailable. Check Google Play Services."
+            ModuleState.READY -> if (scannerMode == ScannerMode.BARCODE) "Align barcode in frame" else "Ready to capture"
+        }
+    }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -136,13 +220,13 @@ fun FoodScannerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     val title = when(scannerMode) {
                         ScannerMode.BARCODE -> "Scan Barcode"
                         ScannerMode.FRONT_PACKAGE -> "Scan Package Name"
                         ScannerMode.NUTRITION -> "Scan Nutrition Label"
                     }
-                    Text(title, fontWeight = FontWeight.Black) 
+                    Text(title, fontWeight = FontWeight.Black)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -150,33 +234,17 @@ fun FoodScannerScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent, 
-                    titleContentColor = Color.White, 
+                    containerColor = Color.Transparent,
+                    titleContentColor = Color.White,
                     navigationIconContentColor = Color.White
                 )
             )
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
-            AndroidView(
-                factory = { ctx ->
-                    PreviewView(ctx).apply {
-                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                    }
-                },
-                modifier = Modifier.fillMaxSize().pointerInput(scannerMode) {
-                    detectTapGestures { offset ->
-                        val previewView = previewViewRef ?: return@detectTapGestures
-                        val cam = camera ?: return@detectTapGestures
-                        val factory = previewView.meteringPointFactory
-                        val point = factory.createPoint(offset.x, offset.y)
-                        val action = FocusMeteringAction.Builder(point).build()
-                        cam.cameraControl.startFocusAndMetering(action)
-                    }
-                },
-                update = { view -> previewViewRef = view }
-            )
-
+            // NOTE: previously there were two duplicate AndroidView blocks here,
+            // both creating a PreviewView and both wired to `update`. Only one
+            // camera preview surface is needed — the duplicate has been removed.
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
@@ -216,14 +284,14 @@ fun FoodScannerScreen(
                             val cameraProvider = try {
                                 cameraProviderFuture.get()
                             } catch (_: Exception) {
-                                cont.resume(false) {}
+                                cont.resume(false)
                                 return@addListener
                             }
 
                             // Re-check right before binding — still the same defensive guard
                             val previewView = previewViewRef
                             if (previewView == null) {
-                                cont.resume(false) {}
+                                cont.resume(false)
                                 return@addListener
                             }
 
@@ -236,10 +304,11 @@ fun FoodScannerScreen(
                                 .build()
                                 .also {
                                     it.setAnalyzer(cameraExecutor) { imageProxy ->
+                                        val scanner = barcodeScanner
                                         val mediaImage = imageProxy.image
-                                        if (mediaImage != null && scannerMode == ScannerMode.BARCODE) {
+                                        if (mediaImage != null && scannerMode == ScannerMode.BARCODE && scanner != null) {
                                             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                                            barcodeScanner.process(image)
+                                            scanner.process(image)
                                                 .addOnSuccessListener { barcodes: List<Barcode> ->
                                                     if (barcodes.isNotEmpty()) {
                                                         val barcode = barcodes[0].rawValue
@@ -269,16 +338,18 @@ fun FoodScannerScreen(
                                     CameraSelector.DEFAULT_BACK_CAMERA,
                                     preview, imageAnalysis, imageCapture
                                 )
-                                cont.resume(true) {}
+                                cont.resume(true)
                             } catch (e: Exception) {
                                 android.util.Log.e("FoodScanner", "Binding failed", e)
-                                cont.resume(false) {}
+                                cont.resume(false)
                             }
                         }, ContextCompat.getMainExecutor(context))
                     }
 
                     if (bound) {
-                        statusMessage = "Align barcode in frame"
+                        if (barcodeModuleState == ModuleState.READY) {
+                            statusMessage = "Align barcode in frame"
+                        }
                         return@LaunchedEffect
                     }
 
@@ -298,7 +369,7 @@ fun FoodScannerScreen(
                     ScannerMode.FRONT_PACKAGE -> 1.0f
                     ScannerMode.NUTRITION -> NUTRITION_OVERLAY_ASPECT
                 }
-                
+
                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(aspect)) {
                     // Frame
                     Surface(
@@ -307,7 +378,7 @@ fun FoodScannerScreen(
                         border = BorderStroke(2.dp, Color.White.copy(alpha = 0.6f)),
                         shape = RoundedCornerShape(16.dp)
                     ) {}
-                    
+
                     // Animated Laser
                     if (scannerMode != ScannerMode.BARCODE && capturedNutrition == null) {
                         val infiniteTransition = rememberInfiniteTransition(label = "laser")
@@ -317,7 +388,7 @@ fun FoodScannerScreen(
                             animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
                             label = "laser"
                         )
-                        
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -344,8 +415,9 @@ fun FoodScannerScreen(
                 if (scannerMode != ScannerMode.BARCODE) {
                     if (capturedNutrition == null) {
                         Button(
-                            enabled = !isCapturing,
+                            enabled = !isCapturing && textModuleState == ModuleState.READY,
                             onClick = {
+                                val recognizer = textRecognizer ?: return@Button
                                 isCapturing = true
                                 statusMessage = "Reading..."
                                 imageCapture.takePicture(
@@ -361,7 +433,7 @@ fun FoodScannerScreen(
                                                 val processed = preprocessBitmap(cropped)
 
                                                 val inputImage = InputImage.fromBitmap(processed, 0)
-                                                textRecognizer.process(inputImage).addOnSuccessListener { visionText ->
+                                                recognizer.process(inputImage).addOnSuccessListener { visionText ->
                                                     if (scannerMode == ScannerMode.FRONT_PACKAGE) {
                                                         detectedName = NutritionScanner.parseName(visionText)
                                                         scannerMode = ScannerMode.NUTRITION
@@ -429,7 +501,7 @@ fun FoodScannerScreen(
                     ) {
                         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("New Barcode: $currentBarcode", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                            
+
                             if (isSearchingBarcode) {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
@@ -442,7 +514,7 @@ fun FoodScannerScreen(
                             } else {
                                 Text(
                                     text = if (apiEnabled) "Not found locally or online." else "Not found in database.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
