@@ -279,7 +279,7 @@ fun FoodScannerScreen(
                     }
 
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                    val bound = kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { cont ->
+                    val bound = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
                         cameraProviderFuture.addListener({
                             val cameraProvider = try {
                                 cameraProviderFuture.get()
