@@ -42,7 +42,21 @@ class CrashHandler(private val context: Context) : Thread.UncaughtExceptionHandl
         throwable.printStackTrace(PrintWriter(stackTrace))
 
         val report = buildString {
+            val packageInfo = try {
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            } catch (_: Exception) {
+                null
+            }
+            val appVersion = packageInfo?.versionName ?: "Unknown"
+            val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo?.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo?.versionCode
+            } ?: "Unknown"
+
             append("Timestamp: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}\n")
+            append("App Version: $appVersion (Build $buildNumber)\n")
             append("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})\n")
             append("Android Version: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n")
             append("Thread: ${thread.name}\n")
