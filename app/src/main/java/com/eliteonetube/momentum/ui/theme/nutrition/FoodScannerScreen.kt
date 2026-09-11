@@ -3,6 +3,7 @@ package com.eliteonetube.momentum.ui.theme.nutrition
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -34,6 +35,7 @@ import androidx.core.graphics.createBitmap
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.eliteonetube.momentum.logic.NutritionScanner
 import com.eliteonetube.momentum.logic.ScannedNutrition
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -63,15 +65,24 @@ fun FoodScannerScreen(
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Using bundled ML Kit - no need for ModuleInstall checks
-    val barcodeScanner = remember { BarcodeScanning.getClient() }
-    val textRecognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    // Defensive initialization to prevent NPE on problematic devices
+    var barcodeScanner by remember { mutableStateOf<BarcodeScanner?>(null) }
+    var textRecognizer by remember { mutableStateOf<TextRecognizer?>(null) }
+
+    LaunchedEffect(Unit) {
+        try {
+            barcodeScanner = BarcodeScanning.getClient()
+            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        } catch (e: Exception) {
+            Log.e("FoodScanner", "ML Kit Init failed", e)
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
             cameraExecutor.shutdown()
-            barcodeScanner.close()
-            textRecognizer.close()
+            barcodeScanner?.close()
+            textRecognizer?.close()
         }
     }
 
@@ -229,10 +240,11 @@ fun FoodScannerScreen(
                                 .build()
                                 .also {
                                     it.setAnalyzer(cameraExecutor) { imageProxy ->
+                                        val scanner = barcodeScanner
                                         val mediaImage = imageProxy.image
-                                        if (mediaImage != null && scannerMode == ScannerMode.BARCODE) {
+                                        if (mediaImage != null && scannerMode == ScannerMode.BARCODE && scanner != null) {
                                             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                                            barcodeScanner.process(image)
+                                            scanner.process(image)
                                                 .addOnSuccessListener { barcodes: List<Barcode> ->
                                                     if (barcodes.isNotEmpty()) {
                                                         val barcode = barcodes[0].rawValue
@@ -337,8 +349,9 @@ fun FoodScannerScreen(
                 if (scannerMode != ScannerMode.BARCODE) {
                     if (capturedNutrition == null) {
                         Button(
-                            enabled = !isCapturing,
+                            enabled = !isCapturing && textRecognizer != null,
                             onClick = {
+                                val recognizer = textRecognizer ?: return@Button
                                 isCapturing = true
                                 statusMessage = "Reading..."
                                 imageCapture.takePicture(
@@ -354,7 +367,7 @@ fun FoodScannerScreen(
                                                 val processed = preprocessBitmap(cropped)
 
                                                 val inputImage = InputImage.fromBitmap(processed, 0)
-                                                textRecognizer.process(inputImage).addOnSuccessListener { visionText ->
+                                                recognizer.process(inputImage).addOnSuccessListener { visionText ->
                                                     if (scannerMode == ScannerMode.FRONT_PACKAGE) {
                                                         detectedName = NutritionScanner.parseName(visionText)
                                                         scannerMode = ScannerMode.NUTRITION
