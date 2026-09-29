@@ -242,7 +242,7 @@ fun GalleryListLayout(checkIns: List<CheckIn>, onPhotoClick: (String) -> Unit) {
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("${ci.weight} kg", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("${ci.weight} kg" + (ci.bodyFatPercentage?.let { " · $it%" } ?: ""), modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))

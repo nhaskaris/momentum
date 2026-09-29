@@ -52,7 +52,7 @@ import java.time.LocalDate
 fun CheckInScreen(
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
-    onComplete: (Double, List<Uri?>) -> Unit,
+    onComplete: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>) -> Unit,
     onCancel: () -> Unit
 ) {
     val today = remember { LocalDate.now().toString() }
@@ -67,6 +67,8 @@ fun CheckInScreen(
             } ?: ""
         ) 
     }
+    // Optional: left blank unless the user measured it this week
+    var bodyFatInput by remember { mutableStateOf("") }
     var frontPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var backPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var sidePhotoUri by remember { mutableStateOf<Uri?>(null) }
@@ -76,6 +78,8 @@ fun CheckInScreen(
     val weightKg = parsedWeight?.let { 
         if (profile.unitSystem == UnitSystem.IMPERIAL) Units.lbToKg(it) else it 
     }
+    val bodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()?.takeIf { it in 2.0..70.0 }
+    val bodyFatValid = bodyFatInput.isBlank() || bodyFat != null
 
     Scaffold(
         topBar = {
@@ -132,8 +136,12 @@ fun CheckInScreen(
                             weightInput = weightInput,
                             onWeightChange = { weightInput = it },
                             unitLabel = unitLabel,
+                            bodyFatInput = bodyFatInput,
+                            onBodyFatChange = { bodyFatInput = it },
+                            bodyFatError = !bodyFatValid,
+                            lastBodyFat = profile.bodyFatPercentage,
                             onNext = { step = 2 },
-                            isValid = weightKg != null
+                            isValid = weightKg != null && bodyFatValid
                         )
                         2 -> PhotoStep(
                             frontUri = frontPhotoUri,
@@ -148,8 +156,9 @@ fun CheckInScreen(
                             profile = profile,
                             recentWeights = recentWeights,
                             newWeight = weightKg ?: 0.0,
+                            newBodyFat = bodyFat,
                             onFinish = {
-                                onComplete(weightKg ?: 0.0, listOf(frontPhotoUri, backPhotoUri, sidePhotoUri))
+                                onComplete(weightKg ?: 0.0, bodyFat, listOf(frontPhotoUri, backPhotoUri, sidePhotoUri))
                             }
                         )
                     }
@@ -199,6 +208,10 @@ private fun WeightStep(
     weightInput: String,
     onWeightChange: (String) -> Unit,
     unitLabel: String,
+    bodyFatInput: String,
+    onBodyFatChange: (String) -> Unit,
+    bodyFatError: Boolean,
+    lastBodyFat: Double?,
     onNext: () -> Unit,
     isValid: Boolean
 ) {
@@ -229,7 +242,33 @@ private fun WeightStep(
             )
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = bodyFatInput,
+            onValueChange = onBodyFatChange,
+            label = { Text("Body fat % (optional)") },
+            placeholder = { Text(lastBodyFat?.let { "Last: $it" } ?: "e.g. 18.5") },
+            supportingText = {
+                Text(
+                    if (bodyFatError) "Enter a value between 2 and 70"
+                    else "Only if you measured it — improves your maintenance estimate"
+                )
+            },
+            isError = bodyFatError,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            )
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = onNext,
             modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(),
@@ -392,6 +431,7 @@ private fun SummaryStep(
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
     newWeight: Double,
+    newBodyFat: Double?,
     onFinish: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -410,6 +450,22 @@ private fun SummaryStep(
             unitSystem = profile.unitSystem,
             modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 8.dp)
         )
+
+        if (newBodyFat != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            val previous = profile.bodyFatPercentage
+            Text(
+                buildString {
+                    append("Body fat: $newBodyFat%")
+                    if (previous != null && previous != newBodyFat) {
+                        append("  (%+.1f from %s%%)".format(newBodyFat - previous, previous))
+                    }
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 

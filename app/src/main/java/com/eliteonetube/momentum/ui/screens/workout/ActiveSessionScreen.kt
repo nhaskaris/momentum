@@ -6,8 +6,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -211,12 +215,11 @@ fun ActiveSessionScreen(
     val pageCount = if (sessionExercises.isEmpty()) 0 else sessionExercises.size + 1
     val pagerState = rememberPagerState(pageCount = { pageCount })
 
-    // Safety: ensure we are on a valid page
-    val currentStepIndex = if (pageCount > 0) {
-        pagerState.currentPage.coerceAtMost(pageCount - 1)
-    } else 0
-    
-    val isFinishStep = pageCount > 0 && currentStepIndex == sessionExercises.size && sessionExercises.isNotEmpty()
+    // targetPage follows even very fast swipes. Read through a delegate so only the scopes that use it
+    // (step chips, bottom buttons) recompose on page changes, not the whole screen.
+    val currentStepIndex by remember(pagerState, pageCount) {
+        derivedStateOf { if (pageCount > 0) pagerState.targetPage.coerceAtMost(pageCount - 1) else 0 }
+    }
 
     val allSets = remember(setsByExercise, sessionExercises) { 
         sessionExercises.flatMapIndexed { index, ex ->
@@ -471,6 +474,7 @@ fun ActiveSessionScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (sessionExercises.isNotEmpty()) {
+                        val isFinishStep = currentStepIndex == sessionExercises.size
                         if (currentStepIndex > 0) {
                             OutlinedButton(
                                 onClick = { coroutineScope.launch { pagerState.animateScrollToPage(currentStepIndex - 1) } },
@@ -519,7 +523,7 @@ fun ActiveSessionScreen(
                 WorkoutStepBar(
                     exercises = sessionExercises,
                     setsByExercise = setsByExercise,
-                    currentStepIndex = currentStepIndex,
+                    currentStepIndex = { currentStepIndex },
                     onStepSelected = { idx -> coroutineScope.launch { pagerState.animateScrollToPage(idx) } }
                 )
             }
@@ -537,6 +541,12 @@ fun ActiveSessionScreen(
                         pageSpacing = 12.dp,
                         // Each page is a column of text fields; pre-building only the next one keeps opening fast
                         beyondViewportPageCount = 1,
+                        // Flip after a shorter drag and snap into place faster than the default spring
+                        flingBehavior = PagerDefaults.flingBehavior(
+                            state = pagerState,
+                            snapPositionalThreshold = 0.3f,
+                            snapAnimationSpec = spring(stiffness = Spring.StiffnessMedium)
+                        ),
                         key = { page -> if (page < sessionExercises.size) "ex_${sessionExercises[page].id}" else "summary" }
                     ) { page ->
                         if (page >= sessionExercises.size) {
@@ -792,17 +802,30 @@ private fun RestTimerOverlay(
 private fun WorkoutStepBar(
     exercises: List<Exercise>,
     setsByExercise: Map<Long, List<PendingSet>>,
-    currentStepIndex: Int,
+    currentStepIndex: () -> Int,
     onStepSelected: (Int) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    // Keep the active chip on screen when there are more exercises than fit
+    LaunchedEffect(listState) {
+        snapshotFlow(currentStepIndex).collect { index ->
+            val layoutInfo = listState.layoutInfo
+            val fullyVisible = layoutInfo.visibleItemsInfo.any {
+                it.index == index && it.offset >= 0 && it.offset + it.size <= layoutInfo.viewportEndOffset
+            }
+            if (!fullyVisible) listState.animateScrollToItem(index)
+        }
+    }
+
     LazyRow(
+        state = listState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         itemsIndexed(items = exercises, key = { _, e -> e.id }) { index, exercise ->
-            val isSelected = currentStepIndex == index
+            val isSelected = currentStepIndex() == index
             val setsLogged = setsByExercise[exercise.id].orEmpty().filter { it.isCompleted }.size
             
                 FilterChip(
@@ -826,7 +849,7 @@ private fun WorkoutStepBar(
         }
         item {
             FilterChip(
-                selected = currentStepIndex == exercises.size,
+                selected = currentStepIndex() == exercises.size,
                 onClick = { onStepSelected(exercises.size) },
                 label = { Text("Finish") },
                 shape = RoundedCornerShape(14.dp),

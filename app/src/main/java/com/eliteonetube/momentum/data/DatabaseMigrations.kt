@@ -249,3 +249,9 @@ val MIGRATION_32_33 = object : Migration(32, 33) {
         connection.execSQL("ALTER TABLE user_profile_table ADD COLUMN activeWorkoutStartTime INTEGER")
     }
 }
+
+val MIGRATION_33_34 = object : Migration(33, 34) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE check_in_table ADD COLUMN bodyFatPercentage REAL")
+    }
+}

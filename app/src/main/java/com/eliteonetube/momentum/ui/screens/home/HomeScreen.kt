@@ -95,7 +95,7 @@ fun HomeScreen(
     onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
     getExerciseHistory: suspend (Long) -> List<LoggedSet>,
-    onCheckInCompleted: (Double, List<Uri?>) -> Unit,
+    onCheckInCompleted: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
     getSetsForTemplate: suspend (Long) -> List<TemplateSet> = { emptyList() },
@@ -198,9 +198,9 @@ fun HomeScreen(
         CheckInScreen(
             profile = savedProfile,
             recentWeights = recentWeights,
-            onComplete = { weight, photos ->
+            onComplete = { weight, bodyFat, photos ->
                 showCheckIn = false
-                onCheckInCompleted(weight, photos)
+                onCheckInCompleted(weight, bodyFat, photos)
             },
             onCancel = { showCheckIn = false }
         )

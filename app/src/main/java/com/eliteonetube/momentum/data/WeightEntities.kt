@@ -47,5 +47,6 @@ data class CheckIn(
     val sidePhotoPath: String? = null,
     val calorieTargetBefore: Int,
     val calorieTargetAfter: Int,
-    val adjustmentReason: String
+    val adjustmentReason: String,
+    val bodyFatPercentage: Double? = null
 )

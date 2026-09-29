@@ -384,13 +384,14 @@ fun MomentumAppContent(
                         workoutDao.clearActiveSets()
                     } }
                 },
-                onCheckInCompleted = { w, ph ->
+                onCheckInCompleted = { w, bf, ph ->
                     savedProfile?.let { p ->
                         coroutineScope.launch {
                             val now = LocalDate.now().toString()
                             weightDao.insertWeight(WeightEntry(date = now, weight = w, calorieTargetAtEntry = p.pendingCalorieTarget ?: p.currentCalorieTarget))
-                            weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = ph.getOrNull(0)?.toString(), backPhotoPath = ph.getOrNull(1)?.toString(), sidePhotoPath = ph.getOrNull(2)?.toString(), calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = p.pendingCalorieTarget ?: p.currentCalorieTarget, adjustmentReason = p.pendingAdjustmentReason ?: "Weekly Review"))
-                            weightDao.saveProfile(p.copy(currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null, checkInDue = false, lastCheckInDate = now))
+                            weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = ph.getOrNull(0)?.toString(), backPhotoPath = ph.getOrNull(1)?.toString(), sidePhotoPath = ph.getOrNull(2)?.toString(), calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = p.pendingCalorieTarget ?: p.currentCalorieTarget, adjustmentReason = p.pendingAdjustmentReason ?: "Weekly Review", bodyFatPercentage = bf))
+                            // A new body fat reading replaces the profile's, so next week's maintenance estimate uses it
+                            weightDao.saveProfile(p.copy(bodyFatPercentage = bf ?: p.bodyFatPercentage, currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null, checkInDue = false, lastCheckInDate = now))
                             NotificationHelper.cancelWeighInReminder(context.applicationContext)
                         }
                     }
