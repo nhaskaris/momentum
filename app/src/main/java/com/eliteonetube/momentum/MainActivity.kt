@@ -396,8 +396,8 @@ fun MomentumAppContent(
                     }
                 },
                 getSetsForSession = { sid -> workoutDao.getSetsForSession(sid).first() },
-                getExercisesForTemplate = { tid -> workoutDao.getExercisesForTemplate(tid).first() },
-                getSetsForTemplateExercise = { teid -> workoutDao.getSetsForTemplateExercise(teid) },
+                getExercisesForTemplate = { tid -> workoutDao.getExercisesForTemplateOnce(tid) },
+                getSetsForTemplate = { tid -> workoutDao.getSetsForTemplate(tid) },
                 onSessionSaved = { date, setsList, tid, exSid, updateRoutine ->
                     coroutineScope.launch {
                         // Placeholders are already resolved by ActiveSessionScreen; drop "no sets yet" markers

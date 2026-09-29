@@ -90,8 +90,12 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTemplateSet(templateSet: TemplateSet): Long
 
-    @Query("SELECT * FROM template_set_table WHERE templateExerciseId = :templateExerciseId ORDER BY setNumber ASC")
-    suspend fun getSetsForTemplateExercise(templateExerciseId: Long): List<TemplateSet>
+    @Query("SELECT * FROM template_exercise_table WHERE templateId = :templateId ORDER BY orderIndex ASC")
+    suspend fun getExercisesForTemplateOnce(templateId: Long): List<TemplateExercise>
+
+    /** All sets of a routine in one query, instead of one query per exercise. */
+    @Query("SELECT * FROM template_set_table WHERE templateExerciseId IN (SELECT id FROM template_exercise_table WHERE templateId = :templateId) ORDER BY templateExerciseId ASC, setNumber ASC")
+    suspend fun getSetsForTemplate(templateId: Long): List<TemplateSet>
 
     @Query("DELETE FROM template_set_table WHERE templateExerciseId IN (SELECT id FROM template_exercise_table WHERE templateId = :templateId)")
     suspend fun deleteTemplateSetsByTemplateId(templateId: Long)

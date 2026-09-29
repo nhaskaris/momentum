@@ -535,7 +535,8 @@ fun ActiveSessionScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         pageSpacing = 12.dp,
-                        beyondViewportPageCount = 2,
+                        // Each page is a column of text fields; pre-building only the next one keeps opening fast
+                        beyondViewportPageCount = 1,
                         key = { page -> if (page < sessionExercises.size) "ex_${sessionExercises[page].id}" else "summary" }
                     ) { page ->
                         if (page >= sessionExercises.size) {

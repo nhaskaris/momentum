@@ -98,7 +98,7 @@ fun HomeScreen(
     onCheckInCompleted: (Double, List<Uri?>) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
-    getSetsForTemplateExercise: suspend (Long) -> List<TemplateSet> = { emptyList() },
+    getSetsForTemplate: suspend (Long) -> List<TemplateSet> = { emptyList() },
     onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?, updateRoutine: Boolean) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
@@ -397,7 +397,7 @@ fun HomeScreen(
                     getSetsForSession = getSetsForSession,
                     getExerciseHistory = getExerciseHistory,
                     getExercisesForTemplate = getExercisesForTemplate,
-                    getSetsForTemplateExercise = getSetsForTemplateExercise,
+                    getSetsForTemplate = getSetsForTemplate,
                     onSessionSaved = { date, sets, tid, sid, updateRoutine ->
                         onClearActiveWorkout()
                         isSessionActive = false
