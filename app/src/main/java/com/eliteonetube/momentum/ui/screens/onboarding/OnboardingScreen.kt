@@ -1,0 +1,547 @@
+package com.eliteonetube.momentum.ui.screens.onboarding
+
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Rect
+import com.eliteonetube.momentum.data.Goal
+import com.eliteonetube.momentum.data.UnitSystem
+import com.eliteonetube.momentum.logic.services.HealthConnectManager
+import com.eliteonetube.momentum.logic.utils.Units
+import com.eliteonetube.momentum.ui.components.screenSafePadding
+import androidx.health.connect.client.PermissionController
+import kotlinx.coroutines.launch
+
+private data class GoalInfo(val goal: Goal, val label: String, val description: String)
+
+private val goalInfoList = listOf(
+    GoalInfo(Goal.CUT, "Cut", "Eat in a calorie deficit to lose fat while holding onto muscle. Calories adjust weekly only when your loss actually stalls."),
+    GoalInfo(Goal.BULK, "Bulk", "Eat in a surplus to build muscle over time, with the surplus kept lean so gains stay steady rather than rushed."),
+    GoalInfo(Goal.MAINTAIN, "Maintain", "Hold your current weight steady — calories nudge in either direction the moment your trend starts drifting."),
+    GoalInfo(Goal.REVERSE, "Reverse", "Coming off a cut? Calories gradually climb back toward maintenance so your metabolism rebuilds without rapid fat regain.")
+)
+
+@Composable
+fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit) {
+    var unitSystem by remember { mutableStateOf(UnitSystem.METRIC) }
+
+    val context = LocalContext.current
+    val healthConnectManager = remember { HealthConnectManager(context) }
+    val coroutineScope = rememberCoroutineScope()
+
+    var weightInput by remember { mutableStateOf("") }
+    var heightCmInput by remember { mutableStateOf("") }
+    var heightFeetInput by remember { mutableStateOf("") }
+    var heightInchesInput by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf("") }
+    var bodyFatInput by remember { mutableStateOf("") }
+    var isMale by remember { mutableStateOf(true) }
+    var stepsInput by remember { mutableStateOf("") }
+    var useHealthConnect by remember { mutableStateOf(false) }
+    var selectedGoal by remember { mutableStateOf<Goal?>(null) }
+    var knowsCalories by remember { mutableStateOf(false) }
+    var customCaloriesInput by remember { mutableStateOf("") }
+
+    // Tutorial State
+    var tutorialActive by remember { mutableStateOf(true) }
+    val targetPositions = remember { mutableStateMapOf<String, Rect>() }
+    val tutorialSteps = remember {
+        listOf(
+            TutorialStep(
+                title = "Current Weight",
+                description = "Your mass is the most important factor for baseline metabolic math. The algorithm uses this to determine your initial calorie needs.",
+                targetTag = "weight_input"
+            ),
+            TutorialStep(
+                title = "Height",
+                description = "Taller individuals generally have more surface area and tissue to maintain, leading to a higher resting energy burn.",
+                targetTag = "height_input"
+            ),
+            TutorialStep(
+                title = "Age & Metabolism",
+                description = "As we age, our metabolic baselines shift. Providing your age helps Momentum set a more realistic starting point.",
+                targetTag = "age_input"
+            ),
+            TutorialStep(
+                title = "Body Fat %",
+                description = "If you know your body fat percentage, the algorithm can use the Katch-McArdle formula for even higher precision in your BMR estimate.",
+                targetTag = "bf_input"
+            ),
+            TutorialStep(
+                title = "Biological Sex",
+                description = "Different hormonal profiles result in slightly different metabolic floors. This helps us dial in the math from day one.",
+                targetTag = "sex_input"
+            ),
+            TutorialStep(
+                title = "Activity Level",
+                description = "Movement is the variable that changes most. Your average steps tell us how much 'active' fuel your body requires daily.",
+                targetTag = "steps_input"
+            ),
+            TutorialStep(
+                title = "Your Strategy",
+                description = "Finally, your goal acts as the 'Compass' for Momentum. It chooses whether to nudge your calories for fat loss or muscle gain.",
+                targetTag = "goal_selector"
+            )
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        val allGranted = healthConnectManager.permissions.all { it in granted }
+        if (allGranted) {
+            useHealthConnect = true
+        }
+    }
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val doneKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
+    val doneKeyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
+
+    val parsedWeightInput = weightInput.replace(',', '.').toDoubleOrNull()
+    val parsedWeightKg = parsedWeightInput?.let {
+        if (unitSystem == UnitSystem.IMPERIAL) Units.lbToKg(it) else it
+    }
+
+    val parsedHeightCm: Double? = if (unitSystem == UnitSystem.IMPERIAL) {
+        val ft = heightFeetInput.toIntOrNull()
+        val inch = heightInchesInput.toIntOrNull()
+        if (ft != null && inch != null) Units.feetInchesToCm(ft, inch) else null
+    } else {
+        heightCmInput.replace(',', '.').toDoubleOrNull()
+    }
+
+    val parsedAge = age.toIntOrNull()
+    val parsedBodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()
+    val parsedSteps = stepsInput.toIntOrNull()
+    val parsedCustomCalories = customCaloriesInput.toIntOrNull()
+
+    val weightError = weightInput.isNotBlank() && parsedWeightKg == null
+    val heightError = if (unitSystem == UnitSystem.IMPERIAL) {
+        (heightFeetInput.isNotBlank() || heightInchesInput.isNotBlank()) && parsedHeightCm == null
+    } else {
+        heightCmInput.isNotBlank() && parsedHeightCm == null
+    }
+    val ageError = age.isNotBlank() && parsedAge == null
+    val bfError = bodyFatInput.isNotBlank() && parsedBodyFat == null
+    val stepsError = stepsInput.isNotBlank() && parsedSteps == null
+    val customCaloriesError = knowsCalories && customCaloriesInput.isNotBlank() && parsedCustomCalories == null
+
+    val step0Valid = parsedWeightKg != null && parsedHeightCm != null && parsedAge != null
+    val step1Valid = parsedSteps != null
+    val step2Valid = selectedGoal != null
+    val step3Valid = !knowsCalories || parsedCustomCalories != null
+
+    val pagerState = rememberPagerState(pageCount = { 4 })
+
+    // Auto-check permissions when we reach the Activity step
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage == 1) {
+            if (healthConnectManager.hasAllPermissions()) {
+                useHealthConnect = true
+            }
+        }
+    }
+
+    // Trigger step fetch when useHealthConnect becomes true
+    LaunchedEffect(useHealthConnect) {
+        if (useHealthConnect) {
+            val avgSteps = healthConnectManager.fetchAverageStepsLast7Days()
+            if (avgSteps != null) {
+                stepsInput = avgSteps.toString()
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .screenSafePadding()
+        ) {
+            LinearProgressIndicator(
+                progress = { (pagerState.currentPage + 1) / 4f },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            HorizontalPager(
+                state = pagerState,
+                userScrollEnabled = false,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> Column(
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text("Welcome to Momentum", style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            "Let's start with the basics.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 16.dp, top = 4.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Use imperial units (lb, ft/in)", style = MaterialTheme.typography.bodySmall)
+                            Switch(
+                                checked = unitSystem == UnitSystem.IMPERIAL,
+                                onCheckedChange = {
+                                    unitSystem = if (it) UnitSystem.IMPERIAL else UnitSystem.METRIC
+                                }
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = weightInput,
+                            onValueChange = { weightInput = it },
+                            label = { Text(if (unitSystem == UnitSystem.IMPERIAL) "Current Weight (lb)" else "Current Weight (kg)") },
+                            isError = weightError,
+                            supportingText = { if (weightError) Text("Enter a valid number") },
+                            keyboardOptions = doneKeyboardOptions,
+                            keyboardActions = doneKeyboardActions,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                                .tutorialTarget("weight_input") { tag, rect -> targetPositions[tag] = rect }
+                        )
+
+                        Box(modifier = Modifier.fillMaxWidth().tutorialTarget("height_input") { tag, rect -> targetPositions[tag] = rect }) {
+                            if (unitSystem == UnitSystem.IMPERIAL) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = heightFeetInput,
+                                        onValueChange = { heightFeetInput = it },
+                                        label = { Text("Height (ft)") },
+                                        isError = heightError,
+                                        keyboardOptions = doneKeyboardOptions,
+                                        keyboardActions = doneKeyboardActions,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    OutlinedTextField(
+                                        value = heightInchesInput,
+                                        onValueChange = { heightInchesInput = it },
+                                        label = { Text("Height (in)") },
+                                        isError = heightError,
+                                        keyboardOptions = doneKeyboardOptions,
+                                        keyboardActions = doneKeyboardActions,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = heightCmInput,
+                                    onValueChange = { heightCmInput = it },
+                                    label = { Text("Height (cm)") },
+                                    isError = heightError,
+                                    supportingText = { if (heightError) Text("Enter a valid number, e.g. 175") },
+                                    keyboardOptions = doneKeyboardOptions,
+                                    keyboardActions = doneKeyboardActions,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                                )
+                            }
+                        }
+
+                        if (unitSystem == UnitSystem.IMPERIAL && heightError) {
+                            Text(
+                                "Enter valid feet and inches",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = age,
+                                onValueChange = { age = it },
+                                label = { Text("Age") },
+                                isError = ageError,
+                                supportingText = { if (ageError) Text("Enter a whole number") },
+                                keyboardOptions = doneKeyboardOptions,
+                                keyboardActions = doneKeyboardActions,
+                                modifier = Modifier.weight(1f).tutorialTarget("age_input") { tag, rect -> targetPositions[tag] = rect }
+                            )
+                            OutlinedTextField(
+                                value = bodyFatInput,
+                                onValueChange = { bodyFatInput = it },
+                                label = { Text("Body Fat % (Optional)") },
+                                isError = bfError,
+                                supportingText = { if (bfError) Text("Valid number") },
+                                keyboardOptions = doneKeyboardOptions,
+                                keyboardActions = doneKeyboardActions,
+                                modifier = Modifier.weight(1f).tutorialTarget("bf_input") { tag, rect -> targetPositions[tag] = rect }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().tutorialTarget("sex_input") { tag, rect -> targetPositions[tag] = rect },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Biological Sex:")
+                            Button(onClick = { isMale = !isMale }, shape = RoundedCornerShape(12.dp)) {
+                                Text(if (isMale) "Male" else "Female")
+                            }
+                        }
+                    }
+
+                    1 -> Column(
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text("Activity", style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            "Roughly how many steps do you walk on an average day?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = stepsInput,
+                            onValueChange = { stepsInput = it },
+                            label = { Text("Average Daily Steps (e.g. 8000)") },
+                            isError = stepsError,
+                            supportingText = { if (stepsError) Text("Enter a whole number") },
+                            keyboardOptions = doneKeyboardOptions,
+                            keyboardActions = doneKeyboardActions,
+                            modifier = Modifier.fillMaxWidth().tutorialTarget("steps_input") { tag, rect -> targetPositions[tag] = rect }
+                        )
+
+                        val sdkAvailable = healthConnectManager.isAvailable()
+                        if (sdkAvailable) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.HealthAndSafety, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Connect Health Connect", fontWeight = FontWeight.Bold)
+                                    }
+                                    Text(
+                                        text = "Automatically import your average steps from Health Connect for more accurate calculations.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                permissionLauncher.launch(healthConnectManager.permissions)
+                                            } catch (e: Exception) {
+                                                Log.e("HealthConnect", "Failed to launch permission request", e)
+                                            }
+                                        },
+                                        modifier = Modifier.align(Alignment.End),
+                                        enabled = !useHealthConnect
+                                    ) {
+                                        Text(if (useHealthConnect) "Connected" else "Connect Now")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> Column(
+                        verticalArrangement = Arrangement.Top,
+                        modifier = Modifier.fillMaxSize().tutorialTarget("goal_selector") { tag, rect -> targetPositions[tag] = rect }
+                    ) {
+                        Text("Your Goal", style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            "What are you working toward?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
+                        )
+
+                        goalInfoList.forEach { info ->
+                            val isSelected = selectedGoal == info.goal
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 10.dp)
+                                    .clickable { selectedGoal = info.goal },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(info.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        RadioButton(selected = isSelected, onClick = { selectedGoal = info.goal })
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(info.description, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+
+                    3 -> Column(
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text("Calories", style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            "Last thing — are you already tracking calories?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
+                        )
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Already tracking calories?", style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            "Skip the estimate and start from what you already eat",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    Switch(checked = knowsCalories, onCheckedChange = { knowsCalories = it })
+                                }
+
+                                if (knowsCalories) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = customCaloriesInput,
+                                        onValueChange = { customCaloriesInput = it },
+                                        label = { Text("Your current daily calories") },
+                                        isError = customCaloriesError,
+                                        supportingText = { if (customCaloriesError) Text("Enter a whole number") },
+                                        keyboardOptions = doneKeyboardOptions,
+                                        keyboardActions = doneKeyboardActions,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (pagerState.currentPage > 0) {
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Back")
+                    }
+                }
+
+                val currentStepValid = when (pagerState.currentPage) {
+                    0 -> step0Valid
+                    1 -> step1Valid
+                    2 -> step2Valid
+                    else -> step3Valid
+                }
+                val isLastPage = pagerState.currentPage == 3
+
+                Button(
+                    onClick = {
+                        if (isLastPage) {
+                            onComplete(
+                                parsedWeightKg!!,
+                                parsedHeightCm!!,
+                                parsedAge!!,
+                                isMale,
+                                parsedSteps!!,
+                                selectedGoal!!,
+                                if (knowsCalories) parsedCustomCalories else null,
+                                unitSystem,
+                                parsedBodyFat,
+                                useHealthConnect
+                            )
+                        } else {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        }
+                    },
+                    enabled = currentStepValid,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (isLastPage) "Finish" else "Next")
+                }
+            }
+        }
+
+        if (tutorialActive) {
+            TutorialOverlay(
+                steps = tutorialSteps,
+                targetPositions = targetPositions,
+                onStepCompleted = { stepIdx ->
+                    coroutineScope.launch {
+                        val targetPage = when (stepIdx) {
+                            0, 1, 2, 3, 4 -> 0
+                            5 -> 1
+                            6 -> 2
+                            else -> 3
+                        }
+                        if (pagerState.currentPage != targetPage) {
+                            pagerState.animateScrollToPage(
+                                page = targetPage,
+                                animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+                            )
+                        }
+                    }
+                },
+                onFinished = {
+                    tutorialActive = false
+                    // Don't animate back, just snap to page 0 to avoid heavy layout work
+                    coroutineScope.launch {
+                        pagerState.scrollToPage(0)
+                    }
+                }
+            )
+        }
+    }
+}

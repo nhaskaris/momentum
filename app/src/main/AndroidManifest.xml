@@ -26,7 +26,7 @@
         android:theme="@style/Theme.WeeklyCoach">
 
         <service
-            android:name=".logic.RestTimerService"
+            android:name=".logic.services.RestTimerService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
@@ -49,7 +49,7 @@
         <!-- For supported versions through Android 13, create an activity to show the rationale
              of Health Connect permissions once users click the privacy policy link. -->
         <activity
-            android:name=".PermissionsRationaleActivity"
+            android:name=".ui.screens.profile.PermissionsRationaleActivity"
             android:exported="true">
         </activity>
 
@@ -58,7 +58,7 @@
         <activity-alias
             android:name="ViewPermissionUsageActivity"
             android:exported="true"
-            android:targetActivity=".PermissionsRationaleActivity"
+            android:targetActivity=".ui.screens.profile.PermissionsRationaleActivity"
             android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />

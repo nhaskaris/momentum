@@ -20,7 +20,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.appwidget.SizeMode
 import com.eliteonetube.momentum.MainActivity
 import com.eliteonetube.momentum.data.WeightDatabase
-import com.eliteonetube.momentum.logic.StreakCalculator
+import com.eliteonetube.momentum.logic.algorithm.StreakCalculator
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
