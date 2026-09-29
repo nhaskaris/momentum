@@ -117,6 +117,9 @@ fun ActiveSessionScreen(
         }
     }
 
+    // Long-lived effects below must always call the latest callback, not the one from first composition
+    val currentOnUpdateActiveSets by rememberUpdatedState(onUpdateActiveSets)
+
     // Debounced Persistence: Avoid writing to DB on every keystroke
     val persistenceFlow = remember { MutableStateFlow<List<PendingSet>?>(null) }
     
@@ -126,7 +129,7 @@ fun ActiveSessionScreen(
             .debounce(800L.milliseconds) // Wait for user to stop typing
             .collectLatest { sets ->
                 if (sets != null) {
-                    onUpdateActiveSets(sets)
+                    currentOnUpdateActiveSets(sets)
                 }
             }
     }
@@ -164,7 +167,7 @@ fun ActiveSessionScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 if (isInitialized) {
-                    onUpdateActiveSets(getCurrentSets())
+                    currentOnUpdateActiveSets(getCurrentSets())
                 }
             }
         }

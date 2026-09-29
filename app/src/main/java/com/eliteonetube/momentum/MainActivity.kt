@@ -29,6 +29,8 @@ import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -121,6 +123,8 @@ fun MomentumAppContent(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    // Keeps active-workout saves and clears in call order so a late save cannot revive a finished workout
+    val activeWorkoutMutex = remember { Mutex() }
 
     // 1. Core State Collection
     val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
@@ -338,8 +342,10 @@ fun MomentumAppContent(
                 onNewFoodItemCreated = { item -> coroutineScope.launch { foodDao.insertFoodItem(item) } },
                 onGetFoodByBarcode = { bc -> foodDao.getFoodItemByBarcode(bc) },
                 onUpdateActiveWorkout = { tid, sets ->
-                    coroutineScope.launch {
-                        val currentProfile = savedProfile!!
+                    coroutineScope.launch { activeWorkoutMutex.withLock {
+                        // Read the profile fresh: this callback can be held by long-lived effects,
+                        // and a stale snapshot would reset the workout start time on every save.
+                        val currentProfile = weightDao.getUserProfile().first() ?: return@withLock
                         val startTime = currentProfile.activeWorkoutStartTime ?: System.currentTimeMillis()
                         
                         weightDao.saveProfile(currentProfile.copy(
@@ -365,17 +371,18 @@ fun MomentumAppContent(
                                 orderIndex = ps.orderIndex
                             )
                         })
-                    }
+                    } }
                 },
                 onClearActiveWorkout = {
-                    coroutineScope.launch {
-                        weightDao.saveProfile(savedProfile!!.copy(
-                            activeWorkoutTemplateId = null, 
+                    coroutineScope.launch { activeWorkoutMutex.withLock {
+                        val currentProfile = weightDao.getUserProfile().first() ?: return@withLock
+                        weightDao.saveProfile(currentProfile.copy(
+                            activeWorkoutTemplateId = null,
                             hasActiveWorkout = false,
                             activeWorkoutStartTime = null
                         ))
                         workoutDao.clearActiveSets()
-                    }
+                    } }
                 },
                 onCheckInCompleted = { w, ph ->
                     savedProfile?.let { p ->
