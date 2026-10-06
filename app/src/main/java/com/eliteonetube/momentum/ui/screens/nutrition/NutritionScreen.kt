@@ -45,6 +45,7 @@ fun NutritionScreen(
     recentWeights: List<WeightEntry>,
     todayLogs: List<FoodLogWithItem> = emptyList(),
     allFoodItems: List<FoodItem> = emptyList(),
+    recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal> = emptyList(),
     onLogFood: (Long, Double) -> Unit,
     onLogMeal: (Long) -> Unit,
@@ -52,6 +53,9 @@ fun NutritionScreen(
     onEditLog: (FoodLogWithItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onMealUpdated: (Long, String, List<Pair<FoodItem, Double>>) -> Unit = { _, _, _ -> },
+    onMealDeleted: (Long) -> Unit = {},
+    getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
     onStartScan: () -> Unit,
     onOpenLearn: () -> Unit = {}
@@ -80,6 +84,7 @@ fun NutritionScreen(
     if (showAddFood) {
         AddFoodDialog(
             foodItems = allFoodItems,
+            recentFoodIds = recentFoodIds,
             allMeals = allMeals,
             onDismiss = { showAddFood = false },
             onFoodSelected = { foodId, qty ->
@@ -91,6 +96,9 @@ fun NutritionScreen(
                 showAddFood = false
             },
             onMealCreated = onMealCreated,
+            onMealUpdated = onMealUpdated,
+            onMealDeleted = onMealDeleted,
+            getMealItems = getMealItems,
             onFoodCreated = onFoodCreated,
             onQuickLog = onQuickLog,
             onStartScan = onStartScan

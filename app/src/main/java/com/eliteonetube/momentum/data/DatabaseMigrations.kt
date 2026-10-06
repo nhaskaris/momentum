@@ -255,3 +255,18 @@ val MIGRATION_33_34 = object : Migration(33, 34) {
         connection.execSQL("ALTER TABLE check_in_table ADD COLUMN bodyFatPercentage REAL")
     }
 }
+
+val MIGRATION_34_35 = object : Migration(34, 35) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE food_item_table ADD COLUMN isQuickLog INTEGER NOT NULL DEFAULT 0")
+        // Flag existing Quick Log entries. Matches only what QuickMacroDialog creates (its fixed names,
+        // 1 serving), so foods the user created themselves are never hidden. Nothing is deleted.
+        connection.execSQL(
+            """
+            UPDATE food_item_table SET isQuickLog = 1
+            WHERE isCustom = 1 AND servingUnit = 'serving' AND servingAmount = 1.0
+              AND (name = 'Quick Log' OR name = 'Quick Calories' OR name LIKE 'Log: %')
+            """.trimIndent()
+        )
+    }
+}

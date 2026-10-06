@@ -218,6 +218,7 @@ fun MomentumAppContent(
     }
     val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
     val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
+    val recentFoodIds by foodDao.getRecentFoodIds().collectAsState(initial = emptyList())
 
     // 2. High-Frequency Logic (Remembered/Isolated)
     var isProfileLoaded by remember { mutableStateOf(false) }
@@ -273,6 +274,7 @@ fun MomentumAppContent(
                 allCheckIns = allCheckIns,
                 todayFoodLogs = todayFoodLogs,
                 allFoodItems = allFoodItems,
+                recentFoodIds = recentFoodIds,
                 allMeals = allMeals,
                 activeSets = activeSets,
                 hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
@@ -373,14 +375,34 @@ fun MomentumAppContent(
                         items.forEach { (f, q) -> foodDao.insertMealFoodItem(MealFoodItem(mealId = mid, foodItemId = f.id, quantity = q)) }
                     }
                 },
-                onFoodCreated = { item -> coroutineScope.launch { foodDao.insertFoodItem(item) } },
+                onFoodCreated = { item ->
+                    coroutineScope.launch {
+                        // Edits update in place; inserting over an existing id would cascade-delete its logs
+                        if (item.id == 0L) foodDao.insertFoodItem(item) else foodDao.updateFoodItem(item)
+                    }
+                },
+                onMealUpdated = { mealId, name, items ->
+                    coroutineScope.launch {
+                        val existing = foodDao.getAllMeals().first().find { it.id == mealId } ?: return@launch
+                        foodDao.updateMealContents(
+                            existing.copy(name = name),
+                            items.map { (f, q) -> MealFoodItem(mealId = mealId, foodItemId = f.id, quantity = q) }
+                        )
+                    }
+                },
+                onMealDeleted = { mealId -> coroutineScope.launch { foodDao.deleteMeal(mealId) } },
+                getMealItems = { mealId ->
+                    val foods = foodDao.getAllFoodItems().first().associateBy { it.id }
+                    foodDao.getItemsForMeal(mealId).first().mapNotNull { row -> foods[row.foodItemId]?.let { it to row.quantity } }
+                },
                 onQuickLog = { item ->
                     coroutineScope.launch {
                         val fid = foodDao.insertFoodItem(item)
                         foodDao.insertFoodLog(DailyFoodLog(date = LocalDate.now().toString(), foodItemId = fid, quantity = 1.0))
                     }
                 },
-                onNewFoodItemCreated = { item -> coroutineScope.launch { foodDao.insertFoodItem(item) } },
+                // Returns the new id so the food can be logged straight away
+                onNewFoodItemCreated = { item -> foodDao.insertFoodItem(item) },
                 onGetFoodByBarcode = { bc -> foodDao.getFoodItemByBarcode(bc) },
                 onUpdateActiveWorkout = { tid, sets ->
                     coroutineScope.launch { activeWorkoutMutex.withLock {

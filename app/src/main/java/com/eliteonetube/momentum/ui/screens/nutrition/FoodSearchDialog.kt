@@ -29,7 +29,7 @@ fun FoodSearchDialog(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFoodForQuantity by remember { mutableStateOf<FoodItem?>(null) }
-    val filteredItems = foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val filteredItems = foodItems.filter { !it.isQuickLog && it.name.contains(searchQuery, ignoreCase = true) }
 
     if (selectedFoodForQuantity != null) {
         LogQuantityDialog(

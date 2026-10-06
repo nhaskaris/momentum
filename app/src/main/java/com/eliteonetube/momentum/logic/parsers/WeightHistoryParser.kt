@@ -7,6 +7,8 @@ import com.eliteonetube.momentum.logic.utils.Units
 import com.google.mlkit.vision.text.Text
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
 import java.util.Locale
 
 object WeightHistoryParser {
@@ -26,14 +28,24 @@ object WeightHistoryParser {
         Regex("""([a-z]{3,9}\s+\d{1,2})""", RegexOption.IGNORE_CASE)  // Jul 30
     )
 
-    private val dateFormats = mapOf(
-        "d MMM yyyy" to DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US),
-        "MMM d yyyy" to DateTimeFormatter.ofPattern("MMM d yyyy", Locale.US),
-        "MMM d, yyyy" to DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US),
-        "dd/MM/yyyy" to DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-        "d MMM" to DateTimeFormatter.ofPattern("d MMM", Locale.US),
-        "MMM d" to DateTimeFormatter.ofPattern("MMM d", Locale.US)
-    )
+    // Formats without a year default to the current year (screenshots often show "30 Jul").
+    // A plain ofPattern("d MMM") can't produce a full date, so those rows used to be dropped.
+    // Built per import (not cached) so "this year" can't go stale if the app stays open over New Year.
+    private fun dateFormats(currentYear: Long): List<DateTimeFormatter> {
+        fun format(pattern: String, locale: Locale? = Locale.US) = DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern(pattern)
+            .parseDefaulting(ChronoField.YEAR_OF_ERA, currentYear)
+            .let { if (locale != null) it.toFormatter(locale) else it.toFormatter() }
+        return listOf(
+            format("d MMM yyyy"),
+            format("MMM d yyyy"),
+            format("MMM d, yyyy"),
+            format("dd/MM/yyyy", locale = null),
+            format("d MMM"),
+            format("MMM d")
+        )
+    }
 
     /**
      * Weights are always returned in kg. A number labelled "lb"/"lbs" is converted; a number with no
@@ -41,6 +53,7 @@ object WeightHistoryParser {
      */
     fun parse(visionText: Text, defaultUnit: UnitSystem): List<WeightEntry> {
         val results = mutableListOf<WeightEntry>()
+        val formats = dateFormats(LocalDate.now().year.toLong())
         val blocks = visionText.textBlocks
         
         val lines = blocks.flatMap { it.lines }.sortedBy { it.boundingBox?.top ?: 0 }
@@ -64,8 +77,6 @@ object WeightHistoryParser {
             }
         }
 
-        val currentYear = LocalDate.now().year
-
         for (row in rows) {
             // Sort lines by left-to-right to keep reading order
             val sortedLines = row.sortedBy { it.boundingBox?.left ?: 0 }
@@ -74,7 +85,7 @@ object WeightHistoryParser {
             
             // 1. Find the date first so we can ignore its components when looking for weights
             val dateMatch = findDateMatch(rowText)
-            val date = dateMatch?.let { parseDate(it, currentYear) } ?: continue
+            val date = dateMatch?.let { parseDate(it, formats) } ?: continue
             
             // 2. Find the weight, excluding the part of the string that matched the date
             val textToSearchForWeight = if (dateMatch != null) {
@@ -117,14 +128,10 @@ object WeightHistoryParser {
         return null
     }
 
-    private fun parseDate(dateStr: String, currentYear: Int): LocalDate? {
-        for (formatter in dateFormats.values) {
+    private fun parseDate(dateStr: String, formats: List<DateTimeFormatter>): LocalDate? {
+        for (formatter in formats) {
             try {
-                var parsed = LocalDate.parse(dateStr, formatter)
-                if (!dateStr.contains(Regex("""\d{4}"""))) {
-                    parsed = parsed.withYear(currentYear)
-                }
-                return parsed
+                return LocalDate.parse(dateStr.trim(), formatter)
             } catch (e: Exception) {}
         }
         return null

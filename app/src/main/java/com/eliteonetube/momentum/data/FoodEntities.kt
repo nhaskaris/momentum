@@ -17,7 +17,9 @@ data class FoodItem(
     val servingAmount: Double = 100.0,
     val servingUnit: String = "g",
     val isCustom: Boolean = false,
-    val barcode: String? = null
+    val barcode: String? = null,
+    /** Created by Quick Log for a one-off entry; kept for the log but hidden from food lists. */
+    val isQuickLog: Boolean = false
 )
 
 @Entity(

@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import kotlinx.coroutines.launch
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.clickable
@@ -29,11 +30,15 @@ import com.eliteonetube.momentum.ui.components.bounceClick
 @Composable
 fun AddFoodDialog(
     foodItems: List<FoodItem>,
+    recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal>,
     onDismiss: () -> Unit,
     onFoodSelected: (Long, Double) -> Unit,
     onMealSelected: (Long) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onMealUpdated: (Long, String, List<Pair<FoodItem, Double>>) -> Unit = { _, _, _ -> },
+    onMealDeleted: (Long) -> Unit = {},
+    getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
     onStartScan: () -> Unit
@@ -46,13 +51,20 @@ fun AddFoodDialog(
     var selectedFoodForQuantity by remember { mutableStateOf<FoodItem?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    val filteredItems = remember(searchQuery, foodItems) {
-        if (searchQuery.isBlank()) {
-            foodItems.take(20)
-        } else {
-            foodItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
-        }
+    // Quick Log entries are one-offs: kept for the diary, never offered as foods to pick
+    val pickableFoods = remember(foodItems) { foodItems.filterNot { it.isQuickLog } }
+    // With no search: what you logged recently first, then everything A–Z
+    val recentFoods = remember(recentFoodIds, pickableFoods) {
+        val byId = pickableFoods.associateBy { it.id }
+        recentFoodIds.mapNotNull { byId[it] }
     }
+    val filteredItems = remember(searchQuery, pickableFoods) {
+        if (searchQuery.isBlank()) pickableFoods
+        else pickableFoods.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+    var mealToEdit by remember { mutableStateOf<Pair<Meal, List<Pair<FoodItem, Double>>>?>(null) }
+    var mealPendingDelete by remember { mutableStateOf<Meal?>(null) }
+    val scope = rememberCoroutineScope()
     
     val filteredMeals = remember(searchQuery, allMeals) {
         if (searchQuery.isBlank()) {
@@ -75,13 +87,43 @@ fun AddFoodDialog(
 
     if (showCreateMeal) {
         CreateMealDialog(
-            allFoodItems = foodItems,
+            allFoodItems = pickableFoods,
             onDismiss = { showCreateMeal = false },
             onStartScan = onStartScan,
             onSave = { name, items ->
                 onMealCreated(name, items)
                 showCreateMeal = false
             }
+        )
+    }
+
+    mealToEdit?.let { (meal, items) ->
+        CreateMealDialog(
+            allFoodItems = pickableFoods,
+            onDismiss = { mealToEdit = null },
+            onStartScan = onStartScan,
+            onSave = { name, newItems ->
+                onMealUpdated(meal.id, name, newItems)
+                mealToEdit = null
+            },
+            title = "Edit Meal",
+            initialName = meal.name,
+            initialItems = items
+        )
+    }
+
+    mealPendingDelete?.let { meal ->
+        AlertDialog(
+            onDismissRequest = { mealPendingDelete = null },
+            title = { Text("Delete meal?", fontWeight = FontWeight.Bold) },
+            text = { Text("\"${meal.name}\" will be removed from your saved meals. Days you already logged it stay as they are.") },
+            confirmButton = {
+                Button(
+                    onClick = { onMealDeleted(meal.id); mealPendingDelete = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { mealPendingDelete = null }) { Text("Cancel") } }
         )
     }
 
@@ -232,39 +274,15 @@ fun AddFoodDialog(
                             }
                         }
 
-                        items(filteredItems) { item ->
-                            ListItem(
-                                headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
-                                supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}") },
-                                leadingContent = {
-                                    Surface(
-                                        modifier = Modifier.size(40.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(item.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                        }
-                                    }
-                                },
-                                trailingContent = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (item.isCustom) {
-                                            IconButton(onClick = { selectedFoodForEdit = item }) {
-                                                Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
-                                            }
-                                        }
-                                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .clickable { selectedFoodForQuantity = item }
-                                    .padding(horizontal = 8.dp)
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 24.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                            )
+                        if (searchQuery.isBlank() && recentFoods.isNotEmpty()) {
+                            item { FoodListHeader("RECENT") }
+                            items(recentFoods, key = { "recent_${it.id}" }) { item ->
+                                FoodRow(item, onClick = { selectedFoodForQuantity = item }, onEdit = { selectedFoodForEdit = item })
+                            }
+                            item { FoodListHeader("ALL FOODS") }
+                        }
+                        items(filteredItems, key = { "food_${it.id}" }) { item ->
+                            FoodRow(item, onClick = { selectedFoodForQuantity = item }, onEdit = { selectedFoodForEdit = item })
                         }
                     }
                 } else {
@@ -309,7 +327,12 @@ fun AddFoodDialog(
                                         }
                                     },
                                     trailingContent = {
-                                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                                        MealMenu(
+                                            onEdit = {
+                                                scope.launch { mealToEdit = meal to getMealItems(meal.id) }
+                                            },
+                                            onDelete = { mealPendingDelete = meal }
+                                        )
                                     },
                                     modifier = Modifier
                                         .clickable { onMealSelected(meal.id) }
@@ -351,6 +374,79 @@ private fun FoodActionCard(
             Icon(icon, null, modifier = Modifier.size(24.dp), tint = contentColor)
             Spacer(modifier = Modifier.height(4.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
+        }
+    }
+}
+
+@Composable
+private fun FoodListHeader(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun FoodRow(item: FoodItem, onClick: () -> Unit, onEdit: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
+        supportingContent = {
+            val amount = if (item.servingAmount % 1.0 == 0.0) item.servingAmount.toInt().toString() else item.servingAmount.toString()
+            Text("${item.calories.toInt()} kcal per $amount ${item.servingUnit}")
+        },
+        leadingContent = {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(item.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (item.isCustom) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, "Edit ${item.name}", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                    }
+                }
+                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+            }
+        },
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp)
+    )
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    )
+}
+
+@Composable
+private fun MealMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, "Meal options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Edit meal") },
+                leadingIcon = { Icon(Icons.Default.Edit, null) },
+                onClick = { expanded = false; onEdit() }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete meal", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                onClick = { expanded = false; onDelete() }
+            )
         }
     }
 }

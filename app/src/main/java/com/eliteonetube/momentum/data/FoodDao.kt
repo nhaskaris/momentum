@@ -4,13 +4,28 @@ import androidx.room3.Dao
 import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
+import androidx.room3.Transaction
 import androidx.room3.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FoodDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // Plain insert, not REPLACE: a REPLACE deletes the old row first, and the CASCADE foreign keys
+    // would then delete every log and meal ingredient using that food. Edits go through updateFoodItem.
+    @Insert
     suspend fun insertFoodItem(foodItem: FoodItem): Long
+
+    @Update
+    suspend fun updateFoodItem(foodItem: FoodItem)
+
+    /** Most recently logged foods first, for the Add Food list. */
+    @Query("""
+        SELECT foodItemId FROM daily_food_log_table
+        GROUP BY foodItemId
+        ORDER BY MAX(date) DESC, MAX(id) DESC
+        LIMIT :limit
+    """)
+    fun getRecentFoodIds(limit: Int = 15): Flow<List<Long>>
 
     @Query("SELECT name FROM food_item_table WHERE isCustom = 0")
     suspend fun getOfficialFoodNames(): List<String>
@@ -69,6 +84,21 @@ interface FoodDao {
 
     @Query("DELETE FROM meal_table WHERE id = :mealId")
     suspend fun deleteMeal(mealId: Long)
+
+    // @Update, not REPLACE, for the same cascade reason as foods
+    @Update
+    suspend fun updateMeal(meal: Meal)
+
+    @Query("DELETE FROM meal_food_item_table WHERE mealId = :mealId")
+    suspend fun deleteMealFoodItems(mealId: Long)
+
+    /** Renames a meal and swaps its ingredients in one transaction. Past meal logs are snapshots and stay as they were. */
+    @Transaction
+    suspend fun updateMealContents(meal: Meal, items: List<MealFoodItem>) {
+        updateMeal(meal)
+        deleteMealFoodItems(meal.id)
+        items.forEach { insertMealFoodItem(it.copy(id = 0, mealId = meal.id)) }
+    }
 
     // --- DAILY MEAL LOG QUERIES ---
 

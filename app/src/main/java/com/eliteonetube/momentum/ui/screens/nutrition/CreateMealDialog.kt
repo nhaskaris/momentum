@@ -26,10 +26,14 @@ fun CreateMealDialog(
     allFoodItems: List<FoodItem>,
     onDismiss: () -> Unit,
     onStartScan: () -> Unit,
-    onSave: (name: String, items: List<Pair<FoodItem, Double>>) -> Unit
+    onSave: (name: String, items: List<Pair<FoodItem, Double>>) -> Unit,
+    // Edit mode: pre-fill with an existing meal
+    title: String = "Create Meal",
+    initialName: String = "",
+    initialItems: List<Pair<FoodItem, Double>> = emptyList()
 ) {
-    var mealName by remember { mutableStateOf("") }
-    var selectedItems by remember { mutableStateOf<List<Pair<FoodItem, Double>>>(emptyList()) }
+    var mealName by remember { mutableStateOf(initialName) }
+    var selectedItems by remember { mutableStateOf(initialItems) }
     var showSearch by remember { mutableStateOf(false) }
 
     if (showSearch) {
@@ -68,7 +72,7 @@ fun CreateMealDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, null)
                     }
-                    Text("Create Meal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     TextButton(
                         onClick = { onSave(mealName.trim(), selectedItems) },
                         enabled = mealName.isNotBlank() && selectedItems.isNotEmpty()

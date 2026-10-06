@@ -159,7 +159,8 @@ fun QuickMacroDialog(
                             servingSize = "1 serving",
                             servingAmount = 1.0,
                             servingUnit = "serving",
-                            isCustom = true
+                            isCustom = true,
+                            isQuickLog = true
                         )
                     )
                 },

@@ -77,6 +77,7 @@ fun HomeScreen(
     allMeals: List<Meal> = emptyList(),
     todayFoodLogs: List<FoodLogWithItem> = emptyList(),
     allFoodItems: List<FoodItem> = emptyList(),
+    recentFoodIds: List<Long> = emptyList(),
     activeSets: List<ActiveWorkoutSet> = emptyList(),
     hasActiveWorkout: Boolean = false,
     openWorkoutRequest: Int = 0,
@@ -97,9 +98,12 @@ fun HomeScreen(
     onFoodLogUpdated: (Long, Long, Double) -> Unit,
     onLogMeal: (Long) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
+    onMealUpdated: (Long, String, List<Pair<FoodItem, Double>>) -> Unit = { _, _, _ -> },
+    onMealDeleted: (Long) -> Unit = {},
+    getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
-    onNewFoodItemCreated: (FoodItem) -> Unit,
+    onNewFoodItemCreated: suspend (FoodItem) -> Long,
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
     onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
@@ -285,11 +289,12 @@ fun HomeScreen(
             barcode = pendingBarcode,
             onDismiss = { scannedResult = null },
             onSave = { item ->
-                onNewFoodItemCreated(item)
                 scannedResult = null
                 pendingBarcode = null
-                itemToLogAfterScan = item
                 coroutineScope.launch {
+                    // Wait for the real id: logging before the save finished used food id 0 and crashed
+                    val newId = onNewFoodItemCreated(item)
+                    itemToLogAfterScan = item.copy(id = newId)
                     pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
                 }
             }
@@ -302,12 +307,7 @@ fun HomeScreen(
             onDismiss = { itemToLogAfterScan = null },
             onConfirm = { multiplier ->
                 coroutineScope.launch {
-                    val finalId = if (item.id == 0L) {
-                        allFoodItems.find { it.name == item.name && it.barcode == item.barcode }?.id ?: 0L
-                    } else {
-                        item.id
-                    }
-                    onFoodLogged(finalId, multiplier)
+                    onFoodLogged(item.id, multiplier)
                     itemToLogAfterScan = null
                 }
             }
@@ -390,6 +390,7 @@ fun HomeScreen(
                     recentWeights = recentWeights,
                     todayLogs = todayFoodLogs,
                     allFoodItems = allFoodItems,
+                    recentFoodIds = recentFoodIds,
                     allMeals = allMeals,
                     onLogFood = { id, qty ->
                         coroutineScope.launch {
@@ -417,6 +418,9 @@ fun HomeScreen(
                         }
                     },
                     onMealCreated = onMealCreated,
+                    onMealUpdated = onMealUpdated,
+                    onMealDeleted = onMealDeleted,
+                    getMealItems = getMealItems,
                     onFoodCreated = onFoodCreated,
                     onStartScan = { showScanner = true },
                     onOpenLearn = { learnOpenAt = LearnCategory.NUTRITION; showLearn = true }
