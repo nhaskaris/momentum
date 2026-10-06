@@ -73,7 +73,7 @@ fun CreateMealDialog(
                         onClick = { onSave(mealName.trim(), selectedItems) },
                         enabled = mealName.isNotBlank() && selectedItems.isNotEmpty()
                     ) {
-                        Text("Save", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                        Text("Save", fontWeight = FontWeight.Bold)
                     }
                 }
 

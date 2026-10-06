@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.ui.components.rememberCurrentDate
 import com.eliteonetube.momentum.logic.algorithm.*
 import com.eliteonetube.momentum.logic.api.*
@@ -71,7 +72,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        // Only on a fresh launch: after rotation or process restore the same intent comes back
+        // and would reopen the check-in (or workout) the user already left
+        if (savedInstanceState == null) handleIntent(intent)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -422,16 +425,25 @@ fun MomentumAppContent(
                         workoutDao.clearActiveSets()
                     } }
                 },
-                onCheckInCompleted = { w, bf, ph ->
-                    savedProfile?.let { p ->
-                        coroutineScope.launch {
-                            val now = LocalDate.now().toString()
-                            weightDao.insertWeight(WeightEntry(date = now, weight = w, calorieTargetAtEntry = p.pendingCalorieTarget ?: p.currentCalorieTarget))
-                            weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = ph.getOrNull(0)?.toString(), backPhotoPath = ph.getOrNull(1)?.toString(), sidePhotoPath = ph.getOrNull(2)?.toString(), calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = p.pendingCalorieTarget ?: p.currentCalorieTarget, adjustmentReason = p.pendingAdjustmentReason ?: "Weekly Review", bodyFatPercentage = bf))
-                            // A new body fat reading replaces the profile's, so next week's maintenance estimate uses it
-                            weightDao.saveProfile(p.copy(bodyFatPercentage = bf ?: p.bodyFatPercentage, currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null, checkInDue = false, lastCheckInDate = now))
-                            NotificationHelper.cancelWeighInReminder(context.applicationContext)
+                onCheckInCompleted = { w, bf, ph, review ->
+                    coroutineScope.launch {
+                        val p = weightDao.getUserProfile().first() ?: return@launch
+                        val now = LocalDate.now().toString()
+                        // Copy photos into app storage: camera shots live in cache and gallery links expire
+                        val (front, back, side) = listOf("front", "back", "side").mapIndexed { i, label ->
+                            ph.getOrNull(i)?.let { MediaUtils.persistProgressPhoto(context.applicationContext, it, label) }
                         }
+                        weightDao.insertWeight(WeightEntry(date = now, weight = w, calorieTargetAtEntry = review.newTarget))
+                        // Saves exactly the verdict the summary showed (computed with this check-in's weight)
+                        weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = front, backPhotoPath = back, sidePhotoPath = side, calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = review.newTarget, adjustmentReason = review.reason, bodyFatPercentage = bf))
+                        weightDao.saveProfile(p.copy(
+                            bodyFatPercentage = bf ?: p.bodyFatPercentage,
+                            currentCalorieTarget = review.newTarget,
+                            estimatedMaintenanceCalories = review.estimatedMaintenance,
+                            pendingCalorieTarget = null, pendingAdjustmentReason = null,
+                            checkInDue = false, lastCheckInDate = now
+                        ))
+                        NotificationHelper.cancelWeighInReminder(context.applicationContext)
                     }
                 },
                 getSetsForSession = { sid -> workoutDao.getSetsForSession(sid).first() },

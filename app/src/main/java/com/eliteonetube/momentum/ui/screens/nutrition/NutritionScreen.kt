@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -173,15 +175,14 @@ fun NutritionScreen(
 
         item {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                Button(
+                PrimaryButton(
                     onClick = { showAddFood = true },
-                    modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
-                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Add Food", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Text("Add Food")
                 }
 
                 SectionDivider()

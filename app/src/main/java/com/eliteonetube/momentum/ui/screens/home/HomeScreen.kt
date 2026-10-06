@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.logic.algorithm.WeeklyReviewResult
+import com.eliteonetube.momentum.logic.algorithm.WeeklyReview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import com.eliteonetube.momentum.logic.api.ExternalFoodApi
@@ -102,7 +104,7 @@ fun HomeScreen(
     onClearActiveWorkout: () -> Unit,
     onGetFoodByBarcode: suspend (String) -> FoodItem?,
     getExerciseHistory: suspend (Long) -> List<LoggedSet>,
-    onCheckInCompleted: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>) -> Unit,
+    onCheckInCompleted: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>, review: WeeklyReviewResult) -> Unit,
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     getExercisesForTemplate: suspend (Long) -> List<TemplateExercise> = { emptyList() },
     getSetsForTemplate: suspend (Long) -> List<TemplateSet> = { emptyList() },
@@ -209,9 +211,17 @@ fun HomeScreen(
         CheckInScreen(
             profile = savedProfile,
             recentWeights = recentWeights,
-            onComplete = { weight, bodyFat, photos ->
+            runReview = { weightKg, bodyFat ->
+                val today = LocalDate.now().toString()
+                WeeklyReview.run(
+                    profile = savedProfile,
+                    entries = recentWeights.filter { it.date != today } + WeightEntry(today, weightKg),
+                    bodyFatPercentage = bodyFat ?: savedProfile.bodyFatPercentage
+                )
+            },
+            onComplete = { weight, bodyFat, photos, review ->
                 showCheckIn = false
-                onCheckInCompleted(weight, bodyFat, photos)
+                onCheckInCompleted(weight, bodyFat, photos, review)
             },
             onCancel = { showCheckIn = false }
         )

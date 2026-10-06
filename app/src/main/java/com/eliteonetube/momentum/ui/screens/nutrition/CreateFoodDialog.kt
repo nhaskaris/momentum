@@ -90,7 +90,7 @@ fun CreateFoodDialog(
                         },
                         enabled = isValid
                     ) {
-                        Text("Save", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                        Text("Save", fontWeight = FontWeight.Bold)
                     }
                 }
 

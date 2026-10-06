@@ -152,7 +152,7 @@ fun ExerciseSetLogger(
                         )
                     )
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
             ) {

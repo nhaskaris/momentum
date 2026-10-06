@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -137,7 +139,7 @@ fun FoodReviewDialog(
                 Spacer(modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.height(32.dp))
 
-                Button(
+                PrimaryButton(
                     onClick = {
                         onSave(
                             FoodItem(
@@ -154,11 +156,10 @@ fun FoodReviewDialog(
                             )
                         )
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     enabled = name.isNotBlank() && calories.isNotBlank()
                 ) {
-                    Text("Save to Database", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Save to Database")
                 }
             }
         }

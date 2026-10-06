@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -219,15 +221,14 @@ fun AddFoodDialog(
                 if (selectedTab == 0) {
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         item {
-                            Button(
+                            PrimaryButton(
                                 onClick = { showCreateFood = true },
-                                modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp).bounceClick(),
-                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
                             ) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Create Custom Food", fontWeight = FontWeight.Bold)
+                                Text("Create Custom Food")
                             }
                         }
 
@@ -269,15 +270,14 @@ fun AddFoodDialog(
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         item {
-                            Button(
+                            PrimaryButton(
                                 onClick = { showCreateMeal = true },
-                                modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp).bounceClick(),
-                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
                             ) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Create New Meal", fontWeight = FontWeight.Bold)
+                                Text("Create New Meal")
                             }
                         }
 

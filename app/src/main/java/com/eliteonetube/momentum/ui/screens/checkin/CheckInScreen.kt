@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.checkin
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -45,6 +47,12 @@ import com.eliteonetube.momentum.ui.screens.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.screens.dashboard.MomentumMascot
 import com.eliteonetube.momentum.ui.components.bounceClick
 import com.eliteonetube.momentum.ui.components.WeightTrendChart
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Brush
+import com.eliteonetube.momentum.logic.algorithm.WeeklyReviewResult
+import com.eliteonetube.momentum.ui.components.BigStat
+import com.eliteonetube.momentum.ui.components.SectionLabel
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
@@ -52,7 +60,9 @@ import java.time.LocalDate
 fun CheckInScreen(
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
-    onComplete: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>) -> Unit,
+    /** Runs the weekly review including the weight (and body fat) entered here. */
+    runReview: (weightKg: Double, bodyFatPercentage: Double?) -> WeeklyReviewResult,
+    onComplete: (weightKg: Double, bodyFatPercentage: Double?, photos: List<Uri?>, review: WeeklyReviewResult) -> Unit,
     onCancel: () -> Unit
 ) {
     val today = remember { LocalDate.now().toString() }
@@ -81,6 +91,10 @@ fun CheckInScreen(
     val bodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()?.takeIf { it in 2.0..70.0 }
     val bodyFatValid = bodyFatInput.isBlank() || bodyFat != null
 
+    // System back steps through the check-in like the arrow does
+    BackHandler { if (step > 0) step-- else onCancel() }
+    val isDark = isSystemInDarkTheme()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -92,9 +106,23 @@ fun CheckInScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
+                            MaterialTheme.colorScheme.background
+                        ),
+                        endY = 900f
+                    )
+                )
+                .padding(padding)
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -152,15 +180,20 @@ fun CheckInScreen(
                             onSideChange = { sidePhotoUri = it },
                             onNext = { step = 3 }
                         )
-                        3 -> SummaryStep(
-                            profile = profile,
-                            recentWeights = recentWeights,
-                            newWeight = weightKg ?: 0.0,
-                            newBodyFat = bodyFat,
-                            onFinish = {
-                                onComplete(weightKg ?: 0.0, bodyFat, listOf(frontPhotoUri, backPhotoUri, sidePhotoUri))
-                            }
-                        )
+                        3 -> {
+                            val newWeight = weightKg ?: 0.0
+                            val review = remember(newWeight, bodyFat) { runReview(newWeight, bodyFat) }
+                            SummaryStep(
+                                profile = profile,
+                                recentWeights = recentWeights,
+                                newWeight = newWeight,
+                                newBodyFat = bodyFat,
+                                review = review,
+                                onFinish = {
+                                    onComplete(newWeight, bodyFat, listOf(frontPhotoUri, backPhotoUri, sidePhotoUri), review)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -171,34 +204,25 @@ fun CheckInScreen(
 @Composable
 private fun IntroStep(onStart: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-        ) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "Time to level up.",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    "Consistency is how we win. Let's record your data from the past week so I can keep your metabolic plan perfectly dialled in.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Text(
+            "Time to level up.",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Black,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "Log today's weight and I'll compare this week with last week to keep your plan dialled in.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(modifier = Modifier.height(48.dp))
-        Button(
+        PrimaryButton(
             onClick = onStart,
-            modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Let's Start", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Let's Start")
         }
     }
 }
@@ -269,13 +293,12 @@ private fun WeightStep(
         )
 
         Spacer(modifier = Modifier.height(32.dp))
-        Button(
+        PrimaryButton(
             onClick = onNext,
-            modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(),
-            enabled = isValid,
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isValid
         ) {
-            Text("Confirm Weight", fontWeight = FontWeight.Bold)
+            Text("Confirm Weight")
         }
     }
 }
@@ -307,12 +330,11 @@ private fun PhotoStep(
         }
 
         Spacer(modifier = Modifier.height(48.dp))
-        Button(
-            onClick = onNext, 
-            modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick(),
-            shape = RoundedCornerShape(16.dp)
+        PrimaryButton(
+            onClick = onNext,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (frontUri != null || backUri != null || sideUri != null) "Next" else "Skip Photos", fontWeight = FontWeight.Bold)
+            Text(if (frontUri != null || backUri != null || sideUri != null) "Next" else "Skip Photos")
         }
     }
 }
@@ -357,7 +379,7 @@ private fun PhotoPicker(label: String, uri: Uri?, onUriChange: (Uri?) -> Unit, m
                 Text("Select Photo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                Button(
+                PrimaryButton(
                     onClick = {
                         val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                         if (hasPermission) {
@@ -370,8 +392,7 @@ private fun PhotoPicker(label: String, uri: Uri?, onUriChange: (Uri?) -> Unit, m
                             permissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.PhotoCamera, null)
                     Spacer(Modifier.width(12.dp))
@@ -380,13 +401,12 @@ private fun PhotoPicker(label: String, uri: Uri?, onUriChange: (Uri?) -> Unit, m
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                OutlinedButton(
+                SecondaryButton(
                     onClick = {
                         galleryLauncher.launch("image/*")
                         showSheet = false
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(12.dp))
@@ -432,21 +452,25 @@ private fun SummaryStep(
     recentWeights: List<WeightEntry>,
     newWeight: Double,
     newBodyFat: Double?,
+    review: WeeklyReviewResult,
     onFinish: () -> Unit
 ) {
+    val today = LocalDate.now().toString()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Your Evolution", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Analysis complete. Here's your plan for the upcoming week.", 
-            style = MaterialTheme.typography.bodyMedium, 
+        Text(
+            "Here's your plan for the upcoming week.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         WeightTrendChart(
-            entries = listOf(WeightEntry(LocalDate.now().toString(), newWeight)) + recentWeights,
+            // Today's check-in weight replaces anything logged earlier today
+            entries = listOf(WeightEntry(today, newWeight)) + recentWeights.filter { it.date != today },
             unitSystem = profile.unitSystem,
             modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 8.dp)
         )
@@ -467,55 +491,39 @@ private fun SummaryStep(
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(28.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("The Verdict", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    profile.pendingAdjustmentReason ?: "Everything looks great! We're staying the course to maintain your current momentum.", 
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                
-                if ((profile.pendingCalorieTarget != null) && (profile.pendingCalorieTarget != profile.currentCalorieTarget)) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("WAS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f))
-                            Text("${profile.currentCalorieTarget}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                        }
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp).rotate(180f), tint = MaterialTheme.colorScheme.primary)
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("NEW TARGET", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Text("${profile.pendingCalorieTarget} kcal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-                        }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SectionLabel("THE VERDICT")
+            Text(review.reason, style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (review.newTarget != profile.currentCalorieTarget) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("WAS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        BigStat("%,d".format(profile.currentCalorieTarget), "kcal")
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp).rotate(180f), tint = MaterialTheme.colorScheme.primary)
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Text("NEW TARGET", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        BigStat("%,d".format(review.newTarget), "kcal", valueColor = MaterialTheme.colorScheme.primary)
                     }
                 }
+            } else {
+                Text("Daily target", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BigStat("%,d".format(review.newTarget), "kcal")
             }
         }
 
         Spacer(modifier = Modifier.height(48.dp))
-        Button(
-            onClick = onFinish, 
-            modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
-            shape = RoundedCornerShape(20.dp)
+        PrimaryButton(
+            onClick = onFinish,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Lock it in", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Lock it in")
         }
         Spacer(modifier = Modifier.height(24.dp))
     }

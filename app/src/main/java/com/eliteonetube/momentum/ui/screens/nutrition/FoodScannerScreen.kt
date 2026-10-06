@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.*
@@ -348,10 +350,10 @@ fun FoodScannerScreen(
             Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(24.dp)) {
                 if (scannerMode != ScannerMode.BARCODE) {
                     if (capturedNutrition == null) {
-                        Button(
+                        PrimaryButton(
                             enabled = !isCapturing && textRecognizer != null,
                             onClick = {
-                                val recognizer = textRecognizer ?: return@Button
+                                val recognizer = textRecognizer ?: return@PrimaryButton
                                 isCapturing = true
                                 statusMessage = "Reading..."
                                 imageCapture.takePicture(
@@ -386,10 +388,9 @@ fun FoodScannerScreen(
                                     }
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(16.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(if (scannerMode == ScannerMode.FRONT_PACKAGE) "Capture Name" else "Capture Label", fontWeight = FontWeight.Bold)
+                            Text(if (scannerMode == ScannerMode.FRONT_PACKAGE) "Capture Name" else "Capture Label")
                         }
                     } else {
                         // Glassy review card
@@ -410,18 +411,16 @@ fun FoodScannerScreen(
                                 }
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    OutlinedButton(
+                                    SecondaryButton(
                                         onClick = { capturedNutrition = null; detectedName = null; scannerMode = ScannerMode.FRONT_PACKAGE; statusMessage = "Scan package name" },
-                                        modifier = Modifier.weight(1f).height(50.dp),
-                                        shape = RoundedCornerShape(14.dp),
+                                        modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                                     ) { Text("Re-take") }
-                                    Button(
+                                    PrimaryButton(
                                         onClick = { onResult(capturedNutrition!!, currentBarcode) },
-                                        modifier = Modifier.weight(1.2f).height(50.dp),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ) { Text("Confirm", fontWeight = FontWeight.Bold) }
+                                        modifier = Modifier.weight(1.2f)
+                                    ) { Text("Confirm") }
                                 }
                             }
                         }

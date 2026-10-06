@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.dashboard
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -52,6 +54,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @Composable
 fun MainDashboard(
@@ -73,8 +76,10 @@ fun MainDashboard(
     val todayEntry = remember(recentWeights, today) { recentWeights.firstOrNull { it.date == today } }
     val unitLabel = if (profile.unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"
     
-    val isMonday = currentDate.dayOfWeek == DayOfWeek.MONDAY
-    val showCheckInAlert = profile.checkInDue || (isMonday && profile.lastCheckInDate != today)
+    // Due once Monday's review has run; the 8-day fallback covers a week where the background job
+    // never got to run (phone off, battery saver)
+    val daysSinceCheckIn = profile.lastCheckInDate?.let { runCatching { ChronoUnit.DAYS.between(LocalDate.parse(it), currentDate) }.getOrNull() }
+    val showCheckInAlert = profile.checkInDue || (daysSinceCheckIn != null && daysSinceCheckIn >= 8)
 
     var weightInput by remember { mutableStateOf("") }
     var isEditingToday by remember { mutableStateOf(false) }
@@ -125,9 +130,11 @@ fun MainDashboard(
                 if (showCheckInAlert) {
                     DashboardAlert(
                         title = "Weekly Review Ready",
-                        description = profile.pendingAdjustmentReason ?: "Time to analyze your progress from the past week and adjust your plan.",
+                        description = "Log today's weight and I'll compare this week with last week to set your plan.",
                         actionText = "Start Review",
                         onAction = onStartCheckIn,
+                        secondaryActionText = "Skip this week",
+                        onSecondaryAction = onAdjustmentDismissed,
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 } else if (profile.pendingAdjustmentReason != null) {
@@ -196,13 +203,12 @@ fun MainDashboard(
 
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (isEditingToday) {
-                                OutlinedButton(
+                                SecondaryButton(
                                     onClick = { isEditingToday = false; weightInput = "" },
-                                    modifier = Modifier.weight(1f).height(50.dp),
-                                    shape = RoundedCornerShape(16.dp)
+                                    modifier = Modifier.weight(1f)
                                 ) { Text("Cancel") }
                             }
-                            Button(
+                            PrimaryButton(
                                 onClick = {
                                     parsedWeightKg?.let {
                                         if (profile.checkInDue) {
@@ -216,10 +222,9 @@ fun MainDashboard(
                                     }
                                 },
                                 enabled = parsedWeightKg != null,
-                                modifier = Modifier.weight(1.5f).height(50.dp).bounceClick(),
-                                shape = RoundedCornerShape(16.dp)
+                                modifier = Modifier.weight(1.5f)
                             ) {
-                                Text(if (profile.checkInDue) "Review & Save" else "Save Weight", fontWeight = FontWeight.Bold)
+                                Text(if (profile.checkInDue) "Review & Save" else "Save Weight")
                             }
                         }
                     }

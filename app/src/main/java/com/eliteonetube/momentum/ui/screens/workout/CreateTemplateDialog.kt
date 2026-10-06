@@ -240,7 +240,7 @@ fun CreateTemplateDialog(
                         },
                         enabled = templateName.isNotBlank() && selectedExercises.isNotEmpty()
                     ) {
-                        Text("Save", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 

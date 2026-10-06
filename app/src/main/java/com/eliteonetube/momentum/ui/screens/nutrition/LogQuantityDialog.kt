@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -194,14 +196,12 @@ fun LogQuantityDialog(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
+            PrimaryButton(
                 onClick = { onConfirm(multiplier) },
                 enabled = qty > 0,
-                modifier = Modifier.fillMaxWidth().height(64.dp),
-                shape = RoundedCornerShape(20.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Log to Nutrition Diary", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Log to Nutrition Diary")
             }
         }
     }

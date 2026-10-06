@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -339,7 +341,7 @@ fun WorkoutsScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                    Button(
+                    PrimaryButton(
                         onClick = {
                             editingSessionId = null
                             currentActiveTemplateId = null
@@ -348,12 +350,11 @@ fun WorkoutsScreen(
                             onUpdateActiveWorkout(null, emptyList())
                             isLoggingSession = true
                         },
-                        modifier = Modifier.fillMaxWidth().height(64.dp).bounceClick(),
-                        shape = RoundedCornerShape(20.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Add, null)
                         Spacer(Modifier.width(12.dp))
-                        Text("Start workout", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Start workout")
                     }
 
                     SectionDivider()

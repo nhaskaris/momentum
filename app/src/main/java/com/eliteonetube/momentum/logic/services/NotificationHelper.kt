@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -38,7 +37,7 @@ object NotificationHelper {
         ensureChannels(context)
 
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-            Toast.makeText(context, "Notifications are disabled for this app.", Toast.LENGTH_LONG).show()
+            // Called from background jobs, where showing a Toast throws — just skip quietly
             return
         }
 
@@ -70,7 +69,7 @@ object NotificationHelper {
         ensureChannels(context)
 
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-            Toast.makeText(context, "Notifications are disabled for this app.", Toast.LENGTH_LONG).show()
+            // Called from background jobs, where showing a Toast throws — just skip quietly
             return
         }
 

@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -484,15 +486,14 @@ fun ActiveSessionScreen(
                     if (sessionExercises.isNotEmpty()) {
                         val isFinishStep = currentStepIndex == sessionExercises.size
                         if (currentStepIndex > 0) {
-                            OutlinedButton(
+                            SecondaryButton(
                                 onClick = { coroutineScope.launch { pagerState.animateScrollToPage(currentStepIndex - 1) } },
-                                modifier = Modifier.weight(1f).height(56.dp),
-                                shape = RoundedCornerShape(16.dp)
+                                modifier = Modifier.weight(1f)
                             ) { Text("Back") }
                         }
 
                         if (isFinishStep) {
-                            Button(
+                            PrimaryButton(
                                 onClick = { 
                                     when {
                                         !isRoutine -> onFinish(finalizedSets, false)
@@ -503,24 +504,22 @@ fun ActiveSessionScreen(
                                 },
                                 // Exercises with no sets aren't saved, so there'd be nothing to finish
                                 enabled = finalizedSets.isNotEmpty(),
-                                modifier = Modifier.weight(2f).height(56.dp),
-                                shape = RoundedCornerShape(16.dp)
+                                modifier = Modifier.weight(2f)
                             ) {
                                 if (finalizedSets.isNotEmpty()) {
                                     Icon(Icons.Default.Check, null)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Complete Workout", fontWeight = FontWeight.Bold)
+                                    Text("Complete Workout")
                                 } else {
-                                    Text("Add a set to finish", fontWeight = FontWeight.Bold)
+                                    Text("Add a set to finish")
                                 }
                             }
                         } else {
-                            Button(
+                            PrimaryButton(
                                 onClick = { coroutineScope.launch { pagerState.animateScrollToPage(currentStepIndex + 1) } },
-                                modifier = Modifier.weight(2f).height(56.dp),
-                                shape = RoundedCornerShape(16.dp)
+                                modifier = Modifier.weight(2f)
                             ) {
-                                Text(if (currentStepIndex == sessionExercises.size - 1) "Review workout" else "Next exercise", fontWeight = FontWeight.Bold)
+                                Text(if (currentStepIndex == sessionExercises.size - 1) "Review workout" else "Next exercise")
                                 Spacer(Modifier.width(8.dp))
                                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                             }

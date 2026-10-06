@@ -6,11 +6,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.eliteonetube.momentum.data.WeightDao
 import com.eliteonetube.momentum.data.WeightDatabase
-import com.eliteonetube.momentum.logic.algorithm.CoachAlgorithm
+import com.eliteonetube.momentum.logic.algorithm.WeeklyReview
 import com.eliteonetube.momentum.logic.algorithm.WeeklyAdjustment
 import kotlinx.coroutines.flow.first
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 class WeeklyRecalculationWorker(
     context: Context,
@@ -47,48 +45,22 @@ class WeeklyRecalculationWorker(
             }
         }
 
-        // Recalculate maintenance off this week's average weight
-        val today = LocalDate.now()
-        val thisWeekWeights = entries.mapNotNull { entry ->
-            val date = try { LocalDate.parse(entry.date) } catch (e: Exception) { return@mapNotNull null }
-            if (ChronoUnit.DAYS.between(date, today) in 0..6) entry.weight else null
-        }
-
-        val recalculatedMaintenance = if (thisWeekWeights.size >= 3) {
-            CoachAlgorithm().calculateInitialMaintenance(
-                weightKg = thisWeekWeights.average(),
-                heightCm = profile.height,
-                age = profile.age,
-                isMale = profile.isMale,
-                averageDailySteps = effectiveAverageSteps,
-                bodyFatPercentage = profile.bodyFatPercentage
-            )
-        } else {
-            profile.estimatedMaintenanceCalories
-        }
-
-        val adjustment = CoachAlgorithm().calculateWeeklyAdjustment(
-            entries = entries,
-            currentCalories = profile.currentCalorieTarget,
-            goal = profile.goal,
-            estimatedMaintenance = recalculatedMaintenance
-        )
-
-        val reason = adjustment?.reason ?: "Right on track — no change needed."
-        val nextTarget = adjustment?.newTarget ?: profile.currentCalorieTarget
+        val review = WeeklyReview.run(profile, entries, averageDailySteps = effectiveAverageSteps)
 
         dao.saveProfile(
             profile.copy(
-                estimatedMaintenanceCalories = recalculatedMaintenance,
-                pendingCalorieTarget = nextTarget,
-                pendingAdjustmentReason = reason,
+                estimatedMaintenanceCalories = review.estimatedMaintenance,
+                // A preview for the notification and Dashboard; the check-in re-runs the review with
+                // the weight entered there, and that result is what gets applied
+                pendingCalorieTarget = review.newTarget,
+                pendingAdjustmentReason = review.reason,
                 checkInDue = true
             )
         )
 
         NotificationHelper.showAdjustmentNotification(
             applicationContext,
-            adjustment ?: WeeklyAdjustment(nextTarget, 0, 0.0, reason)
+            WeeklyAdjustment(review.newTarget, review.newTarget - profile.currentCalorieTarget, 0.0, review.reason)
         )
     }
 }

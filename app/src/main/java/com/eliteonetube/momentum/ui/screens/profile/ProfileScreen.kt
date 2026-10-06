@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.profile
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import com.eliteonetube.momentum.ui.components.SecondaryButton
 import android.content.Intent
 import android.net.Uri
 import android.os.Process
@@ -956,15 +958,14 @@ private fun EditProfileForm(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Cancel") }
-                Button(
+                SecondaryButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                PrimaryButton(
                     onClick = {
                         onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect))
                     },
                     enabled = allValid,
-                    modifier = Modifier.weight(1.5f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) { Text("Save Changes", fontWeight = FontWeight.Bold) }
+                    modifier = Modifier.weight(1.5f)
+                ) { Text("Save Changes") }
             }
 
             Spacer(modifier = Modifier.height(48.dp))
