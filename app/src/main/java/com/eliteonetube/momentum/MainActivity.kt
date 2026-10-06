@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.ui.components.rememberCurrentDate
+import com.eliteonetube.momentum.ui.rememberAppData
 import com.eliteonetube.momentum.logic.algorithm.*
 import com.eliteonetube.momentum.logic.api.*
 import com.eliteonetube.momentum.logic.parsers.*
@@ -128,106 +129,20 @@ fun MomentumAppContent(
     // Keeps active-workout saves and clears in call order so a late save cannot revive a finished workout
     val activeWorkoutMutex = remember { Mutex() }
 
-    // 1. Core State Collection
-    val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
-    val allWeights by weightDao.getAllWeights().collectAsState(initial = emptyList())
-    val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
-    // Collected only while the full history screen is open
-    val allSessionsFlow = remember(workoutDao) { workoutDao.getAllSessions() }
-    val templateSummaries by workoutDao.getTemplateSummaries().collectAsState(initial = emptyList())
-    val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
-    val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
-    val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
-    val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
-    val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
-
+    // 1. Data: collected once; each screen reads only what it shows, so a change redraws just those
     // Stays current past midnight, so "today" queries roll over instead of freezing at app start
     val currentDate by rememberCurrentDate()
-    val thirtyDaysAgo = currentDate.minusDays(30).toString()
-    val recentNutritionFlow = remember(thirtyDaysAgo) {
-        combine(
-            foodDao.getRecentFoodLogs(thirtyDaysAgo),
-            foodDao.getRecentMealLogs(thirtyDaysAgo)
-        ) { items, meals ->
-            val allLogs = items + meals.map { meal ->
-                FoodLogWithItem(
-                    id = meal.id,
-                    date = meal.date,
-                    foodItemId = meal.mealId,
-                    quantity = 1.0,
-                    name = meal.name,
-                    calories = meal.calories,
-                    protein = meal.protein,
-                    fat = meal.fat,
-                    carbs = meal.carbs,
-                    isMeal = true
-                )
-            }
-            
-            allLogs.groupBy { it.date }.map { (date, logs) ->
-                DailyNutrition(
-                    date = date,
-                    totalCalories = logs.sumOf { it.calories * it.quantity },
-                    totalProtein = logs.sumOf { it.protein * it.quantity },
-                    totalCarbs = logs.sumOf { it.carbs * it.quantity },
-                    totalFat = logs.sumOf { it.fat * it.quantity }
-                )
-            }.sortedByDescending { it.date }
-        }.flowOn(Dispatchers.Default)
-    }
-    val recentNutrition by recentNutritionFlow.collectAsState(initial = emptyList())
-
-    // All-time workout totals and records for Analytics (recentSessions is capped at 30)
-    val workoutStatsFlow = remember(thirtyDaysAgo) {
-        combine(
-            workoutDao.getWorkoutTotals(thirtyDaysAgo),
-            workoutDao.getHeaviestSession(),
-            workoutDao.getMostVariedSession()
-        ) { totals, heaviest, mostVaried -> WorkoutStats(totals, heaviest, mostVaried) }
-    }
-    val workoutStats by workoutStatsFlow.collectAsState(initial = null)
-
-    val activeSetsFlow = remember(workoutDao) { workoutDao.getActiveSets().distinctUntilChanged() }
-    val activeSets by activeSetsFlow.collectAsState(initial = emptyList())
+    val appData = rememberAppData(weightDao, workoutDao, foodDao, currentDate)
+    // Collected only while the full history screen is open
+    val allSessionsFlow = remember(workoutDao) { workoutDao.getAllSessions() }
 
     val openWorkoutRequest by openWorkoutRequests.collectAsState()
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
     val openCheckInRequest by openCheckInRequests.collectAsState()
 
-    val today = currentDate.toString()
-    val todayFoodLogsFlow = remember(today) {
-        combine(
-            foodDao.getFoodLogsForDate(today),
-            foodDao.getDailyMealLogsForDate(today)
-        ) { items, meals ->
-            val mappedMeals = meals.map { meal ->
-                FoodLogWithItem(
-                    id = meal.id,
-                    foodItemId = meal.mealId,
-                    quantity = 1.0,
-                    name = meal.name,
-                    calories = meal.calories,
-                    protein = meal.protein,
-                    fat = meal.fat,
-                    carbs = meal.carbs,
-                    isMeal = true
-                )
-            }
-            items + mappedMeals
-        }.flowOn(Dispatchers.Default)
-    }
-    val todayFoodLogs by todayFoodLogsFlow.collectAsState(initial = emptyList())
-    val allFoodItems by foodDao.getAllFoodItems().collectAsState(initial = emptyList())
-    val recentFoodIds by foodDao.getRecentFoodIds().collectAsState(initial = emptyList())
-
     // 2. High-Frequency Logic (Remembered/Isolated)
     var isProfileLoaded by remember { mutableStateOf(false) }
     var currentCalorieTarget by remember { mutableIntStateOf(2000) }
-
-    val currentStreak = remember(allWeightDates) { StreakCalculator.currentStreak(allWeightDates) }
-    val loggedDates = remember(allWeightDates) {
-        allWeightDates.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet()
-    }
 
     LaunchedEffect(Unit) {
         weightDao.getUserProfile().collect { isProfileLoaded = true }
@@ -262,28 +177,12 @@ fun MomentumAppContent(
             HomeScreen(
                 currentCalorieTarget = currentCalorieTarget,
                 savedProfile = savedProfile,
-                recentWeights = recentWeights,
-                allWeights = allWeights,
-                recentSessions = recentSessions,
+                data = appData,
                 allSessionsFlow = allSessionsFlow,
-                templateSummaries = templateSummaries,
-                recentNutrition = recentNutrition,
-                workoutStats = workoutStats,
-                allExercises = allExercises,
-                allTemplates = allTemplates,
-                allCheckIns = allCheckIns,
-                todayFoodLogs = todayFoodLogs,
-                allFoodItems = allFoodItems,
-                recentFoodIds = recentFoodIds,
-                allMeals = allMeals,
-                activeSets = activeSets,
                 hasActiveWorkout = savedProfile?.hasActiveWorkout == true,
                 openWorkoutRequest = openWorkoutRequest,
                 openWeightEntryRequest = openWeightEntryRequest,
                 openCheckInRequest = openCheckInRequest,
-                currentStreak = currentStreak,
-                totalDaysLogged = allWeightDates.size,
-                loggedDates = loggedDates,
                 onWeightSubmitted = { enteredWeight ->
                     coroutineScope.launch {
                         val now = LocalDate.now().toString()
@@ -301,7 +200,7 @@ fun MomentumAppContent(
                 onProfileUpdated = { updatedProfile ->
                     coroutineScope.launch {
                         // Without any logged weight there's nothing to recalculate from, so keep the current estimate
-                        val latestWeightKg = recentWeights.firstOrNull()?.weight
+                        val latestWeightKg = appData.recentWeights.firstOrNull()?.weight
                         if (latestWeightKg == null) {
                             weightDao.saveProfile(updatedProfile)
                             return@launch

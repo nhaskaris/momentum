@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.ui.AppData
 import com.eliteonetube.momentum.logic.algorithm.WeeklyReviewResult
 import com.eliteonetube.momentum.logic.algorithm.WeeklyReview
 import kotlinx.coroutines.flow.Flow
@@ -64,28 +65,12 @@ import kotlin.time.Duration.Companion.milliseconds
 fun HomeScreen(
     currentCalorieTarget: Int,
     savedProfile: UserProfile?,
-    recentWeights: List<WeightEntry>,
-    allWeights: List<WeightEntry> = emptyList(),
-    recentSessions: List<WorkoutSession>,
+    data: AppData,
     allSessionsFlow: Flow<List<WorkoutSession>> = emptyFlow(),
-    templateSummaries: List<TemplateSummary> = emptyList(),
-    recentNutrition: List<DailyNutrition> = emptyList(),
-    workoutStats: WorkoutStats? = null,
-    allExercises: List<Exercise>,
-    allTemplates: List<WorkoutTemplate> = emptyList(),
-    allCheckIns: List<CheckIn> = emptyList(),
-    allMeals: List<Meal> = emptyList(),
-    todayFoodLogs: List<FoodLogWithItem> = emptyList(),
-    allFoodItems: List<FoodItem> = emptyList(),
-    recentFoodIds: List<Long> = emptyList(),
-    activeSets: List<ActiveWorkoutSet> = emptyList(),
     hasActiveWorkout: Boolean = false,
     openWorkoutRequest: Int = 0,
     openWeightEntryRequest: Int = 0,
     openCheckInRequest: Int = 0,
-    currentStreak: Int,
-    totalDaysLogged: Int,
-    loggedDates: Set<LocalDate>,
     onWeightSubmitted: (Double) -> Unit,
     onPastWeightSubmitted: (date: String, weight: Double) -> Unit,
     onWeightDeleted: (String) -> Unit,
@@ -134,9 +119,13 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { AppTab.entries.size })
 
+    // Only flips when a workout starts or ends — reading activeSets directly here would recompose
+    // the whole home screen on every workout autosave
+    val hasActiveSets by remember(data) { derivedStateOf { data.activeSets.isNotEmpty() } }
+
     var hasAutoSwitched by remember { mutableStateOf(false) }
-    LaunchedEffect(activeSets.isNotEmpty(), hasActiveWorkout) {
-        if ((activeSets.isNotEmpty() || hasActiveWorkout) && !hasAutoSwitched) {
+    LaunchedEffect(hasActiveSets, hasActiveWorkout) {
+        if ((hasActiveSets || hasActiveWorkout) && !hasAutoSwitched) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
             hasAutoSwitched = true
         }
@@ -194,9 +183,9 @@ fun HomeScreen(
         }
     }
 
-    var isSessionActive by remember { mutableStateOf(activeSets.isNotEmpty() || hasActiveWorkout) }
-    LaunchedEffect(activeSets.isNotEmpty(), hasActiveWorkout) {
-        if (activeSets.isNotEmpty() || hasActiveWorkout) {
+    var isSessionActive by remember { mutableStateOf(hasActiveSets || hasActiveWorkout) }
+    LaunchedEffect(hasActiveSets, hasActiveWorkout) {
+        if (hasActiveSets || hasActiveWorkout) {
             isSessionActive = true
         }
     }
@@ -214,12 +203,12 @@ fun HomeScreen(
     if (showCheckIn) {
         CheckInScreen(
             profile = savedProfile,
-            recentWeights = recentWeights,
+            recentWeights = data.recentWeights,
             runReview = { weightKg, bodyFat ->
                 val today = LocalDate.now().toString()
                 WeeklyReview.run(
                     profile = savedProfile,
-                    entries = recentWeights.filter { it.date != today } + WeightEntry(today, weightKg),
+                    entries = data.recentWeights.filter { it.date != today } + WeightEntry(today, weightKg),
                     bodyFatPercentage = bodyFat ?: savedProfile.bodyFatPercentage
                 )
             },
@@ -242,7 +231,7 @@ fun HomeScreen(
 
     if (showGallery) {
         ProgressGalleryScreen(
-            checkIns = allCheckIns,
+            checkIns = data.allCheckIns,
             onBack = { showGallery = false }
         )
         return
@@ -347,12 +336,12 @@ fun HomeScreen(
             when (AppTab.entries[page]) {
                 AppTab.DASHBOARD -> MainDashboard(
                     calorieTarget = currentCalorieTarget,
-                    recentWeights = recentWeights,
+                    recentWeights = data.recentWeights,
                     profile = savedProfile,
-                    currentStreak = currentStreak,
-                    totalDaysLogged = totalDaysLogged,
-                    loggedDates = loggedDates,
-                    todayLogs = todayFoodLogs,
+                    currentStreak = data.currentStreak,
+                    totalDaysLogged = data.totalDaysLogged,
+                    loggedDates = data.loggedDates,
+                    todayLogs = data.todayFoodLogs,
                     onOpenNutrition = {
                         coroutineScope.launch { pagerState.animateScrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION)) }
                     },
@@ -377,21 +366,21 @@ fun HomeScreen(
                     onStartCheckIn = { showCheckIn = true }
                 )
                 AppTab.STATISTICS -> StatisticsScreen(
-                    weights = allWeights,
-                    recentSessions = recentSessions,
-                    recentNutrition = recentNutrition,
-                    workoutStats = workoutStats,
+                    weights = data.allWeights,
+                    recentSessions = data.recentSessions,
+                    recentNutrition = data.recentNutrition,
+                    workoutStats = data.workoutStats,
                     goal = savedProfile.goal,
                     unitSystem = savedProfile.unitSystem
                 )
                 AppTab.NUTRITION -> NutritionScreen(
                     calorieTarget = currentCalorieTarget,
                     profile = savedProfile,
-                    recentWeights = recentWeights,
-                    todayLogs = todayFoodLogs,
-                    allFoodItems = allFoodItems,
-                    recentFoodIds = recentFoodIds,
-                    allMeals = allMeals,
+                    recentWeights = data.recentWeights,
+                    todayLogs = data.todayFoodLogs,
+                    allFoodItems = data.allFoodItems,
+                    recentFoodIds = data.recentFoodIds,
+                    allMeals = data.allMeals,
                     onLogFood = { id, qty ->
                         coroutineScope.launch {
                             onFoodLogged(id, qty)
@@ -426,10 +415,10 @@ fun HomeScreen(
                     onOpenLearn = { learnOpenAt = LearnCategory.NUTRITION; showLearn = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(
-                    recentSessions = recentSessions,
-                    allExercises = allExercises,
-                    allTemplates = allTemplates,
-                    activeSets = activeSets,
+                    recentSessions = data.recentSessions,
+                    allExercises = data.allExercises,
+                    allTemplates = data.allTemplates,
+                    activeSets = data.activeSets,
                     hasActiveWorkout = hasActiveWorkout,
                     activeTemplateId = savedProfile.activeWorkoutTemplateId,
                     activeWorkoutStartTime = savedProfile.activeWorkoutStartTime,
@@ -447,7 +436,7 @@ fun HomeScreen(
                     onTemplateCreated = onTemplateCreated,
                     onTemplateUpdated = onTemplateUpdated,
                     allSessionsFlow = allSessionsFlow,
-                    templateSummaries = templateSummaries,
+                    templateSummaries = data.templateSummaries,
                     onTemplateDeleted = onTemplateDeleted,
                     onSessionStateChanged = { isSessionActive = it },
                     onUpdateActiveWorkout = onUpdateActiveWorkout,
@@ -456,9 +445,9 @@ fun HomeScreen(
                 )
                 AppTab.PROFILE -> ProfileScreen(
                     profile = savedProfile,
-                    recentWeights = recentWeights,
-                    allCheckIns = allCheckIns,
-                    allWeights = allWeights,
+                    recentWeights = data.recentWeights,
+                    allCheckIns = data.allCheckIns,
+                    allWeights = data.allWeights,
                     onWeightClick = { showHistoryModal = true },
                     onProfileUpdated = onProfileUpdated,
                     onGoalChanged = onGoalChanged,
@@ -486,6 +475,12 @@ fun HomeScreen(
                 onTabSelected = { tab ->
                     val targetPage = AppTab.entries.indexOf(tab)
                     coroutineScope.launch {
+                        // For far jumps, snap next to the target and animate only the last page,
+                        // instead of sliding every tab in between across the screen
+                        val distance = targetPage - pagerState.currentPage
+                        if (kotlin.math.abs(distance) > 1) {
+                            pagerState.scrollToPage(targetPage - kotlin.math.sign(distance.toFloat()).toInt())
+                        }
                         pagerState.animateScrollToPage(targetPage)
                     }
                 },
@@ -502,7 +497,7 @@ fun HomeScreen(
                         helperMessage = null
                         isAskMode = false
                     } else {
-                        helperMessage = getMascotMessage(currentTab, currentStreak, recentWeights, todayFoodLogs, hasActiveWorkout)
+                        helperMessage = getMascotMessage(currentTab, data.currentStreak, data.recentWeights, data.todayFoodLogs, hasActiveWorkout)
                     }
                 }
             )
@@ -511,7 +506,7 @@ fun HomeScreen(
 
     if (showHistoryModal) {
         WeightHistoryBottomSheet(
-            entries = recentWeights,
+            entries = data.recentWeights,
             unitSystem = savedProfile.unitSystem,
             onDismiss = { showHistoryModal = false },
             onPastWeightSubmitted = onPastWeightSubmitted,
