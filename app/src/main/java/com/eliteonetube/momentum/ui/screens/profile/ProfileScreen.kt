@@ -1,10 +1,10 @@
 package com.eliteonetube.momentum.ui.screens.profile
 
+import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
 import android.content.Intent
 import android.net.Uri
-import android.os.Process
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -34,11 +33,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.health.connect.client.HealthConnectClient
 import com.eliteonetube.momentum.logic.services.WorkScheduler
 import com.eliteonetube.momentum.ui.components.BigStat
@@ -59,7 +55,6 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
-import kotlin.system.exitProcess
 
 private data class GoalOption(val goal: Goal, val label: String, val description: String)
 
@@ -507,7 +502,7 @@ fun ProfileScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(bottomNavClearance()))
         }
     }
 }

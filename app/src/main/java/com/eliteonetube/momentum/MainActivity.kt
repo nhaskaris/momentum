@@ -29,16 +29,12 @@ import com.eliteonetube.momentum.logic.utils.*
 import com.eliteonetube.momentum.ui.components.LoadingScreen
 import com.eliteonetube.momentum.ui.screens.home.HomeScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.Dispatchers
 
 class MainActivity : ComponentActivity() {
 

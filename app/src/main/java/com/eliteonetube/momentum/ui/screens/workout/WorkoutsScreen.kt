@@ -1,10 +1,9 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
-import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
@@ -20,7 +19,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,12 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eliteonetube.momentum.data.*
-import com.eliteonetube.momentum.ui.components.bounceClick
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -499,7 +495,7 @@ fun WorkoutsScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(120.dp)) }
+            item { Spacer(modifier = Modifier.height(bottomNavClearance())) }
         }
 
         startingRoutine?.let { StartingWorkoutOverlay(routineName = it.name) }
@@ -638,17 +634,18 @@ private fun SwipeableSessionRow(
     onClick: () -> Unit,
     onSwipeToDelete: () -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) onSwipeToDelete()
-            false // the confirmation dialog decides; the row always springs back
-        }
-    )
+    val dismissState = rememberSwipeToDismissBoxState()
+    val scope = rememberCoroutineScope()
 
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
+        onDismiss = {
+            // The confirmation dialog decides; the row always springs back
+            onSwipeToDelete()
+            scope.launch { dismissState.reset() }
+        },
         backgroundContent = {
             Box(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.error, RoundedCornerShape(16.dp)).padding(horizontal = 24.dp),
@@ -729,7 +726,7 @@ private fun WorkoutHistoryScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             // Clears the floating bottom navigation bar
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp)
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = bottomNavClearance())
         ) {
             if (sessions?.isEmpty() == true) {
                 item { EmptyState("No workouts logged yet.") }

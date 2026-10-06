@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.components
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
@@ -41,7 +42,7 @@ fun BottomNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 48.dp, vertical = 16.dp),
+            .padding(horizontal = 48.dp, vertical = NavBarVerticalPadding),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -53,7 +54,7 @@ fun BottomNavBar(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
             ),
             modifier = Modifier
-                .height(64.dp)
+                .height(NavBarHeight)
                 .fillMaxWidth()
         ) {
             Row(
@@ -99,3 +100,17 @@ fun BottomNavBar(
         }
     }
 }
+
+private val NavBarHeight = 64.dp
+private val NavBarVerticalPadding = 16.dp
+
+/**
+ * Bottom padding a tab's scrolling content needs so its last item can scroll clear of the
+ * floating nav bar: the bar, its padding, the system navigation area (much taller with 3-button
+ * navigation than with gestures) and a little breathing room. A fixed 120dp hid the end of every
+ * page behind the bar on 3-button phones.
+ */
+@Composable
+fun bottomNavClearance(): Dp =
+    NavBarHeight + NavBarVerticalPadding * 2 +
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp

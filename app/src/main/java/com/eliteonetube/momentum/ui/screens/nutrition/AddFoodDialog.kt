@@ -2,7 +2,6 @@ package com.eliteonetube.momentum.ui.screens.nutrition
 
 import kotlinx.coroutines.launch
 import com.eliteonetube.momentum.ui.components.PrimaryButton
-import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -230,17 +229,15 @@ fun AddFoodDialog(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    TabRow(
+                    SecondaryTabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = Color.Transparent,
                         divider = {},
-                        indicator = { tabPositions ->
-                            if (tabPositions.isNotEmpty()) {
-                                TabRowDefaults.SecondaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                        indicator = {
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(selectedTab, matchContentSize = false),
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     ) {
                         Tab(

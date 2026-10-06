@@ -33,9 +33,6 @@ interface FoodDao {
     @Query("SELECT * FROM food_item_table ORDER BY name ASC")
     fun getAllFoodItems(): Flow<List<FoodItem>>
 
-    @Query("SELECT * FROM food_item_table WHERE name LIKE '%' || :query || '%'")
-    fun searchFoodItems(query: String): Flow<List<FoodItem>>
-
     @Query("SELECT * FROM food_item_table WHERE barcode = :barcode LIMIT 1")
     suspend fun getFoodItemByBarcode(barcode: String): FoodItem?
 
@@ -58,9 +55,6 @@ interface FoodDao {
     @Query("DELETE FROM daily_food_log_table WHERE id = :logId")
     suspend fun deleteFoodLog(logId: Long)
 
-    @Query("SELECT COUNT(*) FROM food_item_table")
-    suspend fun foodItemCount(): Int
-
     // --- MEAL DAO QUERIES ---
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -73,7 +67,8 @@ interface FoodDao {
     fun getAllMeals(): Flow<List<Meal>>
 
     @Query("""
-        SELECT meal_food_item_table.*, food_item_table.name, food_item_table.calories, 
+        SELECT meal_food_item_table.id, meal_food_item_table.foodItemId, meal_food_item_table.quantity,
+               food_item_table.name, food_item_table.calories, 
                food_item_table.protein, food_item_table.fat, food_item_table.carbs,
                food_item_table.servingAmount, food_item_table.servingUnit
         FROM meal_food_item_table

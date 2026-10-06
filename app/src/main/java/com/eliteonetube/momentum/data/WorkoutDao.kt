@@ -19,9 +19,6 @@ interface WorkoutDao {
     @Query("SELECT * FROM exercise_table ORDER BY name ASC")
     fun getAllExercises(): Flow<List<Exercise>>
 
-    @Query("SELECT * FROM exercise_table WHERE muscleGroup = :muscleGroup ORDER BY name ASC")
-    fun getExercisesByMuscleGroup(muscleGroup: String): Flow<List<Exercise>>
-
     @Insert
     suspend fun insertSession(session: WorkoutSession): Long
 
@@ -87,18 +84,6 @@ interface WorkoutDao {
     @Query("DELETE FROM active_workout_set_table")
     suspend fun clearActiveSets()
 
-    @Query("DELETE FROM active_workout_set_table WHERE exerciseId = :exerciseId AND setNumber = :setNumber")
-    suspend fun deleteActiveSet(exerciseId: Long, setNumber: Int)
-
-    @Update
-    suspend fun updateActiveSet(activeSet: ActiveWorkoutSet)
-
-    @Query("DELETE FROM active_workout_set_table WHERE exerciseId = :exerciseId")
-    suspend fun deleteActiveSetsForExercise(exerciseId: Long)
-
-    @Query("DELETE FROM active_workout_set_table WHERE id = :setId")
-    suspend fun deleteSet(setId: Long)
-
     @Transaction
     suspend fun replaceActiveSets(newSets: List<ActiveWorkoutSet>) {
         clearActiveSets()
@@ -154,50 +139,4 @@ interface WorkoutDao {
 
     @Query("DELETE FROM template_exercise_table WHERE templateId = :templateId")
     suspend fun deleteTemplateExercises(templateId: Long)
-
-    @Query("""
-        UPDATE template_exercise_table 
-        SET targetSets = :newSets, targetReps = :newReps, targetWeightKg = :newWeight,
-            targetDurationSeconds = :newDuration, targetDistanceKm = :newDistance
-        WHERE templateId = :templateId AND exerciseId = :exerciseId
-    """)
-    suspend fun updateTemplateExerciseTargets(
-        templateId: Long,
-        exerciseId: Long,
-        newSets: Int,
-        newReps: Int,
-        newWeight: Double,
-        newDuration: Int?,
-        newDistance: Double?
-    )
-
-    // --- PROGRESSION & PAST HISTORY QUERIES ---
-
-    /**
-     * Gets previous sets logged for a specific exercise across all past sessions,
-     * ordered by session date and set ID descending to quickly pull latest performance metrics.
-     */
-    @Query("""
-        SELECT logged_set_table.* FROM logged_set_table
-        INNER JOIN workout_session_table ON logged_set_table.sessionId = workout_session_table.id
-        WHERE logged_set_table.exerciseId = :exerciseId
-        ORDER BY workout_session_table.date DESC, logged_set_table.id ASC
-    """)
-    fun getHistoryForExercise(exerciseId: Long): Flow<List<LoggedSet>>
-
-    /**
-     * Finds the maximum weight lifted for an exercise to help calculate personal records (PRs).
-     */
-    @Query("SELECT MAX(weightKg) FROM logged_set_table WHERE exerciseId = :exerciseId")
-    fun getMaxWeightForExercise(exerciseId: Long): Flow<Double?>
-
-    @Query("""
-        SELECT DISTINCT exercise_table.* FROM exercise_table
-        INNER JOIN logged_set_table ON exercise_table.id = logged_set_table.exerciseId
-        WHERE logged_set_table.sessionId = :sessionId
-    """)
-    suspend fun getExercisesForSessionOnce(sessionId: Long): List<Exercise>
-
-    @Query("SELECT * FROM logged_set_table WHERE sessionId = :sessionId ORDER BY id ASC")
-    suspend fun getSetsForSessionOnce(sessionId: Long): List<LoggedSet>
 }

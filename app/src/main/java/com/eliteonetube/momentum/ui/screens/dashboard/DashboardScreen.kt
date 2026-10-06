@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.screens.dashboard
 
+import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -43,16 +44,13 @@ import com.eliteonetube.momentum.logic.utils.Units
 import com.eliteonetube.momentum.ui.components.BigStat
 import com.eliteonetube.momentum.ui.components.SectionDivider
 import com.eliteonetube.momentum.ui.components.SectionLabel
-import com.eliteonetube.momentum.ui.components.bounceClick
 import com.eliteonetube.momentum.ui.components.rememberCurrentDate
 import com.eliteonetube.momentum.ui.screens.nutrition.MacroTargets
 import com.eliteonetube.momentum.ui.screens.nutrition.MacroTargetsUnavailable
 import com.eliteonetube.momentum.ui.theme.CarbGreen
 import com.eliteonetube.momentum.ui.theme.FatYellow
 import com.eliteonetube.momentum.ui.theme.ProteinBlue
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -93,7 +91,7 @@ fun MainDashboard(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 120.dp)
+        contentPadding = PaddingValues(bottom = bottomNavClearance())
     ) {
         // Hero Section
         item {

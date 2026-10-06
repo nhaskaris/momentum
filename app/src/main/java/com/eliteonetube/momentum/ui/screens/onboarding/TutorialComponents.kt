@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.ui.screens.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.screens.dashboard.MomentumMascot
-import com.eliteonetube.momentum.ui.components.bounceClick
 
 data class TutorialStep(
     val title: String,

@@ -45,7 +45,6 @@ import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.logic.utils.Units
 import com.eliteonetube.momentum.ui.screens.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.screens.dashboard.MomentumMascot
-import com.eliteonetube.momentum.ui.components.bounceClick
 import com.eliteonetube.momentum.ui.components.WeightTrendChart
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme

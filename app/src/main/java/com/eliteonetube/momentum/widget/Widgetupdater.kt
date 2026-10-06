@@ -1,7 +1,6 @@
 package com.eliteonetube.momentum.widget
 
 import android.content.Context
-import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.updateAll
 
 /**
@@ -18,12 +17,5 @@ import androidx.glance.appwidget.updateAll
 object WidgetUpdater {
     suspend fun refresh(context: Context) {
         MomentumWidget().updateAll(context)
-    }
-
-    /** True if at least one instance of the widget is currently placed on a home screen. */
-    suspend fun hasActiveInstances(context: Context): Boolean {
-        return GlanceAppWidgetManager(context)
-            .getGlanceIds(MomentumWidget::class.java)
-            .isNotEmpty()
     }
 }

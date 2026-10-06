@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.screens.statistics
 
+import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -59,7 +60,7 @@ fun StatisticsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 120.dp)
+        contentPadding = PaddingValues(bottom = bottomNavClearance())
     ) {
         // Hero Section — same gradient as the Dashboard hero
         item {
