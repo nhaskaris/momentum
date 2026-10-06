@@ -19,7 +19,10 @@ object ExerciseSeeder {
         "Fast Skipping", "Wind Sprints", "Trail Running/Walking"
     )
 
-    suspend fun seedIfNeeded(context: Context, workoutDao: WorkoutDao) {
+    suspend fun seedIfNeeded(context: Context, workoutDao: WorkoutDao) =
+        SeedGate.runOncePerAppVersion(context, PREFS_NAME) { seedFromAsset(context, workoutDao) }
+
+    private suspend fun seedFromAsset(context: Context, workoutDao: WorkoutDao) {
         val jsonText = try {
             context.assets.open("exercises.json").bufferedReader().use { it.readText() }
         } catch (_: Exception) {

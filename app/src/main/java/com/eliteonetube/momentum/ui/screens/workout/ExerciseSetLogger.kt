@@ -1,5 +1,10 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
@@ -242,48 +247,30 @@ private fun SetInputRow(
             }
 
             if (exercise.exerciseType == ExerciseType.CARDIO) {
-                OutlinedTextField(
+                SetField(
                     value = durationInput,
                     onValueChange = { newValue ->
                         durationInput = newValue
                         onUpdate(set.copy(durationSeconds = if (newValue.isBlank()) null else parseDuration(newValue)))
                     },
-                    placeholder = { Text(placeholderDuration, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
+                    placeholder = placeholderDuration,
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-                    )
                 )
 
-                OutlinedTextField(
+                SetField(
                     value = distanceInput,
                     onValueChange = { newValue ->
                         distanceInput = newValue
                         onUpdate(set.copy(distanceKm = newValue.replace(',', '.').toDoubleOrNull()))
                     },
                     keyboardActions = logSet,
-                    placeholder = { Text(placeholderDistance, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
+                    placeholder = placeholderDistance,
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-                    )
                 )
             } else {
-                OutlinedTextField(
+                SetField(
                     value = weightInput,
                     onValueChange = {
                         weightInput = it
@@ -291,21 +278,12 @@ private fun SetInputRow(
                         if (it.isBlank()) onUpdate(set.copy(weightKg = 0.0))
                         else it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(set.copy(weightKg = if (unitSystem == UnitSystem.IMPERIAL) v / 2.20462 else v)) }
                     },
-                    placeholder = { Text(placeholderWeight, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
+                    placeholder = placeholderWeight,
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-                    )
                 )
 
-                OutlinedTextField(
+                SetField(
                     value = repsInput,
                     onValueChange = {
                         repsInput = it
@@ -313,18 +291,9 @@ private fun SetInputRow(
                         else it.toIntOrNull()?.let { r -> onUpdate(set.copy(reps = r)) }
                     },
                     keyboardActions = logSet,
-                    placeholder = { Text(placeholderReps, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
+                    placeholder = placeholderReps,
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-                    )
                 )
             }
 
@@ -366,4 +335,60 @@ private fun parseDuration(input: String): Int {
     } else {
         input.toIntOrNull() ?: 0
     }
+}
+
+/**
+ * Lightweight input for a set's weight/reps/time/distance. OutlinedTextField builds a lot of
+ * machinery per field (label/outline animations, layout slots); with 2–3 per set row and several
+ * pages built ahead in the pager, that was the main cost of swiping between exercises.
+ */
+@Composable
+private fun SetField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(10.dp)
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+        textAlign = TextAlign.Center,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .height(48.dp)
+            .background(Color.White.copy(alpha = 0.05f), shape)
+            .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, shape),
+        singleLine = true,
+        textStyle = textStyle,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        interactionSource = interactionSource,
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder,
+                        style = textStyle.copy(
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
 }

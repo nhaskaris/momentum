@@ -10,7 +10,10 @@ object FoodSeeder {
     private const val PREFS_NAME = "food_seeder_prefs"
     private const val KEY_SEEDED_VERSION = "seeded_version"
 
-    suspend fun seedIfNeeded(context: Context, foodDao: FoodDao) {
+    suspend fun seedIfNeeded(context: Context, foodDao: FoodDao) =
+        SeedGate.runOncePerAppVersion(context, PREFS_NAME) { seedFromAsset(context, foodDao) }
+
+    private suspend fun seedFromAsset(context: Context, foodDao: FoodDao) {
         val jsonText = try {
             context.assets.open("foods.json").bufferedReader().use { it.readText() }
         } catch (_: Exception) {
