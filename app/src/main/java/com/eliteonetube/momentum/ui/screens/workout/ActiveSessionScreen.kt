@@ -12,6 +12,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerState
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -280,6 +282,10 @@ fun ActiveSessionScreen(
     }
 
     if (showExercisePicker) {
+        BackHandler {
+            showExercisePicker = false
+            exerciseToSwapId = null
+        }
         ExercisePickerScreen(
             allExercises = allExercises,
             onDismiss = {
@@ -328,6 +334,8 @@ fun ActiveSessionScreen(
         )
         return
     }
+
+    PreviousExerciseBackHandler(pagerState, coroutineScope)
 
     val exerciseToRemove = exercisePendingRemoval
     if (exerciseToRemove != null) {
@@ -493,13 +501,18 @@ fun ActiveSessionScreen(
                                         else -> onFinish(finalizedSets, true)
                                     }
                                 },
-                                enabled = allSets.isNotEmpty(),
+                                // Exercises with no sets aren't saved, so there'd be nothing to finish
+                                enabled = finalizedSets.isNotEmpty(),
                                 modifier = Modifier.weight(2f).height(56.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Icon(Icons.Default.Check, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Complete Workout", fontWeight = FontWeight.Bold)
+                                if (finalizedSets.isNotEmpty()) {
+                                    Icon(Icons.Default.Check, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Complete Workout", fontWeight = FontWeight.Bold)
+                                } else {
+                                    Text("Add a set to finish", fontWeight = FontWeight.Bold)
+                                }
                             }
                         } else {
                             Button(
@@ -596,6 +609,10 @@ fun ActiveSessionScreen(
                                 onExerciseSwapped = {
                                     exerciseToSwapId = currentExercise.id
                                     showExercisePicker = true
+                                },
+                                onSetLogged = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    RestTimerService.startTimer(context, restTimerSeconds)
                                 }
                             )
                         }
@@ -856,5 +873,18 @@ private fun WorkoutStepBar(
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondary, selectedLabelColor = MaterialTheme.colorScheme.onSecondary)
             )
         }
+    }
+}
+
+/**
+ * System back goes to the previous exercise. On the first one it isn't intercepted, so back
+ * behaves as usual (the workout is saved either way). Separate composable so reading the page
+ * here doesn't recompose the whole session screen on every swipe.
+ */
+@Composable
+private fun PreviousExerciseBackHandler(pagerState: PagerState, scope: kotlinx.coroutines.CoroutineScope) {
+    val canGoBack by remember(pagerState) { derivedStateOf { pagerState.targetPage > 0 } }
+    BackHandler(enabled = canGoBack) {
+        scope.launch { pagerState.animateScrollToPage(pagerState.targetPage - 1) }
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +38,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.health.connect.client.HealthConnectClient
+import com.eliteonetube.momentum.logic.services.WorkScheduler
+import com.eliteonetube.momentum.ui.components.BigStat
+import com.eliteonetube.momentum.ui.components.SectionDivider
+import com.eliteonetube.momentum.ui.components.SectionLabel
 import com.eliteonetube.momentum.data.AppTheme
 import com.eliteonetube.momentum.data.CheckIn
 import com.eliteonetube.momentum.data.Goal
@@ -63,15 +68,18 @@ private val goalOptions = listOf(
     GoalOption(Goal.REVERSE, "Reverse", "Gradually climb calories back toward maintenance after a cut.")
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
+    allWeights: List<WeightEntry> = emptyList(),
     allCheckIns: List<CheckIn> = emptyList(),
     onWeightClick: () -> Unit,
     onProfileUpdated: (UserProfile) -> Unit,
     onGoalChanged: (Goal) -> Unit,
     onViewGallery: () -> Unit,
+    onOpenLearn: () -> Unit = {},
     onWeightsImported: (List<WeightEntry>) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -86,6 +94,7 @@ fun ProfileScreen(
     var detectedWeights by remember { mutableStateOf<List<WeightEntry>?>(null) }
     var isProcessingImage by remember { mutableStateOf(false) }
     var crashReport by remember { mutableStateOf(CrashHandler.getCrashReport(context)) }
+    var editingReminder by remember { mutableStateOf<WorkScheduler.ReminderSlot?>(null) }
 
     // Reconcile in case the user revoked access from Health Connect settings directly
     LaunchedEffect(Unit) {
@@ -162,7 +171,7 @@ fun ProfileScreen(
                 val image = InputImage.fromFilePath(context, uri)
                 recognizer.process(image)
                     .addOnSuccessListener { visionText ->
-                        val parsed = WeightHistoryParser.parse(visionText)
+                        val parsed = WeightHistoryParser.parse(visionText, profile.unitSystem)
                         allDetected.addAll(parsed)
                     }
                     .addOnCompleteListener {
@@ -188,6 +197,29 @@ fun ProfileScreen(
             }
         )
         return
+    }
+
+    editingReminder?.let { slot ->
+        val current = WorkScheduler.reminderTime(profile, slot)
+        val state = rememberTimePickerState(
+            initialHour = current.hour,
+            initialMinute = current.minute,
+            is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+        )
+        TimePickerDialog(
+            title = if (slot == WorkScheduler.ReminderSlot.MORNING) "Morning reminder" else "Evening reminder",
+            onDismiss = { editingReminder = null },
+            onConfirm = {
+                val picked = "%02d:%02d".format(state.hour, state.minute)
+                onProfileUpdated(
+                    if (slot == WorkScheduler.ReminderSlot.MORNING) profile.copy(morningReminderTime = picked)
+                    else profile.copy(eveningReminderTime = picked)
+                )
+                editingReminder = null
+            }
+        ) {
+            TimePicker(state = state)
+        }
     }
 
     if (showChangeGoalDialog) {
@@ -224,6 +256,8 @@ fun ProfileScreen(
     detectedWeights?.let { weights ->
         ConfirmImportDialog(
             weights = weights,
+            existingByDate = remember(allWeights) { allWeights.associate { it.date to it.weight } },
+            unitSystem = profile.unitSystem,
             onDismiss = { detectedWeights = null },
             onConfirm = { selected ->
                 onWeightsImported(selected)
@@ -232,20 +266,23 @@ fun ProfileScreen(
         )
     }
 
-    val currentWeightKg = recentWeights.firstOrNull()?.weight ?: 0.0
+    val currentWeightKg = recentWeights.firstOrNull()?.weight
+    val isImperial = profile.unitSystem == UnitSystem.IMPERIAL
+    val divider = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
+        // Hero — same gradient as the other tabs
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (isSystemInDarkTheme()) 0.15f else 0.12f),
                             MaterialTheme.colorScheme.background
                         )
                     )
@@ -256,308 +293,216 @@ fun ProfileScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Profile",
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 60.sp),
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 44.sp),
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Manage your metrics",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    text = "YOUR STATS & SETTINGS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Stats & Settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                FilledTonalIconButton(
-                    onClick = { isEditing = true },
-                    shape = RoundedCornerShape(12.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+            // YOU
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("YOU", modifier = Modifier.weight(1f))
+                TextButton(onClick = { isEditing = true }, modifier = Modifier.offset(y = (-6).dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Edit", fontWeight = FontWeight.Bold)
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClickLabel = "Weight history", onClick = onWeightClick)
                 ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Edit Profile")
-                }
-            }
-
-            ProfileBlock(title = "Body Composition", icon = Icons.Default.MonitorWeight) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        label = "Weight",
-                        value = if (currentWeightKg > 0) Units.displayWeight(currentWeightKg, profile.unitSystem) else "--",
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        onClick = onWeightClick
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        label = "Body Fat",
-                        value = if (profile.bodyFatPercentage != null) "${profile.bodyFatPercentage}%" else "--",
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                }
-            }
-
-            ProfileBlock(title = "Physical Details", icon = Icons.Default.Person) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProfileStatRow(
-                        icon = Icons.Default.Straighten,
-                        label = "Height",
-                        value = Units.displayHeight(profile.height, profile.unitSystem)
-                    )
-                    ProfileStatRow(
-                        icon = Icons.Default.Cake,
-                        label = "Age",
-                        value = "${profile.age} years"
-                    )
-                    ProfileStatRow(
-                        icon = Icons.Default.Wc,
-                        label = "Sex",
-                        value = if (profile.isMale) "Male" else "Female"
-                    )
-                }
-            }
-
-            ProfileBlock(title = "Activity & Integration", icon = Icons.AutoMirrored.Filled.DirectionsWalk) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProfileStatRow(
-                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                        label = "Daily Steps",
-                        value = "${profile.averageDailySteps}"
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(
-                                Icons.Default.HealthAndSafety,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("Health Connect", style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    if (profile.useHealthConnect) "Connected" else "Disconnected",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (profile.useHealthConnect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        if (profile.useHealthConnect) {
-                            OutlinedButton(
-                                onClick = { showDisconnectDialog = true },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Disconnect")
-                            }
-                        } else {
-                            FilledTonalButton(
-                                onClick = { connectHealthConnect() },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Connect")
-                            }
-                        }
+                    Text("Weight", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (currentWeightKg != null) {
+                        BigStat(
+                            "%.1f".format(if (isImperial) Units.kgToLb(currentWeightKg) else currentWeightKg),
+                            if (isImperial) "lb" else "kg"
+                        )
+                    } else {
+                        BigStat("--", "")
                     }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    ProfileStatRow(
-                        icon = Icons.Default.Tune,
-                        label = "Units",
-                        value = if (profile.unitSystem == UnitSystem.IMPERIAL) "Imperial" else "Metric"
-                    )
+                    Text("History ›", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Body fat", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    BigStat(profile.bodyFatPercentage?.let { "%.1f".format(it) } ?: "--", if (profile.bodyFatPercentage != null) "%" else "")
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            ProfileStatRow(Icons.Default.Straighten, "Height", Units.displayHeight(profile.height, profile.unitSystem))
+            HorizontalDivider(color = divider)
+            ProfileStatRow(Icons.Default.Cake, "Age", "${profile.age} years")
+            HorizontalDivider(color = divider)
+            ProfileStatRow(Icons.Default.Wc, "Sex", if (profile.isMale) "Male" else "Female")
 
-            ProfileBlock(title = "Goal & Metabolism", icon = Icons.Default.LocalFireDepartment) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showChangeGoalDialog = true },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text("Current Goal", style = MaterialTheme.typography.labelSmall)
-                                    Text(
-                                        profile.goal.name.lowercase().replaceFirstChar { it.uppercase() },
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null)
-                        }
-                    }
+            SectionDivider()
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Estimated Maintenance", style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                "${profile.estimatedMaintenanceCalories} kcal",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+            // GOAL
+            SectionLabel("GOAL")
+            SettingsRow(
+                icon = Icons.Default.Flag,
+                title = profile.goal.name.lowercase().replaceFirstChar { it.uppercase() },
+                subtitle = "Tap to change your goal",
+                onClick = { showChangeGoalDialog = true },
+                trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            )
+            HorizontalDivider(color = divider)
+            ProfileStatRow(Icons.Default.LocalFireDepartment, "Estimated maintenance", "%,d kcal".format(profile.estimatedMaintenanceCalories))
+
+            SectionDivider()
+
+            // ACTIVITY
+            SectionLabel("ACTIVITY")
+            ProfileStatRow(Icons.AutoMirrored.Filled.DirectionsWalk, "Daily steps", "%,d".format(profile.averageDailySteps))
+            HorizontalDivider(color = divider)
+            SettingsRow(
+                icon = Icons.Default.HealthAndSafety,
+                title = "Health Connect",
+                subtitle = if (profile.useHealthConnect) "Connected — steps sync automatically" else "Not connected",
+                trailing = {
+                    if (profile.useHealthConnect) {
+                        TextButton(
+                            onClick = { showDisconnectDialog = true },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Disconnect") }
+                    } else {
+                        FilledTonalButton(onClick = { connectHealthConnect() }, shape = RoundedCornerShape(12.dp)) { Text("Connect") }
                     }
                 }
-            }
+            )
+            HorizontalDivider(color = divider)
+            ProfileStatRow(Icons.Default.Tune, "Units", if (isImperial) "Imperial" else "Metric")
 
-            ProfileBlock(title = "Data Management", icon = Icons.Default.FileDownload) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Import your past weight data from other health apps using a screenshot.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { pickerLauncher.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = !isProcessingImage
-                    ) {
-                        if (isProcessingImage) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        } else {
-                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Scan Multi Weights", fontWeight = FontWeight.Bold)
-                        }
-                    }
+            SectionDivider()
+
+            // DATA
+            SectionLabel("DATA")
+            SettingsRow(
+                icon = Icons.Default.AddPhotoAlternate,
+                title = "Import weights from screenshots",
+                subtitle = "Read past weigh-ins from another app's history screen",
+                onClick = if (isProcessingImage) null else ({ pickerLauncher.launch("image/*") }),
+                trailing = {
+                    if (isProcessingImage) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
-
+            )
             if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
-                ProfileBlock(title = "Progress Gallery", icon = Icons.Default.PhotoLibrary) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            "Track your visual transformation over time.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onViewGallery,
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Default.Compare, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("View & Compare Photos", fontWeight = FontWeight.Bold)
-                        }
+                HorizontalDivider(color = divider)
+                SettingsRow(
+                    icon = Icons.Default.PhotoLibrary,
+                    title = "Progress photos",
+                    subtitle = "View and compare your check-in photos",
+                    onClick = onViewGallery,
+                    trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+
+            SectionDivider()
+
+            // LEARN
+            SectionLabel("LEARN")
+            SettingsRow(
+                icon = Icons.AutoMirrored.Filled.MenuBook,
+                title = "How Momentum works",
+                subtitle = "Targets, weekly adjustments and training tips",
+                onClick = onOpenLearn,
+                trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            )
+
+            SectionDivider()
+
+            // SETTINGS
+            SectionLabel("SETTINGS")
+            SettingsRow(
+                icon = Icons.Default.Notifications,
+                title = "Weigh-in reminders",
+                subtitle = "Only sent if you haven't logged your weight that day",
+                trailing = {
+                    Switch(checked = profile.remindersEnabled, onCheckedChange = { onProfileUpdated(profile.copy(remindersEnabled = it)) })
+                }
+            )
+            if (profile.remindersEnabled) {
+                HorizontalDivider(color = divider)
+                SettingsRow(
+                    icon = Icons.Default.WbSunny,
+                    title = "Morning reminder",
+                    subtitle = "Also when your weekly check-in arrives on Mondays",
+                    onClick = { editingReminder = WorkScheduler.ReminderSlot.MORNING },
+                    trailing = { ReminderTimeText(WorkScheduler.reminderTime(profile, WorkScheduler.ReminderSlot.MORNING)) }
+                )
+                HorizontalDivider(color = divider)
+                SettingsRow(
+                    icon = Icons.Default.Bedtime,
+                    title = "Evening reminder",
+                    onClick = { editingReminder = WorkScheduler.ReminderSlot.EVENING },
+                    trailing = { ReminderTimeText(WorkScheduler.reminderTime(profile, WorkScheduler.ReminderSlot.EVENING)) }
+                )
+            }
+            HorizontalDivider(color = divider)
+            SettingsRow(
+                icon = Icons.Default.QrCodeScanner,
+                title = "Online barcode lookup",
+                subtitle = "Search Open Food Facts when a barcode isn't saved on your phone",
+                trailing = {
+                    Switch(checked = profile.useExternalApi, onCheckedChange = { onProfileUpdated(profile.copy(useExternalApi = it)) })
+                }
+            )
+            HorizontalDivider(color = divider)
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("Theme", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                AppTheme.entries.forEachIndexed { index, theme ->
+                    SegmentedButton(
+                        selected = profile.theme == theme,
+                        onClick = { onProfileUpdated(profile.copy(theme = theme)) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = AppTheme.entries.size)
+                    ) {
+                        Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
                     }
                 }
             }
 
-            ProfileBlock(title = "App Settings", icon = Icons.Default.SettingsSuggest) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Daily Reminders", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                            Text("Morning: ${profile.morningReminderTime} • Evening: ${profile.eveningReminderTime}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
-                            checked = profile.remindersEnabled,
-                            onCheckedChange = { onProfileUpdated(profile.copy(remindersEnabled = it)) }
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Online Barcode Lookup", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                            Text("Search Open Food Facts if barcode is not found locally.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
-                            checked = profile.useExternalApi,
-                            onCheckedChange = { onProfileUpdated(profile.copy(useExternalApi = it)) }
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    Text("App Theme", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        AppTheme.entries.forEachIndexed { index, theme ->
-                            SegmentedButton(
-                                selected = profile.theme == theme,
-                                onClick = { onProfileUpdated(profile.copy(theme = theme)) },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = AppTheme.entries.size)
-                            ) {
-                                Text(theme.name.lowercase().replaceFirstChar { it.uppercase() })
-                            }
-                        }
-                    }
-
-                    if (crashReport != null) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_SUBJECT, "Momentum Crash Report")
-                                    putExtra(Intent.EXTRA_TEXT, crashReport)
-                                }
-                                context.startActivity(Intent.createChooser(intent, "Send Crash Report"))
+            crashReport?.let { report ->
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = divider)
+                SettingsRow(
+                    icon = Icons.Default.BugReport,
+                    title = "Crash report available",
+                    subtitle = "Sending it helps fix the problem",
+                    trailing = {
+                        Row {
+                            TextButton(onClick = {
                                 CrashHandler.clearCrashReport(context)
                                 crashReport = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        ) {
-                            Icon(Icons.Default.BugReport, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Send Crash Report")
+                            }) { Text("Dismiss") }
+                            FilledTonalButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, "Momentum Crash Report")
+                                        putExtra(Intent.EXTRA_TEXT, report)
+                                    }
+                                    // Kept until dismissed: the share sheet can be closed without sending
+                                    context.startActivity(Intent.createChooser(intent, "Send Crash Report"))
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Send") }
                         }
                     }
-                }
+                )
             }
 
             Spacer(modifier = Modifier.height(120.dp))
@@ -565,68 +510,32 @@ fun ProfileScreen(
     }
 }
 
+/** A plain settings-style row: icon, title, optional subtitle, and a trailing control. */
 @Composable
-private fun ProfileBlock(
-    title: String,
+private fun SettingsRow(
     icon: ImageVector,
-    content: @Composable () -> Unit
+    title: String,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable () -> Unit = {}
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                content()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            subtitle?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-    }
-}
-
-@Composable
-private fun StatCard(
-    label: String,
-    value: String,
-    containerColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null
-) {
-    Card(
-        modifier = modifier
-            .height(100.dp)
-            .let { if (onClick != null) it.clickable { onClick() } else it },
-        colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = if(isSystemInDarkTheme()) 0.25f else 0.15f)),
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, containerColor.copy(alpha = 0.4f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
-        }
+        Spacer(modifier = Modifier.width(8.dp))
+        trailing()
     }
 }
 
@@ -640,7 +549,7 @@ private fun ProfileStatRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -648,10 +557,10 @@ private fun ProfileStatRow(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         }
         Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = valueColor)
@@ -742,10 +651,14 @@ private fun RestartAppDialog(
 @Composable
 private fun ConfirmImportDialog(
     weights: List<WeightEntry>,
+    existingByDate: Map<String, Double>,
+    unitSystem: UnitSystem,
     onDismiss: () -> Unit,
     onConfirm: (List<WeightEntry>) -> Unit
 ) {
-    var selectedEntries by remember { mutableStateOf(weights.toSet()) }
+    // Dates you already logged start unticked, so a misread screenshot can't silently replace them
+    var selectedEntries by remember { mutableStateOf(weights.filter { it.date !in existingByDate }.toSet()) }
+    val dateFormat = remember { java.time.format.DateTimeFormatter.ofPattern("EEE d MMM yyyy") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -772,8 +685,18 @@ private fun ConfirmImportDialog(
                             })
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(entry.date, fontWeight = FontWeight.Bold)
-                                Text("${entry.weight} kg", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    runCatching { java.time.LocalDate.parse(entry.date).format(dateFormat) }.getOrDefault(entry.date),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(Units.displayWeight(entry.weight, unitSystem), style = MaterialTheme.typography.bodySmall)
+                                existingByDate[entry.date]?.let { existing ->
+                                    Text(
+                                        "Replaces ${Units.displayWeight(existing, unitSystem)} you logged",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
@@ -899,48 +822,6 @@ private fun EditProfileForm(
     var bodyFatInput by remember { mutableStateOf(profile.bodyFatPercentage?.toString() ?: "") }
     var isMale by remember { mutableStateOf(profile.isMale) }
     var stepsInput by remember { mutableStateOf(profile.averageDailySteps.toString()) }
-
-    var morningTime by remember { mutableStateOf(profile.morningReminderTime) }
-    var eveningTime by remember { mutableStateOf(profile.eveningReminderTime) }
-
-    var showMorningPicker by remember { mutableStateOf(false) }
-    var showEveningPicker by remember { mutableStateOf(false) }
-
-    if (showMorningPicker) {
-        val initial = morningTime.split(":")
-        val state = rememberTimePickerState(
-            initialHour = initial.getOrNull(0)?.toIntOrNull() ?: 8,
-            initialMinute = initial.getOrNull(1)?.toIntOrNull() ?: 30,
-            is24Hour = true
-        )
-        TimePickerDialog(
-            onDismiss = { showMorningPicker = false },
-            onConfirm = {
-                morningTime = "%02d:%02d".format(state.hour, state.minute)
-                showMorningPicker = false
-            }
-        ) {
-            TimePicker(state = state)
-        }
-    }
-
-    if (showEveningPicker) {
-        val initial = eveningTime.split(":")
-        val state = rememberTimePickerState(
-            initialHour = initial.getOrNull(0)?.toIntOrNull() ?: 20,
-            initialMinute = initial.getOrNull(1)?.toIntOrNull() ?: 0,
-            is24Hour = true
-        )
-        TimePickerDialog(
-            onDismiss = { showEveningPicker = false },
-            onConfirm = {
-                eveningTime = "%02d:%02d".format(state.hour, state.minute)
-                showEveningPicker = false
-            }
-        ) {
-            TimePicker(state = state)
-        }
-    }
 
     val parsedAge = age.toIntOrNull()
     val parsedBodyFat = bodyFatInput.replace(',', '.').toDoubleOrNull()
@@ -1075,25 +956,10 @@ private fun EditProfileForm(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                TimeInputButton(
-                    label = "Morning Reminder",
-                    time = morningTime,
-                    onClick = { showMorningPicker = true },
-                    modifier = Modifier.weight(1f)
-                )
-                TimeInputButton(
-                    label = "Evening Reminder",
-                    time = eveningTime,
-                    onClick = { showEveningPicker = true },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Cancel") }
                 Button(
                     onClick = {
-                        onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect, morningReminderTime = morningTime, eveningReminderTime = eveningTime))
+                        onSave(profile.copy(height = parsedHeightCm!!, age = parsedAge!!, isMale = isMale, averageDailySteps = parsedSteps!!, unitSystem = unitSystem, bodyFatPercentage = parsedBodyFat, useHealthConnect = useHealthConnect))
                     },
                     enabled = allValid,
                     modifier = Modifier.weight(1.5f).height(56.dp),
@@ -1106,43 +972,17 @@ private fun EditProfileForm(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimeInputButton(
-    label: String,
-    time: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-        Surface(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = time, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
-}
 
 @Composable
 private fun TimePickerDialog(
+    title: String,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     content: @Composable () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Black) },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
@@ -1155,5 +995,16 @@ private fun TimePickerDialog(
             }
         },
         shape = RoundedCornerShape(28.dp)
+    )
+}
+
+/** A reminder time in the phone's own 12/24-hour style. */
+@Composable
+private fun ReminderTimeText(time: java.time.LocalTime) {
+    Text(
+        time.format(java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Black,
+        color = MaterialTheme.colorScheme.primary
     )
 }

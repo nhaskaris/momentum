@@ -14,22 +14,26 @@ class WeighInReminderWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        return try {
-            val database = WeightDatabase.getInstance(applicationContext)
-            val dao = database.weightDao()
-            
-            val profile = dao.getUserProfile().first() ?: return Result.success()
-            val today = LocalDate.now().toString()
-            val loggedToday = dao.hasWeightForDate(today)
+        val slot = inputData.getString(WorkScheduler.KEY_SLOT)
+            ?.let { name -> WorkScheduler.ReminderSlot.entries.firstOrNull { it.name == name } }
 
-            if (!loggedToday) {
+        try {
+            val dao = WeightDatabase.getInstance(applicationContext).weightDao()
+            val profile = dao.getUserProfile().first() ?: return Result.success()
+            if (!profile.remindersEnabled) return Result.success()
+
+            if (!dao.hasWeightForDate(LocalDate.now().toString())) {
                 NotificationHelper.showWeighInReminder(applicationContext)
             }
 
-            Result.success()
+            // Queue tomorrow's reminder for this slot (one-off jobs don't repeat by themselves)
+            if (slot != null) {
+                WorkScheduler.scheduleNextReminder(applicationContext, slot, WorkScheduler.reminderTime(profile, slot))
+            }
         } catch (e: Exception) {
+            // No retry: a retried run would queue a second "next" reminder. Opening the app reschedules anyway.
             Log.e("WeighInReminderWorker", "Error running weigh-in reminder", e)
-            Result.retry()
         }
+        return Result.success()
     }
 }

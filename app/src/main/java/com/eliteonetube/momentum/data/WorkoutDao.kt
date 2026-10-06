@@ -28,6 +28,38 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_session_table ORDER BY date DESC LIMIT 30")
     fun getRecentSessions(): Flow<List<WorkoutSession>>
 
+    /** Every session, for the full history screen. */
+    @Query("SELECT * FROM workout_session_table ORDER BY date DESC, id DESC")
+    fun getAllSessions(): Flow<List<WorkoutSession>>
+
+    @Query("""
+        SELECT t.id AS templateId,
+               (SELECT COUNT(*) FROM template_exercise_table te WHERE te.templateId = t.id) AS exerciseCount,
+               (SELECT MAX(s.date) FROM workout_session_table s WHERE s.templateId = t.id) AS lastDone
+        FROM workout_template_table t
+    """)
+    fun getTemplateSummaries(): Flow<List<TemplateSummary>>
+
+    // @Update, not REPLACE: a REPLACE deletes the row first, which would cascade-delete the routine's
+    // exercises and null out templateId on every session logged from it.
+    @Update
+    suspend fun updateTemplate(template: WorkoutTemplate)
+
+    @Query("""
+        SELECT COUNT(*) AS sessions,
+               COALESCE(SUM(setCount), 0) AS sets,
+               COALESCE(SUM(totalVolumeKg), 0.0) AS volumeKg,
+               COALESCE(SUM(CASE WHEN date > :since THEN 1 ELSE 0 END), 0) AS sessionsLast30Days
+        FROM workout_session_table
+    """)
+    fun getWorkoutTotals(since: String): Flow<WorkoutTotals>
+
+    @Query("SELECT * FROM workout_session_table ORDER BY totalVolumeKg DESC LIMIT 1")
+    fun getHeaviestSession(): Flow<WorkoutSession?>
+
+    @Query("SELECT * FROM workout_session_table ORDER BY exerciseCount DESC, date DESC LIMIT 1")
+    fun getMostVariedSession(): Flow<WorkoutSession?>
+
     @Query("DELETE FROM workout_session_table WHERE id = :sessionId")
     suspend fun deleteSession(sessionId: Long)
 

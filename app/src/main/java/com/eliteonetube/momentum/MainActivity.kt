@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.eliteonetube.momentum.data.*
+import com.eliteonetube.momentum.ui.components.rememberCurrentDate
 import com.eliteonetube.momentum.logic.algorithm.*
 import com.eliteonetube.momentum.logic.api.*
 import com.eliteonetube.momentum.logic.parsers.*
@@ -78,8 +79,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        WorkScheduler.scheduleWeeklyRecalculation(applicationContext)
-
         val database = WeightDatabase.getInstance(applicationContext)
         val weightDao = database.weightDao()
         val workoutDao = database.workoutDao()
@@ -130,13 +129,18 @@ fun MomentumAppContent(
     val recentWeights by weightDao.getLastTwoWeeks().collectAsState(initial = emptyList())
     val allWeights by weightDao.getAllWeights().collectAsState(initial = emptyList())
     val recentSessions by workoutDao.getRecentSessions().collectAsState(initial = emptyList())
+    // Collected only while the full history screen is open
+    val allSessionsFlow = remember(workoutDao) { workoutDao.getAllSessions() }
+    val templateSummaries by workoutDao.getTemplateSummaries().collectAsState(initial = emptyList())
     val allExercises by workoutDao.getAllExercises().collectAsState(initial = emptyList())
     val allTemplates by workoutDao.getAllTemplates().collectAsState(initial = emptyList())
     val allCheckIns by weightDao.getAllCheckIns().collectAsState(initial = emptyList())
     val allMeals by foodDao.getAllMeals().collectAsState(initial = emptyList())
     val allWeightDates by weightDao.getAllWeightDates().collectAsState(initial = emptyList())
 
-    val thirtyDaysAgo = remember { LocalDate.now().minusDays(30).toString() }
+    // Stays current past midnight, so "today" queries roll over instead of freezing at app start
+    val currentDate by rememberCurrentDate()
+    val thirtyDaysAgo = currentDate.minusDays(30).toString()
     val recentNutritionFlow = remember(thirtyDaysAgo) {
         combine(
             foodDao.getRecentFoodLogs(thirtyDaysAgo),
@@ -170,6 +174,16 @@ fun MomentumAppContent(
     }
     val recentNutrition by recentNutritionFlow.collectAsState(initial = emptyList())
 
+    // All-time workout totals and records for Analytics (recentSessions is capped at 30)
+    val workoutStatsFlow = remember(thirtyDaysAgo) {
+        combine(
+            workoutDao.getWorkoutTotals(thirtyDaysAgo),
+            workoutDao.getHeaviestSession(),
+            workoutDao.getMostVariedSession()
+        ) { totals, heaviest, mostVaried -> WorkoutStats(totals, heaviest, mostVaried) }
+    }
+    val workoutStats by workoutStatsFlow.collectAsState(initial = null)
+
     val activeSetsFlow = remember(workoutDao) { workoutDao.getActiveSets().distinctUntilChanged() }
     val activeSets by activeSetsFlow.collectAsState(initial = emptyList())
 
@@ -177,7 +191,7 @@ fun MomentumAppContent(
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
     val openCheckInRequest by openCheckInRequests.collectAsState()
 
-    val today = remember { LocalDate.now().toString() }
+    val today = currentDate.toString()
     val todayFoodLogsFlow = remember(today) {
         combine(
             foodDao.getFoodLogsForDate(today),
@@ -216,10 +230,25 @@ fun MomentumAppContent(
     }
 
     LaunchedEffect(savedProfile) {
-        savedProfile?.let { 
-            currentCalorieTarget = it.currentCalorieTarget
-            WorkScheduler.scheduleDailyReminders(context.applicationContext, it)
-        }
+        savedProfile?.let { currentCalorieTarget = it.currentCalorieTarget }
+    }
+
+    // Reschedule notifications only when their settings change, not on every profile save
+    val reminderSettings = savedProfile?.let { Triple(it.remindersEnabled, it.morningReminderTime, it.eveningReminderTime) }
+    LaunchedEffect(reminderSettings) {
+        WorkScheduler.scheduleDailyReminders(context.applicationContext, savedProfile ?: return@LaunchedEffect)
+    }
+    var scheduledCheckInTime by remember { mutableStateOf<java.time.LocalTime?>(null) }
+    val checkInTime = savedProfile?.let { WorkScheduler.reminderTime(it, WorkScheduler.ReminderSlot.MORNING) }
+    LaunchedEffect(checkInTime) {
+        if (checkInTime == null) return@LaunchedEffect
+        // Keep an already-queued check-in on app start; replace it only when the time actually changed
+        WorkScheduler.scheduleWeeklyCheckIn(
+            context.applicationContext,
+            checkInTime,
+            replace = scheduledCheckInTime != null && scheduledCheckInTime != checkInTime
+        )
+        scheduledCheckInTime = checkInTime
     }
 
     if (!isProfileLoaded) {
@@ -232,7 +261,10 @@ fun MomentumAppContent(
                 recentWeights = recentWeights,
                 allWeights = allWeights,
                 recentSessions = recentSessions,
+                allSessionsFlow = allSessionsFlow,
+                templateSummaries = templateSummaries,
                 recentNutrition = recentNutrition,
+                workoutStats = workoutStats,
                 allExercises = allExercises,
                 allTemplates = allTemplates,
                 allCheckIns = allCheckIns,
@@ -263,8 +295,14 @@ fun MomentumAppContent(
                 onWeightDeleted = { date -> coroutineScope.launch { weightDao.deleteWeight(date) } },
                 onProfileUpdated = { updatedProfile ->
                     coroutineScope.launch {
+                        // Without any logged weight there's nothing to recalculate from, so keep the current estimate
+                        val latestWeightKg = recentWeights.firstOrNull()?.weight
+                        if (latestWeightKg == null) {
+                            weightDao.saveProfile(updatedProfile)
+                            return@launch
+                        }
                         val recalculated = algorithm.calculateInitialMaintenance(
-                            recentWeights.firstOrNull()?.weight ?: updatedProfile.height,
+                            latestWeightKg,
                             updatedProfile.height, updatedProfile.age, updatedProfile.isMale,
                             updatedProfile.averageDailySteps, updatedProfile.bodyFatPercentage
                         )
@@ -467,6 +505,31 @@ fun MomentumAppContent(
                 },
                 onSessionDeleted = { sid -> coroutineScope.launch { workoutDao.deleteSession(sid) } },
                 onCreateExercise = { n, m, t, oc -> coroutineScope.launch { val ex = Exercise(name = n, muscleGroup = m, exerciseType = t); val nid = workoutDao.insertExercise(ex); oc(ex.copy(id = nid)) } },
+                onTemplateUpdated = { tid, n, nt, exs ->
+                    coroutineScope.launch {
+                        workoutDao.updateTemplate(WorkoutTemplate(id = tid, name = n, notes = nt))
+                        val existing = workoutDao.getExercisesForTemplateOnce(tid)
+                        val existingSets = workoutDao.getSetsForTemplate(tid).groupBy { it.templateExerciseId }
+                        val contents = exs.mapIndexed { i, input ->
+                            val old = existing.firstOrNull { it.exerciseId == input.exercise.id }
+                            val oldSets = old?.let { existingSets[it.id] }.orEmpty()
+                            // Exercises whose numbers weren't touched keep their per-set targets;
+                            // edited ones get the dialog's uniform sets × reps × weight
+                            val unchanged = oldSets.isNotEmpty() && oldSets.size == input.targetSets &&
+                                oldSets.first().targetReps == input.targetReps && oldSets.first().targetWeightKg == input.targetWeightKg
+                            val sets = if (unchanged) oldSets else List(input.targetSets) { sn ->
+                                TemplateSet(templateExerciseId = 0, setNumber = sn + 1, targetReps = input.targetReps, targetWeightKg = input.targetWeightKg)
+                            }
+                            TemplateExercise(
+                                templateId = tid, exerciseId = input.exercise.id,
+                                targetSets = input.targetSets, targetReps = input.targetReps, targetWeightKg = input.targetWeightKg,
+                                orderIndex = i,
+                                targetDurationSeconds = old?.targetDurationSeconds, targetDistanceKm = old?.targetDistanceKm
+                            ) to sets
+                        }
+                        workoutDao.replaceTemplateContents(tid, contents)
+                    }
+                },
                 onTemplateCreated = { n, nt, exs ->
                     coroutineScope.launch {
                         val tid = workoutDao.insertTemplate(WorkoutTemplate(name = n, notes = nt))

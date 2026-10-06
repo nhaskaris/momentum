@@ -144,3 +144,24 @@ data class TemplateSet(
     val targetDurationSeconds: Int? = null,
     val targetDistanceKm: Double? = null
 )
+
+/** Aggregates over every logged session (not just the recent ones shown in lists and charts). */
+data class WorkoutTotals(
+    val sessions: Int,
+    val sets: Int,
+    val volumeKg: Double,
+    val sessionsLast30Days: Int
+)
+
+data class WorkoutStats(
+    val totals: WorkoutTotals,
+    val heaviest: WorkoutSession?,
+    val mostVaried: WorkoutSession?
+)
+
+/** Per-routine info for the Train tab list (not a table). */
+data class TemplateSummary(
+    val templateId: Long,
+    val exerciseCount: Int,
+    val lastDone: String?
+)

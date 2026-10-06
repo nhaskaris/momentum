@@ -1,7 +1,9 @@
 package com.eliteonetube.momentum.logic.parsers
 
 import android.util.Log
+import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.WeightEntry
+import com.eliteonetube.momentum.logic.utils.Units
 import com.google.mlkit.vision.text.Text
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -12,7 +14,7 @@ object WeightHistoryParser {
     private const val TAG = "WeightHistoryParser"
     
     // Prioritize numbers followed by units (kg, lb) or numbers with decimals
-    private val weightWithUnitRegex = Regex("""(\d{2,3}(?:[.,]\d)?)\s*(?:kg|lb|lbs)""", RegexOption.IGNORE_CASE)
+    private val weightWithUnitRegex = Regex("""(\d{2,3}(?:[.,]\d)?)\s*(kg|lbs?)""", RegexOption.IGNORE_CASE)
     private val weightDecimalRegex = Regex("""(\d{2,3}[.,]\d)""")
     private val weightSimpleRegex = Regex("""(\d{2,3})""")
     
@@ -33,7 +35,11 @@ object WeightHistoryParser {
         "MMM d" to DateTimeFormatter.ofPattern("MMM d", Locale.US)
     )
 
-    fun parse(visionText: Text): List<WeightEntry> {
+    /**
+     * Weights are always returned in kg. A number labelled "lb"/"lbs" is converted; a number with no
+     * unit is taken to be in [defaultUnit] (the user's own setting).
+     */
+    fun parse(visionText: Text, defaultUnit: UnitSystem): List<WeightEntry> {
         val results = mutableListOf<WeightEntry>()
         val blocks = visionText.textBlocks
         
@@ -77,7 +83,8 @@ object WeightHistoryParser {
                 rowText
             }
             
-            val weight = extractWeight(textToSearchForWeight) ?: extractWeight(rowText) // Fallback to full text if cleaning failed
+            val weight = extractWeightKg(textToSearchForWeight, defaultUnit)
+                ?: extractWeightKg(rowText, defaultUnit) // Fallback to full text if cleaning failed
             
             if (weight != null) {
                 Log.d(TAG, "Found valid entry: $date -> $weight")
@@ -88,24 +95,18 @@ object WeightHistoryParser {
         return results.distinctBy { it.date }.sortedByDescending { it.date }
     }
 
-    private fun extractWeight(text: String): Double? {
-        // High priority: Number + Unit
+    private fun extractWeightKg(text: String, defaultUnit: UnitSystem): Double? {
+        // High priority: Number + Unit — the label wins over the user's setting
         weightWithUnitRegex.find(text)?.let {
-            return it.groupValues[1].replace(",", ".").toDoubleOrNull()
+            val value = it.groupValues[1].replace(",", ".").toDoubleOrNull() ?: return null
+            val isPounds = it.groupValues[2].startsWith("lb", ignoreCase = true)
+            return if (isPounds) Units.lbToKg(value) else value
         }
-        
-        // Medium priority: Number with decimal
-        weightDecimalRegex.find(text)?.let {
-            return it.groupValues[1].replace(",", ".").toDoubleOrNull()
-        }
-        
-        // Low priority: Last simple number found (often weight is on the right)
-        val matches = weightSimpleRegex.findAll(text).toList()
-        if (matches.isNotEmpty()) {
-            return matches.last().groupValues[1].toDoubleOrNull()
-        }
-        
-        return null
+
+        val unitless = weightDecimalRegex.find(text)?.groupValues?.get(1)?.replace(",", ".")?.toDoubleOrNull() // Number with decimal
+            ?: weightSimpleRegex.findAll(text).lastOrNull()?.groupValues?.get(1)?.toDoubleOrNull() // Last number (often weight is on the right)
+            ?: return null
+        return if (defaultUnit == UnitSystem.IMPERIAL) Units.lbToKg(unitless) else unitless
     }
 
     private fun findDateMatch(text: String): String? {

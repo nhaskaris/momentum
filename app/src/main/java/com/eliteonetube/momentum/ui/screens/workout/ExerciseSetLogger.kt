@@ -7,6 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
@@ -41,6 +44,8 @@ fun ExerciseSetLogger(
     onSetRemoved: (Int) -> Unit,
     onExerciseRemoved: () -> Unit,
     onExerciseSwapped: () -> Unit = {},
+    // Keyboard "Done" on a set's last field — most people log by typing, not by ticking
+    onSetLogged: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -119,7 +124,8 @@ fun ExerciseSetLogger(
                         historySet = historySet,
                         unitSystem = unitSystem,
                         onUpdate = { upd -> onSetUpdated(set.setNumber, upd) },
-                        onRemove = { onSetRemoved(set.setNumber) }
+                        onRemove = { onSetRemoved(set.setNumber) },
+                        onLogged = onSetLogged
                     )
                 }
             }
@@ -165,8 +171,14 @@ private fun SetInputRow(
     historySet: LoggedSet?,
     unitSystem: UnitSystem,
     onUpdate: (PendingSet) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onLogged: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val logSet = KeyboardActions(onDone = {
+        focusManager.clearFocus()
+        onLogged()
+    })
     val displayWeight = remember(set.weightKg, unitSystem) {
         if (set.weightKg == 0.0) "" 
         else if (unitSystem == UnitSystem.IMPERIAL) {
@@ -234,12 +246,11 @@ private fun SetInputRow(
                     value = durationInput,
                     onValueChange = { newValue ->
                         durationInput = newValue
-                        val seconds = parseDuration(newValue)
-                        onUpdate(set.copy(durationSeconds = seconds))
+                        onUpdate(set.copy(durationSeconds = if (newValue.isBlank()) null else parseDuration(newValue)))
                     },
                     placeholder = { Text(placeholderDuration, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
                     shape = RoundedCornerShape(10.dp),
@@ -257,9 +268,10 @@ private fun SetInputRow(
                         distanceInput = newValue
                         onUpdate(set.copy(distanceKm = newValue.replace(',', '.').toDoubleOrNull()))
                     },
+                    keyboardActions = logSet,
                     placeholder = { Text(placeholderDistance, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
                     shape = RoundedCornerShape(10.dp),
@@ -273,13 +285,15 @@ private fun SetInputRow(
             } else {
                 OutlinedTextField(
                     value = weightInput,
-                    onValueChange = { 
+                    onValueChange = {
                         weightInput = it
-                        it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(set.copy(weightKg = if (unitSystem == UnitSystem.IMPERIAL) v / 2.20462 else v)) } 
+                        // Empty = use the placeholder again; unparseable mid-typing input (e.g. "8.") is ignored
+                        if (it.isBlank()) onUpdate(set.copy(weightKg = 0.0))
+                        else it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(set.copy(weightKg = if (unitSystem == UnitSystem.IMPERIAL) v / 2.20462 else v)) }
                     },
                     placeholder = { Text(placeholderWeight, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
                     shape = RoundedCornerShape(10.dp),
@@ -293,10 +307,15 @@ private fun SetInputRow(
 
                 OutlinedTextField(
                     value = repsInput,
-                    onValueChange = { repsInput = it; it.toIntOrNull()?.let { r -> onUpdate(set.copy(reps = r)) } },
+                    onValueChange = {
+                        repsInput = it
+                        if (it.isBlank()) onUpdate(set.copy(reps = 0))
+                        else it.toIntOrNull()?.let { r -> onUpdate(set.copy(reps = r)) }
+                    },
+                    keyboardActions = logSet,
                     placeholder = { Text(placeholderReps, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))) },
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
                     shape = RoundedCornerShape(10.dp),

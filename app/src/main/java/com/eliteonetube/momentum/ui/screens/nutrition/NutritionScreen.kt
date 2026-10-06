@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +30,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.ui.theme.*
+import com.eliteonetube.momentum.ui.components.SectionDivider
+import com.eliteonetube.momentum.ui.components.SectionLabel
 import com.eliteonetube.momentum.ui.components.bounceClick
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -46,30 +51,27 @@ fun NutritionScreen(
     onQuickLog: (FoodItem) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onFoodCreated: (FoodItem) -> Unit,
-    onStartScan: () -> Unit
+    onStartScan: () -> Unit,
+    onOpenLearn: () -> Unit = {}
 ) {
-    val currentWeightKg = remember(recentWeights, profile.height) { 
-        recentWeights.firstOrNull()?.weight ?: profile.height 
-    }
+    // Newest logged weight (recentWeights is the latest entries, not a date window)
+    val currentWeightKg = recentWeights.firstOrNull()?.weight
 
-    val caloriesConsumed by remember(todayLogs) { 
-        derivedStateOf { todayLogs.sumOf { it.calories * it.quantity } } 
-    }
-    val proteinConsumed by remember(todayLogs) { 
-        derivedStateOf { todayLogs.sumOf { it.protein * it.quantity } } 
-    }
-    val fatConsumed by remember(todayLogs) { 
-        derivedStateOf { todayLogs.sumOf { it.fat * it.quantity } } 
-    }
-    val carbsConsumed by remember(todayLogs) { 
-        derivedStateOf { todayLogs.sumOf { it.carbs * it.quantity } } 
-    }
+    // Deletes wait for the Undo snackbar to close; until then the entry is just hidden
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var pendingDeleteKeys by remember { mutableStateOf(emptySet<String>()) }
+    val visibleLogs = remember(todayLogs, pendingDeleteKeys) { todayLogs.filterNot { it.listKey in pendingDeleteKeys } }
 
-    val proteinGramsTarget = remember(currentWeightKg) { (currentWeightKg * 2.0).roundToInt() }
-    val fatGramsTarget = remember(currentWeightKg) { (currentWeightKg * 0.8).roundToInt() }
-    val carbGramsTarget = remember(calorieTarget, proteinGramsTarget, fatGramsTarget) { 
-        ((calorieTarget - (proteinGramsTarget * 4) - (fatGramsTarget * 9)) / 4.0).roundToInt() 
-    }
+    val caloriesConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.calories * it.quantity } }
+    val proteinConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.protein * it.quantity } }
+    val fatConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.fat * it.quantity } }
+    val carbsConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.carbs * it.quantity } }
+
+    val macroTargets = remember(calorieTarget, currentWeightKg) { MacroTargets.from(calorieTarget, currentWeightKg) }
+    val remaining = (calorieTarget - caloriesConsumed).roundToInt()
+    val isOver = remaining < 0
+    val isDark = isSystemInDarkTheme()
 
     var showAddFood by remember { mutableStateOf(false) }
 
@@ -93,11 +95,31 @@ fun NutritionScreen(
         )
     }
 
+    fun deleteWithUndo(log: FoodLogWithItem) {
+        // Only one Undo at a time: closing the previous snackbar commits its delete
+        snackbarHostState.currentSnackbarData?.dismiss()
+        pendingDeleteKeys = pendingDeleteKeys + log.listKey
+        coroutineScope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "Removed ${log.name}",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                pendingDeleteKeys = pendingDeleteKeys - log.listKey
+            } else {
+                // Key stays hidden: ids are never reused, and it avoids a flash before the row leaves the list
+                onDeleteLog(log.id, log.isMeal)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
-        // Hero Section
+        // Hero Section — same gradient as the Dashboard hero
         item {
             Box(
                 modifier = Modifier
@@ -105,7 +127,7 @@ fun NutritionScreen(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
                                 MaterialTheme.colorScheme.background
                             )
                         )
@@ -115,26 +137,36 @@ fun NutritionScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
                     Text(
-                        text = "${(calorieTarget - caloriesConsumed).roundToInt()}",
+                        text = "%,d".format(if (isOver) -remaining else remaining),
                         style = MaterialTheme.typography.displayLarge.copy(
                             fontSize = 72.sp,
                             letterSpacing = (-4).sp
                         ),
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = if (isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "kcal remaining",
+                        text = if (isOver) "kcal over" else "kcal remaining",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier.padding(bottom = 32.dp)
                     )
 
-                    MacroBar("Protein", proteinConsumed.roundToInt(), proteinGramsTarget, ProteinBlue)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    MacroBar("Fats", fatConsumed.roundToInt(), fatGramsTarget, FatYellow)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    MacroBar("Carbs", carbsConsumed.roundToInt(), carbGramsTarget, CarbGreen)
+                    if (macroTargets != null) {
+                        MacroBar("Protein", proteinConsumed.roundToInt(), macroTargets.proteinGrams, ProteinBlue)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        MacroBar("Fats", fatConsumed.roundToInt(), macroTargets.fatGrams, FatYellow)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        MacroBar("Carbs", carbsConsumed.roundToInt(), macroTargets.carbGrams, CarbGreen)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(onClick = onOpenLearn) {
+                            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("How are my macros set?", style = MaterialTheme.typography.labelLarge)
+                        }
+                    } else {
+                        MacroTargetsUnavailable()
+                    }
                 }
             }
         }
@@ -152,58 +184,68 @@ fun NutritionScreen(
                     Text("Add Food", fontWeight = FontWeight.Black, fontSize = 18.sp)
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-                SectionHeader("Today's Log", Icons.Default.Restaurant)
-            }
-        }
-        
-        if (todayLogs.isEmpty()) {
-            item {
-                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                    EmptyState("No food logged yet. Use the scanner to start tracking.")
-                }
-            }
-        } else {
-            items(todayLogs, key = { it.id }) { log ->
-                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        FoodLogItem(
-                            log = log, 
-                            onDelete = { onDeleteLog(log.id, log.isMeal) },
-                            onClick = { onEditLog(log) }
-                        )
-                    }
-                }
+                SectionDivider()
+                SectionLabel("TODAY'S LOG")
             }
         }
 
-        item {
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
-                SectionHeader("Coaching", Icons.Default.Info)
-                MacroExplanationCard(
-                    title = "Protein: The Builder",
-                    description = "Crucial for repairing and building muscle tissue. Target: 2.0g/kg.",
-                    color = ProteinBlue
+        if (visibleLogs.isEmpty()) {
+            item {
+                Text(
+                    "No food logged yet. Tap Add Food or scan a barcode to start.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                MacroExplanationCard(
-                    title = "Fats: The Regulator",
-                    description = "Essential for hormones and brain health. Target: 0.8g/kg.",
-                    color = FatYellow
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                MacroExplanationCard(
-                    title = "Carbs: The Fuel",
-                    description = "Primary energy source for intense training.",
-                    color = CarbGreen
-                )
+            }
+        } else {
+            // Foods and meals live in separate tables with overlapping ids, so the key needs the type too
+            itemsIndexed(visibleLogs, key = { _, log -> log.listKey }) { index, log ->
+                Column(modifier = Modifier.padding(horizontal = 24.dp).animateItem()) {
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    FoodLogItem(
+                        log = log,
+                        onDelete = { deleteWithUndo(log) },
+                        onClick = { onEditLog(log) }
+                    )
+                }
             }
         }
     }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)
+    )
+    }
+}
+
+/** Unique across foods and meals, whose ids come from different tables. */
+private val FoodLogWithItem.listKey: String get() = (if (isMeal) "meal_" else "food_") + id
+
+/** Daily macro targets: protein 2.0 g/kg, fat 0.8 g/kg, carbs fill the remaining calories. */
+data class MacroTargets(val proteinGrams: Int, val fatGrams: Int, val carbGrams: Int) {
+    companion object {
+        /** Null when no weight has been logged: targets are per kg, so there is nothing to base them on. */
+        fun from(calorieTarget: Int, weightKg: Double?): MacroTargets? {
+            if (weightKg == null || weightKg <= 0.0) return null
+            val protein = (weightKg * 2.0).roundToInt()
+            val fat = (weightKg * 0.8).roundToInt()
+            val carbs = ((calorieTarget - protein * 4 - fat * 9) / 4.0).roundToInt().coerceAtLeast(0)
+            return MacroTargets(protein, fat, carbs)
+        }
+    }
+}
+
+@Composable
+fun MacroTargetsUnavailable() {
+    Text(
+        "Log your weight to get protein, fat and carb targets.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -223,7 +265,7 @@ fun MacroBar(label: String, current: Int, target: Int, color: Color) {
         }
         Spacer(modifier = Modifier.height(6.dp))
         LinearProgressIndicator(
-            progress = { (current.toFloat() / target.toFloat()).coerceIn(0f, 1f) },
+            progress = { if (target > 0) (current.toFloat() / target).coerceIn(0f, 1f) else 0f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(10.dp)
@@ -235,17 +277,6 @@ fun MacroBar(label: String, current: Int, target: Int, color: Color) {
     }
 }
 
-@Composable
-fun SectionHeader(title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = 16.dp)
-    ) {
-        Icon(icon, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    }
-}
 
 @Composable
 fun EmptyState(message: String) {
@@ -271,7 +302,7 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
         modifier = Modifier
             .fillMaxWidth()
             .bounceClick { if (!log.isMeal) onClick() } // Meals might not be editable yet
-            .padding(16.dp),
+            .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -313,7 +344,7 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
                 val logQty = log.quantity * log.servingAmount
                 val displayQty = if (logQty % 1.0 == 0.0) logQty.toInt().toString() else "%.1f".format(logQty)
                 Text(
-                    text = if (log.isMeal) "${log.calories.roundToInt()} kcal • Bundle"
+                    text = if (log.isMeal) "${log.calories.roundToInt()} kcal"
                            else "${(log.calories * log.quantity).roundToInt()} kcal • $displayQty ${log.servingUnit}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -333,18 +364,3 @@ fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit)
     }
 }
 
-@Composable
-fun MacroExplanationCard(title: String, description: String, color: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.05f)),
-        border = CardDefaults.outlinedCardBorder().copy(brush = Brush.linearGradient(listOf(color.copy(alpha = 0.2f), color.copy(alpha = 0.05f))))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, color = color, style = MaterialTheme.typography.titleSmall)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}

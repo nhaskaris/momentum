@@ -46,11 +46,16 @@ fun CreateTemplateDialog(
     getSetsForSession: suspend (Long) -> List<LoggedSet>,
     onDismiss: () -> Unit,
     onCreateTemplate: (name: String, notes: String?, inputs: List<TemplateExerciseInput>) -> Unit,
-    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> }
+    onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
+    // Edit mode: pre-fill with an existing routine
+    title: String = "New Routine",
+    initialName: String = "",
+    initialNotes: String? = null,
+    initialExercises: List<TemplateExerciseInput> = emptyList()
 ) {
-    var templateName by remember { mutableStateOf("") }
-    var templateNotes by remember { mutableStateOf("") }
-    var selectedExercises by remember { mutableStateOf<List<TemplateExerciseInput>>(emptyList()) }
+    var templateName by remember { mutableStateOf(initialName) }
+    var templateNotes by remember { mutableStateOf(initialNotes.orEmpty()) }
+    var selectedExercises by remember { mutableStateOf(initialExercises) }
     
     var showExercisePicker by remember { mutableStateOf(false) }
     var showSessionPicker by remember { mutableStateOf(false) }
@@ -228,7 +233,7 @@ fun CreateTemplateDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, null)
                     }
-                    Text("New Routine", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     TextButton(
                         onClick = {
                             onCreateTemplate(templateName.trim(), templateNotes.trim().ifEmpty { null }, selectedExercises)

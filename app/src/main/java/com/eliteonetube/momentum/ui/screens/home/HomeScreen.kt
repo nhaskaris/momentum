@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import com.eliteonetube.momentum.data.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import com.eliteonetube.momentum.logic.api.ExternalFoodApi
 import com.eliteonetube.momentum.logic.api.ScannedNutrition
 import com.eliteonetube.momentum.logic.services.HealthConnectManager
@@ -43,6 +45,8 @@ import com.eliteonetube.momentum.ui.screens.onboarding.IntroScreen
 import com.eliteonetube.momentum.ui.screens.onboarding.OnboardingScreen
 import com.eliteonetube.momentum.ui.screens.profile.ProfileScreen
 import com.eliteonetube.momentum.ui.screens.profile.ProgressGalleryScreen
+import com.eliteonetube.momentum.ui.screens.learn.LearnCategory
+import com.eliteonetube.momentum.ui.screens.learn.LearnScreen
 import com.eliteonetube.momentum.ui.screens.statistics.StatisticsScreen
 import com.eliteonetube.momentum.ui.screens.workout.ActiveSessionScreen
 import com.eliteonetube.momentum.ui.screens.workout.PendingSet
@@ -61,7 +65,10 @@ fun HomeScreen(
     recentWeights: List<WeightEntry>,
     allWeights: List<WeightEntry> = emptyList(),
     recentSessions: List<WorkoutSession>,
+    allSessionsFlow: Flow<List<WorkoutSession>> = emptyFlow(),
+    templateSummaries: List<TemplateSummary> = emptyList(),
     recentNutrition: List<DailyNutrition> = emptyList(),
+    workoutStats: WorkoutStats? = null,
     allExercises: List<Exercise>,
     allTemplates: List<WorkoutTemplate> = emptyList(),
     allCheckIns: List<CheckIn> = emptyList(),
@@ -102,6 +109,7 @@ fun HomeScreen(
     onSessionSaved: (date: String, sets: List<PendingSet>, templateId: Long?, sessionId: Long?, updateRoutine: Boolean) -> Unit,
     onSessionDeleted: (Long) -> Unit,
     onTemplateCreated: (String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _ -> },
+    onTemplateUpdated: (Long, String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
     onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
     onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit
@@ -142,6 +150,9 @@ fun HomeScreen(
     
     var showCheckIn by remember { mutableStateOf(false) }
     var showGallery by remember { mutableStateOf(false) }
+    // Section the Learn screen scrolls to when opened (null = top)
+    var learnOpenAt by remember { mutableStateOf<LearnCategory?>(null) }
+    var showLearn by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
 
     LaunchedEffect(openCheckInRequest) {
@@ -203,6 +214,14 @@ fun HomeScreen(
                 onCheckInCompleted(weight, bodyFat, photos)
             },
             onCancel = { showCheckIn = false }
+        )
+        return
+    }
+
+    if (showLearn) {
+        LearnScreen(
+            initialCategory = learnOpenAt,
+            onBack = { showLearn = false; learnOpenAt = null }
         )
         return
     }
@@ -323,6 +342,10 @@ fun HomeScreen(
                     currentStreak = currentStreak,
                     totalDaysLogged = totalDaysLogged,
                     loggedDates = loggedDates,
+                    todayLogs = todayFoodLogs,
+                    onOpenNutrition = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION)) }
+                    },
                     onWeightSubmitted = { enteredWeight ->
                         coroutineScope.launch {
                             onWeightSubmitted(enteredWeight)
@@ -347,6 +370,8 @@ fun HomeScreen(
                     weights = allWeights,
                     recentSessions = recentSessions,
                     recentNutrition = recentNutrition,
+                    workoutStats = workoutStats,
+                    goal = savedProfile.goal,
                     unitSystem = savedProfile.unitSystem
                 )
                 AppTab.NUTRITION -> NutritionScreen(
@@ -383,7 +408,8 @@ fun HomeScreen(
                     },
                     onMealCreated = onMealCreated,
                     onFoodCreated = onFoodCreated,
-                    onStartScan = { showScanner = true }
+                    onStartScan = { showScanner = true },
+                    onOpenLearn = { learnOpenAt = LearnCategory.NUTRITION; showLearn = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(
                     recentSessions = recentSessions,
@@ -405,6 +431,9 @@ fun HomeScreen(
                     },
                     onSessionDeleted = onSessionDeleted,
                     onTemplateCreated = onTemplateCreated,
+                    onTemplateUpdated = onTemplateUpdated,
+                    allSessionsFlow = allSessionsFlow,
+                    templateSummaries = templateSummaries,
                     onTemplateDeleted = onTemplateDeleted,
                     onSessionStateChanged = { isSessionActive = it },
                     onUpdateActiveWorkout = onUpdateActiveWorkout,
@@ -415,10 +444,12 @@ fun HomeScreen(
                     profile = savedProfile,
                     recentWeights = recentWeights,
                     allCheckIns = allCheckIns,
+                    allWeights = allWeights,
                     onWeightClick = { showHistoryModal = true },
                     onProfileUpdated = onProfileUpdated,
                     onGoalChanged = onGoalChanged,
                     onViewGallery = { showGallery = true },
+                    onOpenLearn = { learnOpenAt = null; showLearn = true },
                     onWeightsImported = { entries ->
                         coroutineScope.launch {
                             entries.forEach { onPastWeightSubmitted(it.date, it.weight) }
