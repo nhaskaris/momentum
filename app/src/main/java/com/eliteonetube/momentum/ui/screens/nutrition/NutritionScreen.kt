@@ -1,5 +1,19 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.rotate
+import com.eliteonetube.momentum.ui.components.rememberCurrentDate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import androidx.compose.foundation.background
@@ -31,71 +45,117 @@ import com.eliteonetube.momentum.ui.components.bounceClick
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NutritionScreen(
     calorieTarget: Int,
     profile: UserProfile,
     recentWeights: List<WeightEntry>,
     todayLogs: List<FoodLogWithItem> = emptyList(),
+    diaryForDate: (String) -> Flow<List<FoodLogWithItem>> = { flowOf(emptyList()) },
     allFoodItems: List<FoodItem> = emptyList(),
     recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal> = emptyList(),
-    onLogFood: (Long, Double) -> Unit,
-    onLogMeal: (Long) -> Unit,
+    onLogFood: (foodId: Long, quantity: Double, target: LogTarget) -> Unit,
+    onLogMeal: (mealId: Long, target: LogTarget) -> Unit,
     onDeleteLog: (Long, Boolean) -> Unit,
     onEditLog: (FoodLogWithItem) -> Unit,
-    onQuickLog: (FoodItem) -> Unit,
+    onMoveLog: (FoodLogWithItem, MealSlot) -> Unit = { _, _ -> },
+    copyDiarySection: suspend (fromDate: String, toDate: String, slot: MealSlot) -> Int = { _, _, _ -> 0 },
+    onQuickLog: (FoodItem, LogTarget) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onMealUpdated: (Long, String, List<Pair<FoodItem, Double>>) -> Unit = { _, _, _ -> },
     onMealDeleted: (Long) -> Unit = {},
     getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
-    onStartScan: () -> Unit,
-    onOpenLearn: () -> Unit = {}
+    onStartScan: (LogTarget) -> Unit,
+    onOpenLearn: () -> Unit = {},
+    onEnableOnlineSearch: () -> Unit = {},
+    onSaveOnlineFood: suspend (FoodItem) -> FoodItem = { it }
 ) {
     // Newest logged weight (recentWeights is the latest entries, not a date window)
     val currentWeightKg = recentWeights.firstOrNull()?.weight
+    val isDark = isSystemInDarkTheme()
+
+    // Which day the diary shows; never in the future
+    val today by rememberCurrentDate()
+    var selectedDateText by rememberSaveable { mutableStateOf(today.toString()) }
+    val selectedDate = remember(selectedDateText, today) {
+        runCatching { LocalDate.parse(selectedDateText) }.getOrDefault(today).coerceAtMost(today)
+    }
+    val isToday = selectedDate == today
+    // Today's entries are already collected app-wide; other days are queried while shown
+    val pastDayLogs by remember(selectedDate) { diaryForDate(selectedDate.toString()) }.collectAsState(initial = emptyList())
+    val dayLogs = if (isToday) todayLogs else pastDayLogs
 
     // Deletes wait for the Undo snackbar to close; until then the entry is just hidden
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var pendingDeleteKeys by remember { mutableStateOf(emptySet<String>()) }
-    val visibleLogs = remember(todayLogs, pendingDeleteKeys) { todayLogs.filterNot { it.listKey in pendingDeleteKeys } }
+    val visibleLogs = remember(dayLogs, pendingDeleteKeys) { dayLogs.filterNot { it.listKey in pendingDeleteKeys } }
+    val logsBySlot = remember(visibleLogs) { visibleLogs.groupBy { it.mealSlot } }
 
     val caloriesConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.calories * it.quantity } }
     val proteinConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.protein * it.quantity } }
     val fatConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.fat * it.quantity } }
     val carbsConsumed = remember(visibleLogs) { visibleLogs.sumOf { it.carbs * it.quantity } }
-
     val macroTargets = remember(calorieTarget, currentWeightKg) { MacroTargets.from(calorieTarget, currentWeightKg) }
-    val remaining = (calorieTarget - caloriesConsumed).roundToInt()
-    val isOver = remaining < 0
-    val isDark = isSystemInDarkTheme()
 
-    var showAddFood by remember { mutableStateOf(false) }
+    // Where the Add Food dialog logs to; non-null while it's open
+    var addTarget by remember { mutableStateOf<LogTarget?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val collapsedSlots = remember { mutableStateListOf<MealSlot>() }
 
-    if (showAddFood) {
+    addTarget?.let { target ->
         AddFoodDialog(
+            title = "Add to ${target.slot.label}",
             foodItems = allFoodItems,
             recentFoodIds = recentFoodIds,
             allMeals = allMeals,
-            onDismiss = { showAddFood = false },
+            onDismiss = { addTarget = null },
             onFoodSelected = { foodId, qty ->
-                onLogFood(foodId, qty)
-                showAddFood = false
+                onLogFood(foodId, qty, target)
+                addTarget = null
             },
             onMealSelected = { mealId ->
-                onLogMeal(mealId)
-                showAddFood = false
+                onLogMeal(mealId, target)
+                addTarget = null
             },
             onMealCreated = onMealCreated,
             onMealUpdated = onMealUpdated,
             onMealDeleted = onMealDeleted,
             getMealItems = getMealItems,
             onFoodCreated = onFoodCreated,
-            onQuickLog = onQuickLog,
-            onStartScan = onStartScan
+            onQuickLog = { item -> onQuickLog(item, target) },
+            onStartScan = { onStartScan(target) },
+            onlineSearchEnabled = profile.useExternalApi,
+            onEnableOnlineSearch = onEnableOnlineSearch,
+            onSaveOnlineFood = onSaveOnlineFood
         )
+    }
+
+    if (showDatePicker) {
+        val todayMillis = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        selectedDateText = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+        ) {
+            DatePicker(state = pickerState)
+        }
     }
 
     fun deleteWithUndo(log: FoodLogWithItem) {
@@ -117,108 +177,237 @@ fun NutritionScreen(
         }
     }
 
+    fun copyFromPreviousDay(slot: MealSlot) {
+        val from = selectedDate.minusDays(1)
+        coroutineScope.launch {
+            val copied = copyDiarySection(from.toString(), selectedDate.toString(), slot)
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(
+                if (copied > 0) "Copied $copied ${if (copied == 1) "entry" else "entries"} to ${slot.label.lowercase()}"
+                else "Nothing logged for ${slot.label.lowercase()} on ${dayLabel(from, today).lowercase()}"
+            )
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = bottomNavClearance())
-    ) {
-        // Hero Section — same gradient as the Dashboard hero
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
-                                MaterialTheme.colorScheme.background
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = bottomNavClearance())
+        ) {
+            // Date bar + compact summary
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
+                                    MaterialTheme.colorScheme.background
+                                )
                             )
                         )
-                    )
-                    .padding(top = 48.dp, bottom = 32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 24.dp)) {
-                    Text(
-                        text = "%,d".format(if (isOver) -remaining else remaining),
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 72.sp,
-                            letterSpacing = (-4).sp
-                        ),
-                        fontWeight = FontWeight.Black,
-                        color = if (isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = if (isOver) "kcal over" else "kcal remaining",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(bottom = 32.dp)
-                    )
+                        .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 8.dp)
+                ) {
+                    // Grouped in the middle so the arrows stay clear of the mascot in the top-right corner
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(onClick = { selectedDateText = selectedDate.minusDays(1).toString() }) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous day")
+                        }
+                        Text(
+                            dayLabel(selectedDate, today),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .widthIn(min = 120.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(onClickLabel = "Pick a date") { showDatePicker = true }
+                                .padding(vertical = 4.dp)
+                        )
+                        IconButton(
+                            onClick = { selectedDateText = selectedDate.plusDays(1).toString() },
+                            enabled = !isToday
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next day")
+                        }
+                    }
+                    if (!isToday) {
+                        TextButton(
+                            onClick = { selectedDateText = today.toString() },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) { Text("Back to today") }
+                    }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SummaryRow("Calories", caloriesConsumed, calorieTarget, "kcal", MaterialTheme.colorScheme.primary)
                     if (macroTargets != null) {
-                        MacroBar("Protein", proteinConsumed.roundToInt(), macroTargets.proteinGrams, ProteinBlue)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        MacroBar("Fats", fatConsumed.roundToInt(), macroTargets.fatGrams, FatYellow)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        MacroBar("Carbs", carbsConsumed.roundToInt(), macroTargets.carbGrams, CarbGreen)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        TextButton(onClick = onOpenLearn) {
+                        SummaryRow("Protein", proteinConsumed, macroTargets.proteinGrams, "g", ProteinBlue)
+                        SummaryRow("Carbs", carbsConsumed, macroTargets.carbGrams, "g", CarbGreen)
+                        SummaryRow("Fat", fatConsumed, macroTargets.fatGrams, "g", FatYellow)
+                        TextButton(onClick = onOpenLearn, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("How are my macros set?", style = MaterialTheme.typography.labelLarge)
                         }
                     } else {
+                        Spacer(modifier = Modifier.height(8.dp))
                         MacroTargetsUnavailable()
                     }
                 }
             }
-        }
 
-        item {
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                PrimaryButton(
-                    onClick = { showAddFood = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Add Food")
+            // Uncategorized first (older entries), only when it has anything; then the four sections
+            val slots = buildList {
+                if (!logsBySlot[MealSlot.UNCATEGORIZED].isNullOrEmpty()) add(MealSlot.UNCATEGORIZED)
+                addAll(MealSlot.sections)
+            }
+            slots.forEach { slot ->
+                val entries = logsBySlot[slot].orEmpty()
+                val expanded = slot !in collapsedSlots
+                item(key = "header_${slot.name}") {
+                    MealSectionHeader(
+                        slot = slot,
+                        calories = entries.sumOf { it.calories * it.quantity },
+                        count = entries.size,
+                        expanded = expanded,
+                        onToggle = { if (expanded) collapsedSlots.add(slot) else collapsedSlots.remove(slot) },
+                        onAdd = if (slot == MealSlot.UNCATEGORIZED) null else ({ addTarget = LogTarget(selectedDate.toString(), slot) }),
+                        onCopyPreviousDay = if (slot == MealSlot.UNCATEGORIZED) null else ({ copyFromPreviousDay(slot) }),
+                        previousDayLabel = dayLabel(selectedDate.minusDays(1), today)
+                    )
                 }
-
-                SectionDivider()
-                SectionLabel("TODAY'S LOG")
-            }
-        }
-
-        if (visibleLogs.isEmpty()) {
-            item {
-                Text(
-                    "No food logged yet. Tap Add Food or scan a barcode to start.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-            }
-        } else {
-            // Foods and meals live in separate tables with overlapping ids, so the key needs the type too
-            itemsIndexed(visibleLogs, key = { _, log -> log.listKey }) { index, log ->
-                Column(modifier = Modifier.padding(horizontal = 24.dp).animateItem()) {
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    FoodLogItem(
-                        log = log,
-                        onDelete = { deleteWithUndo(log) },
-                        onClick = { onEditLog(log) }
+                if (expanded) {
+                    itemsIndexed(entries, key = { _, log -> log.listKey }) { _, log ->
+                        Column(modifier = Modifier.padding(horizontal = 24.dp).animateItem()) {
+                            FoodLogItem(
+                                log = log,
+                                onDelete = { deleteWithUndo(log) },
+                                onClick = { onEditLog(log) },
+                                onMove = { target -> onMoveLog(log, target) }
+                            )
+                        }
+                    }
+                }
+                item(key = "divider_${slot.name}") {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                 }
             }
         }
-    }
 
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)
-    )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)
+        )
+    }
+}
+
+/** "Today", "Yesterday", or e.g. "Mon 6 Oct". */
+private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> "Today"
+    today.minusDays(1) -> "Yesterday"
+    else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM"))
+}
+
+/** One compact line of the daily summary: "Protein   82 / 160 g   51%" over a thin bar. */
+@Composable
+private fun SummaryRow(label: String, current: Double, target: Int, unit: String, color: Color) {
+    val progress = if (target > 0) (current / target).toFloat() else 0f
+    val isOver = progress > 1f
+    Column(modifier = Modifier.padding(vertical = 5.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "%,d / %,d %s".format(current.roundToInt(), target, unit),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "${(progress * 100).roundToInt()}%",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        // Drawn by hand: a progress indicator's round cap shows a dot even at 0%
+        Box(modifier = Modifier.fillMaxWidth().height(6.dp).background(color.copy(alpha = 0.15f), CircleShape)) {
+            if (progress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(if (isOver) MaterialTheme.colorScheme.error else color, CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MealSectionHeader(
+    slot: MealSlot,
+    calories: Double,
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onAdd: (() -> Unit)?,
+    onCopyPreviousDay: (() -> Unit)?,
+    previousDayLabel: String
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(if (expanded) 0f else -90f, label = "sectionChevron")
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = if (expanded) "Collapse ${slot.label}" else "Expand ${slot.label}", onClick = onToggle)
+            .padding(start = 24.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+    ) {
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp).rotate(chevronRotation)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(slot.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                if (count == 0) "Nothing logged" else "%,d kcal".format(calories.roundToInt()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (onCopyPreviousDay != null) {
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "${slot.label} options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Copy from ${previousDayLabel.lowercase()}") },
+                        leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                        onClick = { menuOpen = false; onCopyPreviousDay() }
+                    )
+                }
+            }
+        }
+        if (onAdd != null) {
+            FilledTonalIconButton(onClick = onAdd) {
+                Icon(Icons.Default.Add, contentDescription = "Add to ${slot.label}")
+            }
+        }
     }
 }
 
@@ -250,117 +439,71 @@ fun MacroTargetsUnavailable() {
     )
 }
 
-@Composable
-fun MacroBar(label: String, current: Int, target: Int, color: Color) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Text(
-                text = "$current / ${target}g",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { if (target > 0) (current.toFloat() / target).coerceIn(0f, 1f) else 0f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
-                .clip(CircleShape),
-            color = color,
-            trackColor = color.copy(alpha = 0.15f),
-            strokeCap = StrokeCap.Round
-        )
-    }
-}
+
 
 
 @Composable
-fun EmptyState(message: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-    ) {
-        Column(
-            modifier = Modifier.padding(32.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(Icons.Default.Inbox, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(message, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit) {
+fun FoodLogItem(log: FoodLogWithItem, onDelete: () -> Unit, onClick: () -> Unit, onMove: (MealSlot) -> Unit = {}) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { if (!log.isMeal) onClick() } // Meals might not be editable yet
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .bounceClick { if (!log.isMeal) onClick() } // Meals are logged as a whole, so there's no amount to edit
+            .padding(start = 28.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = if (log.isMeal) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f) 
-                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (log.isMeal) {
-                        Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
-                    } else {
-                        Text(log.name.take(1).uppercase(), fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-                    }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(log.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1)
+                if (log.isMeal) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "MEAL",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(log.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1)
-                    if (log.isMeal) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                "MEAL", 
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    }
-                }
+            if (!log.isMeal) {
                 val logQty = log.quantity * log.servingAmount
                 val displayQty = if (logQty % 1.0 == 0.0) logQty.toInt().toString() else "%.1f".format(logQty)
                 Text(
-                    text = if (log.isMeal) "${log.calories.roundToInt()} kcal"
-                           else "${(log.calories * log.quantity).roundToInt()} kcal • $displayQty ${log.servingUnit}",
-                    style = MaterialTheme.typography.labelMedium,
+                    "$displayQty ${log.servingUnit}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (!log.isMeal) {
-                IconButton(onClick = onClick) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                }
+        Text(
+            "%,d kcal".format((log.calories * log.quantity).roundToInt()),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "${log.name} options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (!log.isMeal) {
+                    DropdownMenuItem(
+                        text = { Text("Edit amount") },
+                        leadingIcon = { Icon(Icons.Default.Edit, null) },
+                        onClick = { menuOpen = false; onClick() }
+                    )
+                }
+                MealSlot.sections.filter { it != log.mealSlot }.forEach { slot ->
+                    DropdownMenuItem(
+                        text = { Text("Move to ${slot.label}") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) },
+                        onClick = { menuOpen = false; onMove(slot) }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                    onClick = { menuOpen = false; onDelete() }
+                )
             }
         }
     }

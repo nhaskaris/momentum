@@ -23,6 +23,11 @@ android {
     }
 
     buildTypes {
+        // Separate app ID so debug builds install next to the real app, with their own empty data
+        // (handy for testing onboarding or risky changes without touching your real diary)
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

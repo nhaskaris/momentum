@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.ui.components.rememberCurrentDate
+import com.eliteonetube.momentum.ui.diaryFor
 import com.eliteonetube.momentum.ui.rememberAppData
 import com.eliteonetube.momentum.logic.algorithm.*
 import com.eliteonetube.momentum.logic.api.*
@@ -242,21 +243,27 @@ fun MomentumAppContent(
                         }
                     }
                 },
-                onFoodLogged = { foodId, qty ->
-                    coroutineScope.launch { foodDao.insertFoodLog(DailyFoodLog(date = LocalDate.now().toString(), foodItemId = foodId, quantity = qty)) }
+                onFoodLogged = { foodId, qty, target ->
+                    coroutineScope.launch {
+                        foodDao.insertFoodLog(DailyFoodLog(date = target.date, foodItemId = foodId, quantity = qty, mealSlot = target.slot))
+                    }
                 },
                 onFoodLogDeleted = { id, isMeal ->
                     coroutineScope.launch { if (isMeal) foodDao.deleteDailyMealLog(id) else foodDao.deleteFoodLog(id) }
                 },
-                onFoodLogUpdated = { id, fId, q ->
-                    coroutineScope.launch { foodDao.updateFoodLog(DailyFoodLog(id = id, date = LocalDate.now().toString(), foodItemId = fId, quantity = q)) }
+                // Only the amount changes: the entry keeps its day and section
+                onFoodLogUpdated = { id, q -> coroutineScope.launch { foodDao.updateFoodLogQuantity(id, q) } },
+                onFoodLogMoved = { id, isMeal, slot ->
+                    coroutineScope.launch { if (isMeal) foodDao.setMealLogSlot(id, slot) else foodDao.setFoodLogSlot(id, slot) }
                 },
-                onLogMeal = { mealId ->
+                copyDiarySection = { fromDate, toDate, slot -> foodDao.copySection(fromDate, toDate, slot) },
+                diaryForDate = { date -> foodDao.diaryFor(date) },
+                onLogMeal = { mealId, target ->
                     coroutineScope.launch {
                         val meal = foodDao.getAllMeals().first().find { it.id == mealId } ?: return@launch
                         val items = foodDao.getItemsForMeal(mealId).first()
                         foodDao.insertDailyMealLog(DailyMealLog(
-                            date = LocalDate.now().toString(), mealId = mealId, name = meal.name,
+                            date = target.date, mealId = mealId, name = meal.name, mealSlot = target.slot,
                             calories = items.sumOf { it.calories * it.quantity },
                             protein = items.sumOf { it.protein * it.quantity },
                             fat = items.sumOf { it.fat * it.quantity },
@@ -290,10 +297,10 @@ fun MomentumAppContent(
                     val foods = foodDao.getAllFoodItems().first().associateBy { it.id }
                     foodDao.getItemsForMeal(mealId).first().mapNotNull { row -> foods[row.foodItemId]?.let { it to row.quantity } }
                 },
-                onQuickLog = { item ->
+                onQuickLog = { item, target ->
                     coroutineScope.launch {
                         val fid = foodDao.insertFoodItem(item)
-                        foodDao.insertFoodLog(DailyFoodLog(date = LocalDate.now().toString(), foodItemId = fid, quantity = 1.0))
+                        foodDao.insertFoodLog(DailyFoodLog(date = target.date, foodItemId = fid, quantity = 1.0, mealSlot = target.slot))
                     }
                 },
                 // Returns the new id so the food can be logged straight away
@@ -469,11 +476,11 @@ fun MomentumAppContent(
                     }
                 },
                 onTemplateDeleted = { tid -> coroutineScope.launch { workoutDao.deleteTemplate(tid) } },
-                onOnboardingCompleted = { w, h, a, m, s, g, cc, us, bf, hc ->
+                onOnboardingCompleted = { w, h, a, m, s, g, cc, us, bf, hc, onlineLookup ->
                     val main = algorithm.calculateInitialMaintenance(w, h, a, m, s, bf)
                     val init = cc ?: when (g) { Goal.CUT -> main - 500; Goal.BULK -> main + 300; Goal.MAINTAIN -> main; Goal.REVERSE -> main - 300 }
                     coroutineScope.launch {
-                        weightDao.saveProfile(UserProfile(height = h, age = a, isMale = m, averageDailySteps = s, estimatedMaintenanceCalories = main, goal = g, currentCalorieTarget = init, unitSystem = us, bodyFatPercentage = bf, useHealthConnect = hc, useExternalApi = false))
+                        weightDao.saveProfile(UserProfile(height = h, age = a, isMale = m, averageDailySteps = s, estimatedMaintenanceCalories = main, goal = g, currentCalorieTarget = init, unitSystem = us, bodyFatPercentage = bf, useHealthConnect = hc, useExternalApi = onlineLookup))
                         weightDao.insertWeight(WeightEntry(date = LocalDate.now().toString(), weight = w, calorieTargetAtEntry = init))
                     }
                 },

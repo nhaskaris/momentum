@@ -9,7 +9,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 object MediaUtils {
-    private const val FILE_PROVIDER_AUTHORITY = "com.eliteonetube.momentum.fileprovider"
+    // Matches ${applicationId}.fileprovider in the manifest, so debug and release builds don't clash
+    private fun fileProviderAuthority(context: Context) = "${context.packageName}.fileprovider"
 
     /** Temporary target for a camera capture; lives in cache until [persistProgressPhoto] copies it. */
     fun createImageUri(context: Context): Uri? {
@@ -18,7 +19,7 @@ object MediaUtils {
             directory.mkdirs()
         }
         val file = File(directory, "temp_image_${System.currentTimeMillis()}.jpg")
-        return FileProvider.getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
+        return FileProvider.getUriForFile(context, fileProviderAuthority(context), file)
     }
 
     /**
@@ -38,7 +39,7 @@ object MediaUtils {
             if (copied == null) return@withContext null
 
             // The camera's temporary file is no longer needed once copied
-            if (source.authority == FILE_PROVIDER_AUTHORITY) {
+            if (source.authority == fileProviderAuthority(context)) {
                 runCatching { context.contentResolver.delete(source, null, null) }
             }
             Uri.fromFile(target).toString()

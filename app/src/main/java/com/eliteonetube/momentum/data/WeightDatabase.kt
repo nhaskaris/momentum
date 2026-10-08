@@ -24,7 +24,7 @@ import androidx.room3.RoomDatabase
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 35
+    version = 36
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -50,7 +50,7 @@ abstract class WeightDatabase : RoomDatabase() {
                     MIGRATION_26_27, MIGRATION_27_28,
                     MIGRATION_28_29, MIGRATION_29_30,
                     MIGRATION_30_31, MIGRATION_31_32,
-                    MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35
+                    MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36
                     // No destructive fallback: a missing migration must crash, never wipe user data
                 ).build()
                 INSTANCE = instance

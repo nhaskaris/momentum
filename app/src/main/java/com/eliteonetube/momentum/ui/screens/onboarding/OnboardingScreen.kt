@@ -1,5 +1,20 @@
 package com.eliteonetube.momentum.ui.screens.onboarding
 
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Public
+import com.eliteonetube.momentum.ui.components.SectionLabel
+import com.eliteonetube.momentum.ui.components.SecondaryButton
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -42,7 +57,7 @@ private val goalInfoList = listOf(
 )
 
 @Composable
-fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit) {
+fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean, Boolean) -> Unit) {
     var unitSystem by remember { mutableStateOf(UnitSystem.METRIC) }
 
     val context = LocalContext.current
@@ -58,6 +73,8 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
     var isMale by remember { mutableStateOf(true) }
     var stepsInput by remember { mutableStateOf("") }
     var useHealthConnect by remember { mutableStateOf(false) }
+    // Off by default: the app is offline-first unless the user chooses online lookup here (or later in Settings)
+    var useOnlineLookup by remember { mutableStateOf(false) }
     var selectedGoal by remember { mutableStateOf<Goal?>(null) }
     var knowsCalories by remember { mutableStateOf(false) }
     var customCaloriesInput by remember { mutableStateOf("") }
@@ -173,16 +190,26 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val isDark = isSystemInDarkTheme()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
+                        MaterialTheme.colorScheme.background
+                    ),
+                    endY = 900f
+                )
+            )
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .screenSafePadding()
         ) {
-            LinearProgressIndicator(
-                progress = { (pagerState.currentPage + 1) / 4f },
-                modifier = Modifier.fillMaxWidth()
-            )
+            StepProgress(current = pagerState.currentPage, total = 4)
             Spacer(modifier = Modifier.height(24.dp))
 
             HorizontalPager(
@@ -191,268 +218,203 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             ) { page ->
                 when (page) {
-                    0 -> Column(
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Text("Welcome to Momentum", style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            "Let's start with the basics.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 16.dp, top = 4.dp)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Use imperial units (lb, ft/in)", style = MaterialTheme.typography.bodySmall)
-                            Switch(
-                                checked = unitSystem == UnitSystem.IMPERIAL,
-                                onCheckedChange = {
-                                    unitSystem = if (it) UnitSystem.IMPERIAL else UnitSystem.METRIC
-                                }
-                            )
+                    0 -> StepPage("STEP 1 OF 4", "About you", "The basics Momentum needs to estimate your starting calories.") {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                            listOf(UnitSystem.METRIC to "Metric (kg, cm)", UnitSystem.IMPERIAL to "Imperial (lb, ft)").forEachIndexed { i, (system, label) ->
+                                SegmentedButton(
+                                    selected = unitSystem == system,
+                                    onClick = { unitSystem = system },
+                                    shape = SegmentedButtonDefaults.itemShape(index = i, count = 2)
+                                ) { Text(label) }
+                            }
                         }
 
-                        OutlinedTextField(
+                        OnboardingField(
                             value = weightInput,
                             onValueChange = { weightInput = it },
-                            label = { Text(if (unitSystem == UnitSystem.IMPERIAL) "Current Weight (lb)" else "Current Weight (kg)") },
-                            isError = weightError,
-                            supportingText = { if (weightError) Text("Enter a valid number") },
+                            label = "Current weight",
+                            suffix = if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg",
+                            error = if (weightError) "Enter a valid number" else null,
                             keyboardOptions = doneKeyboardOptions,
                             keyboardActions = doneKeyboardActions,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                            modifier = Modifier.fillMaxWidth()
                                 .tutorialTarget("weight_input") { tag, rect -> targetPositions[tag] = rect }
                         )
 
                         Box(modifier = Modifier.fillMaxWidth().tutorialTarget("height_input") { tag, rect -> targetPositions[tag] = rect }) {
                             if (unitSystem == UnitSystem.IMPERIAL) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    OutlinedTextField(
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OnboardingField(
                                         value = heightFeetInput,
                                         onValueChange = { heightFeetInput = it },
-                                        label = { Text("Height (ft)") },
-                                        isError = heightError,
+                                        label = "Height",
+                                        suffix = "ft",
+                                        error = if (heightError) "Enter feet and inches" else null,
                                         keyboardOptions = doneKeyboardOptions,
                                         keyboardActions = doneKeyboardActions,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    OutlinedTextField(
+                                    OnboardingField(
                                         value = heightInchesInput,
                                         onValueChange = { heightInchesInput = it },
-                                        label = { Text("Height (in)") },
-                                        isError = heightError,
+                                        label = "",
+                                        suffix = "in",
+                                        error = if (heightError) " " else null,
                                         keyboardOptions = doneKeyboardOptions,
                                         keyboardActions = doneKeyboardActions,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
                             } else {
-                                OutlinedTextField(
+                                OnboardingField(
                                     value = heightCmInput,
                                     onValueChange = { heightCmInput = it },
-                                    label = { Text("Height (cm)") },
-                                    isError = heightError,
-                                    supportingText = { if (heightError) Text("Enter a valid number, e.g. 175") },
+                                    label = "Height",
+                                    suffix = "cm",
+                                    error = if (heightError) "Enter a valid number, e.g. 175" else null,
                                     keyboardOptions = doneKeyboardOptions,
                                     keyboardActions = doneKeyboardActions,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
 
-                        if (unitSystem == UnitSystem.IMPERIAL && heightError) {
-                            Text(
-                                "Enter valid feet and inches",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OnboardingField(
                                 value = age,
                                 onValueChange = { age = it },
-                                label = { Text("Age") },
-                                isError = ageError,
-                                supportingText = { if (ageError) Text("Enter a whole number") },
+                                label = "Age",
+                                suffix = "years",
+                                error = if (ageError) "Whole number" else null,
                                 keyboardOptions = doneKeyboardOptions,
                                 keyboardActions = doneKeyboardActions,
                                 modifier = Modifier.weight(1f).tutorialTarget("age_input") { tag, rect -> targetPositions[tag] = rect }
                             )
-                            OutlinedTextField(
+                            OnboardingField(
                                 value = bodyFatInput,
                                 onValueChange = { bodyFatInput = it },
-                                label = { Text("Body Fat % (Optional)") },
-                                isError = bfError,
-                                supportingText = { if (bfError) Text("Valid number") },
+                                label = "Body fat (optional)",
+                                suffix = "%",
+                                error = if (bfError) "Valid number" else null,
                                 keyboardOptions = doneKeyboardOptions,
                                 keyboardActions = doneKeyboardActions,
                                 modifier = Modifier.weight(1f).tutorialTarget("bf_input") { tag, rect -> targetPositions[tag] = rect }
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().tutorialTarget("sex_input") { tag, rect -> targetPositions[tag] = rect },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Biological Sex:")
-                            Button(onClick = { isMale = !isMale }, shape = RoundedCornerShape(12.dp)) {
-                                Text(if (isMale) "Male" else "Female")
+                        Column(modifier = Modifier.fillMaxWidth().tutorialTarget("sex_input") { tag, rect -> targetPositions[tag] = rect }) {
+                            Text(
+                                "Biological sex",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                listOf(true to "Male", false to "Female").forEachIndexed { i, (male, label) ->
+                                    SegmentedButton(
+                                        selected = isMale == male,
+                                        onClick = { isMale = male },
+                                        shape = SegmentedButtonDefaults.itemShape(index = i, count = 2)
+                                    ) { Text(label) }
+                                }
                             }
                         }
                     }
 
-                    1 -> Column(
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Text("Activity", style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            "Roughly how many steps do you walk on an average day?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
-                        )
-
-                        OutlinedTextField(
+                    1 -> StepPage("STEP 2 OF 4", "Activity", "Roughly how many steps do you walk on an average day?") {
+                        OnboardingField(
                             value = stepsInput,
                             onValueChange = { stepsInput = it },
-                            label = { Text("Average Daily Steps (e.g. 8000)") },
-                            isError = stepsError,
-                            supportingText = { if (stepsError) Text("Enter a whole number") },
+                            label = "Average daily steps",
+                            suffix = "steps",
+                            error = if (stepsError) "Enter a whole number" else null,
                             keyboardOptions = doneKeyboardOptions,
                             keyboardActions = doneKeyboardActions,
                             modifier = Modifier.fillMaxWidth().tutorialTarget("steps_input") { tag, rect -> targetPositions[tag] = rect }
                         )
 
-                        val sdkAvailable = healthConnectManager.isAvailable()
-                        if (sdkAvailable) {
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                        if (healthConnectManager.isAvailable()) {
+                            OptionRow(
+                                icon = Icons.Default.HealthAndSafety,
+                                title = "Health Connect",
+                                description = "Import your average steps automatically for more accurate calculations."
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.HealthAndSafety, contentDescription = null)
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text("Connect Health Connect", fontWeight = FontWeight.Bold)
-                                    }
-                                    Text(
-                                        text = "Automatically import your average steps from Health Connect for more accurate calculations.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    )
-                                    Button(
-                                        onClick = {
-                                            try {
-                                                permissionLauncher.launch(healthConnectManager.permissions)
-                                            } catch (e: Exception) {
-                                                Log.e("HealthConnect", "Failed to launch permission request", e)
-                                            }
-                                        },
-                                        modifier = Modifier.align(Alignment.End),
-                                        enabled = !useHealthConnect
-                                    ) {
-                                        Text(if (useHealthConnect) "Connected" else "Connect Now")
-                                    }
+                                if (useHealthConnect) {
+                                    Text("Connected", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                } else {
+                                    FilledTonalButton(onClick = {
+                                        try {
+                                            permissionLauncher.launch(healthConnectManager.permissions)
+                                        } catch (e: Exception) {
+                                            Log.e("HealthConnect", "Failed to launch permission request", e)
+                                        }
+                                    }) { Text("Connect") }
                                 }
                             }
                         }
-                    }
 
-                    2 -> Column(
-                        verticalArrangement = Arrangement.Top,
-                        modifier = Modifier.fillMaxSize().tutorialTarget("goal_selector") { tag, rect -> targetPositions[tag] = rect }
-                    ) {
-                        Text("Your Goal", style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            "What are you working toward?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
-                        )
-
-                        goalInfoList.forEach { info ->
-                            val isSelected = selectedGoal == info.goal
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 10.dp)
-                                    .clickable { selectedGoal = info.goal },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(info.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                        RadioButton(selected = isSelected, onClick = { selectedGoal = info.goal })
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(info.description, style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
+                        OptionRow(
+                            icon = Icons.Default.Public,
+                            title = "Online food lookup",
+                            description = "Off: Momentum works fully offline with your own foods. " +
+                                "On: also find foods by name or barcode with Open Food Facts, a free, open food database — " +
+                                "only your search words and scanned barcodes are sent, nothing about you. " +
+                                "You can change this anytime in Settings."
+                        ) {
+                            Switch(checked = useOnlineLookup, onCheckedChange = { useOnlineLookup = it })
                         }
                     }
 
-                    3 -> Column(
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize()
+                    2 -> StepPage(
+                        "STEP 3 OF 4", "Your goal", "What are you working toward?",
+                        modifier = Modifier.tutorialTarget("goal_selector") { tag, rect -> targetPositions[tag] = rect }
                     ) {
-                        Text("Calories", style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            "Last thing — are you already tracking calories?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 24.dp, top = 4.dp)
-                        )
-
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                        Column {
+                            goalInfoList.forEachIndexed { index, info ->
+                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                val isSelected = selectedGoal == info.goal
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable(role = Role.RadioButton) { selectedGoal = info.goal }
+                                        .padding(vertical = 12.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Already tracking calories?", style = MaterialTheme.typography.bodyMedium)
+                                    RadioButton(selected = isSelected, onClick = null, modifier = Modifier.padding(top = 2.dp, end = 12.dp))
+                                    Column {
                                         Text(
-                                            "Skip the estimate and start from what you already eat",
-                                            style = MaterialTheme.typography.bodySmall
+                                            info.label,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                         )
+                                        Text(info.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    Switch(checked = knowsCalories, onCheckedChange = { knowsCalories = it })
-                                }
-
-                                if (knowsCalories) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = customCaloriesInput,
-                                        onValueChange = { customCaloriesInput = it },
-                                        label = { Text("Your current daily calories") },
-                                        isError = customCaloriesError,
-                                        supportingText = { if (customCaloriesError) Text("Enter a whole number") },
-                                        keyboardOptions = doneKeyboardOptions,
-                                        keyboardActions = doneKeyboardActions,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
                                 }
                             }
+                        }
+                    }
+
+                    3 -> StepPage("STEP 4 OF 4", "Calories", "Last thing — are you already tracking calories?") {
+                        OptionRow(
+                            icon = Icons.Default.LocalFireDepartment,
+                            title = "I already track calories",
+                            description = "Skip the estimate and start from what you already eat."
+                        ) {
+                            Switch(checked = knowsCalories, onCheckedChange = { knowsCalories = it })
+                        }
+                        if (knowsCalories) {
+                            OnboardingField(
+                                value = customCaloriesInput,
+                                onValueChange = { customCaloriesInput = it },
+                                label = "Your current daily calories",
+                                suffix = "kcal",
+                                error = if (customCaloriesError) "Enter a whole number" else null,
+                                keyboardOptions = doneKeyboardOptions,
+                                keyboardActions = doneKeyboardActions,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }
@@ -465,7 +427,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (pagerState.currentPage > 0) {
-                    OutlinedButton(
+                    SecondaryButton(
                         onClick = {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage - 1)
@@ -485,7 +447,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                 }
                 val isLastPage = pagerState.currentPage == 3
 
-                Button(
+                PrimaryButton(
                     onClick = {
                         if (isLastPage) {
                             onComplete(
@@ -498,7 +460,8 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                                 if (knowsCalories) parsedCustomCalories else null,
                                 unitSystem,
                                 parsedBodyFat,
-                                useHealthConnect
+                                useHealthConnect,
+                                useOnlineLookup
                             )
                         } else {
                             coroutineScope.launch {
@@ -507,7 +470,7 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                         }
                     },
                     enabled = currentStepValid,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.4f)
                 ) {
                     Text(if (isLastPage) "Finish" else "Next")
                 }
@@ -542,6 +505,108 @@ fun OnboardingScreen(onComplete: (Double, Double, Int, Boolean, Int, Goal, Int?,
                     }
                 }
             )
+        }
+    }
+}
+
+/** Four thin segments: done and current steps filled, the rest faint. */
+@Composable
+private fun StepProgress(current: Int, total: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        repeat(total) { i ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (i <= current) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    )
+            )
+        }
+    }
+}
+
+/** A step's heading (small capital label, big title, muted line) followed by its content. */
+@Composable
+private fun StepPage(
+    label: String,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column {
+            SectionLabel(label)
+            Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            )
+        }
+        content()
+    }
+}
+
+/** Filled, borderless input matching the rest of the app; the unit sits inside the field. */
+@Composable
+private fun OnboardingField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    suffix: String,
+    error: String?,
+    keyboardOptions: KeyboardOptions,
+    keyboardActions: KeyboardActions,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = if (label.isNotEmpty()) ({ Text(label) }) else null,
+        suffix = { Text(suffix) },
+        isError = error != null,
+        supportingText = error?.takeIf { it.isNotBlank() }?.let { { Text(it) } },
+        singleLine = true,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = Color.Transparent,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        modifier = modifier
+    )
+}
+
+/** A choice row: icon, title, explanation, and a control (switch or button) on the right. */
+@Composable
+private fun OptionRow(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    control: @Composable () -> Unit
+) {
+    Column {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            control()
         }
     }
 }

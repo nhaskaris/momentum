@@ -17,7 +17,7 @@ object HelperAssistant {
             q.contains("macro") -> 
                 "Macros are Protein, Carbs, and Fats. Together they make up your total daily calories!"
             q.contains("privacy") || q.contains("data") || q.contains("local") -> 
-                "Your data is stored 100% locally on this device. No cloud, no tracking!"
+                "Your data is stored on this device — no account, no cloud, no tracking. If you turn on online food lookup, only your food searches and scanned barcodes go to Open Food Facts."
             q.contains("log") || q.contains("food") -> 
                 "Go to the Nutrition tab and tap the '+' button or scan a barcode to log what you eat!"
             q.contains("workout") || q.contains("train") || q.contains("exercise") -> 

@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.onboarding
 
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import androidx.compose.ui.unit.sp
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -122,33 +124,43 @@ fun TutorialOverlay(
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Text(
+                                text = "TIP ${steps.indexOf(step) + 1} OF ${steps.size}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
                                 text = step.title,
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.primary
+                                fontWeight = FontWeight.Black
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = step.description,
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Button(
-                                onClick = {
-                                    if (currentStepIdx < steps.lastIndex) {
-                                        currentStepIdx++
-                                        onStepCompleted(currentStepIdx)
-                                    } else {
-                                        onFinished()
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                // Seven tips before you can type anything is a lot; let people skip ahead
+                                if (currentStepIdx < steps.lastIndex) {
+                                    TextButton(onClick = onFinished) { Text("Skip tour") }
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                PrimaryButton(
+                                    onClick = {
+                                        if (currentStepIdx < steps.lastIndex) {
+                                            currentStepIdx++
+                                            onStepCompleted(currentStepIdx)
+                                        } else {
+                                            onFinished()
+                                        }
                                     }
-                                },
-                                modifier = Modifier.align(Alignment.End),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Text(
-                                    text = if (currentStepIdx == steps.lastIndex) "Start Journey" else "Next",
-                                    fontWeight = FontWeight.Bold
-                                )
+                                ) {
+                                    Text(if (currentStepIdx == steps.lastIndex) "Start Journey" else "Next")
+                                }
                             }
                         }
                     }

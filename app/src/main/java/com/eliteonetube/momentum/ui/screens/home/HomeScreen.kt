@@ -72,16 +72,19 @@ fun HomeScreen(
     onGoalChanged: (Goal) -> Unit,
     onAdjustmentAccepted: () -> Unit,
     onAdjustmentDismissed: () -> Unit,
-    onFoodLogged: (Long, Double) -> Unit,
+    onFoodLogged: (foodId: Long, quantity: Double, target: LogTarget) -> Unit,
     onFoodLogDeleted: (Long, Boolean) -> Unit,
-    onFoodLogUpdated: (Long, Long, Double) -> Unit,
-    onLogMeal: (Long) -> Unit,
+    onFoodLogUpdated: (logId: Long, quantity: Double) -> Unit,
+    onFoodLogMoved: (logId: Long, isMeal: Boolean, slot: MealSlot) -> Unit,
+    copyDiarySection: suspend (fromDate: String, toDate: String, slot: MealSlot) -> Int,
+    diaryForDate: (String) -> Flow<List<FoodLogWithItem>>,
+    onLogMeal: (mealId: Long, target: LogTarget) -> Unit,
     onMealCreated: (String, List<Pair<FoodItem, Double>>) -> Unit,
     onMealUpdated: (Long, String, List<Pair<FoodItem, Double>>) -> Unit = { _, _, _ -> },
     onMealDeleted: (Long) -> Unit = {},
     getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
-    onQuickLog: (FoodItem) -> Unit,
+    onQuickLog: (FoodItem, LogTarget) -> Unit,
     onNewFoodItemCreated: suspend (FoodItem) -> Long,
     onUpdateActiveWorkout: (Long?, List<PendingSet>) -> Unit,
     onClearActiveWorkout: () -> Unit,
@@ -97,7 +100,7 @@ fun HomeScreen(
     onTemplateUpdated: (Long, String, String?, List<TemplateExerciseInput>) -> Unit = { _, _, _, _ -> },
     onTemplateDeleted: (Long) -> Unit = {},
     onCreateExercise: (String, String, ExerciseType, (Exercise) -> Unit) -> Unit = { _, _, _, _ -> },
-    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean) -> Unit
+    onOnboardingCompleted: (Double, Double, Int, Boolean, Int, Goal, Int?, UnitSystem, Double?, Boolean, Boolean) -> Unit
 ) {
     val context = LocalContext.current
     if (savedProfile == null) {
@@ -152,6 +155,8 @@ fun HomeScreen(
     var scannedResult by remember { mutableStateOf<ScannedNutrition?>(null) }
     var pendingBarcode by remember { mutableStateOf<String?>(null) }
     var itemToLogAfterScan by remember { mutableStateOf<FoodItem?>(null) }
+    // Day and section the scan was started from; a scan from elsewhere falls back to now
+    var scanTarget by remember { mutableStateOf<LogTarget?>(null) }
     var logToEdit by remember { mutableStateOf<FoodLogWithItem?>(null) }
 
     var mascotMood by remember(savedProfile.checkInDue) {
@@ -290,8 +295,10 @@ fun HomeScreen(
             onDismiss = { itemToLogAfterScan = null },
             onConfirm = { multiplier ->
                 coroutineScope.launch {
-                    onFoodLogged(item.id, multiplier)
+                    onFoodLogged(item.id, multiplier, scanTarget ?: LogTarget.now())
                     itemToLogAfterScan = null
+                    scanTarget = null
+                    WidgetUpdater.refresh(context)
                 }
             }
         )
@@ -312,7 +319,7 @@ fun HomeScreen(
             initialQuantity = log.quantity,
             onDismiss = { logToEdit = null },
             onConfirm = { multiplier ->
-                onFoodLogUpdated(log.id, log.foodItemId, multiplier)
+                onFoodLogUpdated(log.id, multiplier)
                 logToEdit = null
             }
         )
@@ -372,21 +379,24 @@ fun HomeScreen(
                     profile = savedProfile,
                     recentWeights = data.recentWeights,
                     todayLogs = data.todayFoodLogs,
+                    diaryForDate = diaryForDate,
                     allFoodItems = data.allFoodItems,
                     recentFoodIds = data.recentFoodIds,
                     allMeals = data.allMeals,
-                    onLogFood = { id, qty ->
+                    onLogFood = { id, qty, target ->
                         coroutineScope.launch {
-                            onFoodLogged(id, qty)
+                            onFoodLogged(id, qty, target)
                             WidgetUpdater.refresh(context)
                         }
                     },
-                    onLogMeal = { mealId ->
+                    onLogMeal = { mealId, target ->
                         coroutineScope.launch {
-                            onLogMeal(mealId)
+                            onLogMeal(mealId, target)
                             WidgetUpdater.refresh(context)
                         }
                     },
+                    onMoveLog = { log, slot -> onFoodLogMoved(log.id, log.isMeal, slot) },
+                    copyDiarySection = copyDiarySection,
                     onDeleteLog = { id, isMeal ->
                         coroutineScope.launch {
                             onFoodLogDeleted(id, isMeal)
@@ -394,9 +404,9 @@ fun HomeScreen(
                         }
                     },
                     onEditLog = { log -> logToEdit = log },
-                    onQuickLog = { item ->
+                    onQuickLog = { item, target ->
                         coroutineScope.launch {
-                            onQuickLog(item)
+                            onQuickLog(item, target)
                             WidgetUpdater.refresh(context)
                         }
                     },
@@ -405,7 +415,12 @@ fun HomeScreen(
                     onMealDeleted = onMealDeleted,
                     getMealItems = getMealItems,
                     onFoodCreated = onFoodCreated,
-                    onStartScan = { showScanner = true },
+                    onStartScan = { target -> scanTarget = target; showScanner = true },
+                    onEnableOnlineSearch = { onProfileUpdated(savedProfile.copy(useExternalApi = true)) },
+                    // Reuse the food you already saved from this barcode instead of creating a duplicate
+                    onSaveOnlineFood = { item ->
+                        item.barcode?.let { onGetFoodByBarcode(it) } ?: item.copy(id = onNewFoodItemCreated(item))
+                    },
                     onOpenLearn = { learnOpenAt = LearnCategory.NUTRITION; showLearn = true }
                 )
                 AppTab.WORKOUTS -> WorkoutsScreen(

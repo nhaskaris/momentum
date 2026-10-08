@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import com.eliteonetube.momentum.data.*
 import com.eliteonetube.momentum.logic.algorithm.StreakCalculator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -96,11 +97,7 @@ fun rememberAppData(weightDao: WeightDao, workoutDao: WorkoutDao, foodDao: FoodD
             workoutDao.getMostVariedSession()
         ) { totals, heaviest, mostVaried -> WorkoutStats(totals, heaviest, mostVaried) }
     }
-    val todayFoodLogsFlow = remember(today) {
-        combine(foodDao.getFoodLogsForDate(today), foodDao.getDailyMealLogsForDate(today)) { items, meals ->
-            items + meals.map { it.asLogItem() }
-        }.flowOn(Dispatchers.Default)
-    }
+    val todayFoodLogsFlow = remember(today) { foodDao.diaryFor(today) }
 
     val recentWeights = remember { weightDao.getLastTwoWeeks() }.collectAsState(initial = emptyList())
     val allWeights = remember { weightDao.getAllWeights() }.collectAsState(initial = emptyList())
@@ -128,6 +125,12 @@ fun rememberAppData(weightDao: WeightDao, workoutDao: WorkoutDao, foodDao: FoodD
     }
 }
 
+/** Everything logged on [date]: individual foods and whole meals, as one diary list. */
+fun FoodDao.diaryFor(date: String): Flow<List<FoodLogWithItem>> =
+    combine(getFoodLogsForDate(date), getDailyMealLogsForDate(date)) { items, meals ->
+        items + meals.map { it.asLogItem() }
+    }.flowOn(Dispatchers.Default)
+
 /** A logged meal shown alongside individual foods in diary lists and totals. */
 private fun DailyMealLog.asLogItem() = FoodLogWithItem(
     id = id,
@@ -139,5 +142,6 @@ private fun DailyMealLog.asLogItem() = FoodLogWithItem(
     protein = protein,
     fat = fat,
     carbs = carbs,
-    isMeal = true
+    isMeal = true,
+    mealSlot = mealSlot
 )

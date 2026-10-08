@@ -270,3 +270,12 @@ val MIGRATION_34_35 = object : Migration(34, 35) {
         )
     }
 }
+
+val MIGRATION_35_36 = object : Migration(35, 36) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Diary sections. Existing entries have no time recorded, so they go under "Uncategorized";
+        // nothing else about them changes.
+        connection.execSQL("ALTER TABLE daily_food_log_table ADD COLUMN mealSlot TEXT NOT NULL DEFAULT 'UNCATEGORIZED'")
+        connection.execSQL("ALTER TABLE daily_meal_log_table ADD COLUMN mealSlot TEXT NOT NULL DEFAULT 'UNCATEGORIZED'")
+    }
+}

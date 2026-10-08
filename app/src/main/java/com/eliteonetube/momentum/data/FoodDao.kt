@@ -39,8 +39,6 @@ interface FoodDao {
     @Insert
     suspend fun insertFoodLog(log: DailyFoodLog)
 
-    @Update
-    suspend fun updateFoodLog(log: DailyFoodLog)
 
     @Query("""
         SELECT daily_food_log_table.*, food_item_table.name, food_item_table.calories, 
@@ -54,6 +52,32 @@ interface FoodDao {
 
     @Query("DELETE FROM daily_food_log_table WHERE id = :logId")
     suspend fun deleteFoodLog(logId: Long)
+
+    // Targeted updates: rebuilding the whole row used to reset its date to today
+    @Query("UPDATE daily_food_log_table SET quantity = :quantity WHERE id = :logId")
+    suspend fun updateFoodLogQuantity(logId: Long, quantity: Double)
+
+    @Query("UPDATE daily_food_log_table SET mealSlot = :slot WHERE id = :logId")
+    suspend fun setFoodLogSlot(logId: Long, slot: MealSlot)
+
+    @Query("UPDATE daily_meal_log_table SET mealSlot = :slot WHERE id = :logId")
+    suspend fun setMealLogSlot(logId: Long, slot: MealSlot)
+
+    @Query("SELECT * FROM daily_food_log_table WHERE date = :date AND mealSlot = :slot")
+    suspend fun getFoodLogRows(date: String, slot: MealSlot): List<DailyFoodLog>
+
+    @Query("SELECT * FROM daily_meal_log_table WHERE date = :date AND mealSlot = :slot")
+    suspend fun getMealLogRows(date: String, slot: MealSlot): List<DailyMealLog>
+
+    /** Copies one section of a day into another day's same section. Returns how many entries were copied. */
+    @Transaction
+    suspend fun copySection(fromDate: String, toDate: String, slot: MealSlot): Int {
+        val foods = getFoodLogRows(fromDate, slot)
+        val meals = getMealLogRows(fromDate, slot)
+        foods.forEach { insertFoodLog(it.copy(id = 0, date = toDate)) }
+        meals.forEach { insertDailyMealLog(it.copy(id = 0, date = toDate)) }
+        return foods.size + meals.size
+    }
 
     // --- MEAL DAO QUERIES ---
 

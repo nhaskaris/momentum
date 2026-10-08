@@ -1,5 +1,8 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import com.eliteonetube.momentum.logic.api.ExternalFoodApi
 import kotlinx.coroutines.launch
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import com.eliteonetube.momentum.ui.components.bounceClick
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodDialog(
+    title: String = "Add Food",
     foodItems: List<FoodItem>,
     recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal>,
@@ -40,7 +44,11 @@ fun AddFoodDialog(
     getMealItems: suspend (Long) -> List<Pair<FoodItem, Double>> = { emptyList() },
     onFoodCreated: (FoodItem) -> Unit,
     onQuickLog: (FoodItem) -> Unit,
-    onStartScan: () -> Unit
+    onStartScan: () -> Unit,
+    onlineSearchEnabled: Boolean = false,
+    onEnableOnlineSearch: () -> Unit = {},
+    /** Saves an online result as one of your foods (or returns the one you already have) so it can be logged. */
+    onSaveOnlineFood: suspend (FoodItem) -> FoodItem = { it }
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showQuickMacro by remember { mutableStateOf(false) }
@@ -64,6 +72,23 @@ fun AddFoodDialog(
     var mealToEdit by remember { mutableStateOf<Pair<Meal, List<Pair<FoodItem, Double>>>?>(null) }
     var mealPendingDelete by remember { mutableStateOf<Meal?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Open Food Facts results for the current search; null = nothing searched (or still typing)
+    var onlineResults by remember { mutableStateOf<List<FoodItem>?>(null) }
+    var onlineLoading by remember { mutableStateOf(false) }
+    var onlineFailed by remember { mutableStateOf(false) }
+    val onlineQuery = searchQuery.trim()
+    val savedBarcodes = remember(foodItems) { foodItems.mapNotNull { it.barcode }.toSet() }
+    LaunchedEffect(onlineQuery, onlineSearchEnabled) {
+        onlineResults = null
+        onlineFailed = false
+        if (!onlineSearchEnabled || onlineQuery.length < MIN_ONLINE_QUERY) { onlineLoading = false; return@LaunchedEffect }
+        delay(400) // wait for typing to pause; a new keystroke cancels this effect
+        onlineLoading = true
+        val results = ExternalFoodApi.search(onlineQuery)
+        onlineLoading = false
+        if (results == null) onlineFailed = true else onlineResults = results
+    }
     
     val filteredMeals = remember(searchQuery, allMeals) {
         if (searchQuery.isBlank()) {
@@ -175,7 +200,7 @@ fun AddFoodDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, null)
                     }
-                    Text("Add Food", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.width(48.dp)) // To center title
                 }
 
@@ -280,6 +305,33 @@ fun AddFoodDialog(
                         }
                         items(filteredItems, key = { "food_${it.id}" }) { item ->
                             FoodRow(item, onClick = { selectedFoodForQuantity = item }, onEdit = { selectedFoodForEdit = item })
+                        }
+
+                        if (onlineQuery.length >= MIN_ONLINE_QUERY) {
+                            item { FoodListHeader("FROM OPEN FOOD FACTS") }
+                            when {
+                                !onlineSearchEnabled -> item {
+                                    OnlineSearchMessage("Online lookup is off. Turn it on to search millions of products by name.") {
+                                        TextButton(onClick = onEnableOnlineSearch) { Text("Turn on") }
+                                    }
+                                }
+                                onlineLoading -> item {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    }
+                                }
+                                onlineFailed -> item { OnlineSearchMessage("Couldn't reach Open Food Facts. Check your connection and try again.") }
+                                onlineResults?.isEmpty() == true -> item { OnlineSearchMessage("No matches online for \"$onlineQuery\".") }
+                                else -> items(
+                                    // Products already saved as your foods are listed above; don't show them twice
+                                    onlineResults.orEmpty().filter { it.barcode == null || it.barcode !in savedBarcodes },
+                                    key = { "online_${it.barcode ?: it.name}" }
+                                ) { result ->
+                                    OnlineFoodRow(result) {
+                                        scope.launch { selectedFoodForQuantity = onSaveOnlineFood(result) }
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -446,4 +498,49 @@ private fun MealMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
             )
         }
     }
+}
+
+private const val MIN_ONLINE_QUERY = 3
+
+@Composable
+private fun OnlineSearchMessage(text: String, action: (@Composable () -> Unit)? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        action?.invoke()
+    }
+}
+
+@Composable
+private fun OnlineFoodRow(item: FoodItem, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(item.name, fontWeight = FontWeight.Bold, maxLines = 2) },
+        supportingContent = { Text("${item.calories.roundToInt()} kcal per 100 g") },
+        leadingContent = {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
+                }
+            }
+        },
+        trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline) },
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp)
+    )
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    )
 }

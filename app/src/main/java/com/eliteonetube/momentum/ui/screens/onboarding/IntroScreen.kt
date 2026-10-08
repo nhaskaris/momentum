@@ -1,5 +1,11 @@
 package com.eliteonetube.momentum.ui.screens.onboarding
 
+import com.eliteonetube.momentum.ui.screens.dashboard.MomentumMascot
+import com.eliteonetube.momentum.ui.screens.dashboard.MascotMood
+import com.eliteonetube.momentum.ui.components.PrimaryButton
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -23,7 +29,7 @@ private data class IntroPage(val title: String, val body: String)
 private val introPages = listOf(
     IntroPage(
         title = "Momentum",
-        body = "Your personal fitness helper, built with privacy in mind. Everything is stored locally on your device — no cloud, no tracking, just your data and your progress."
+        body = "Your personal fitness helper, built with privacy in mind. Your data stays on your device — no account, no cloud, no tracking. Online food lookup is optional — you choose during setup."
     ),
     IntroPage(
         title = "Cut",
@@ -47,67 +53,80 @@ private val introPages = listOf(
 fun IntroScreen(onFinished: () -> Unit) {
     val pagerState = rememberPagerState(pageCount = { introPages.size })
     val coroutineScope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f),
+                        MaterialTheme.colorScheme.background
+                    ),
+                    endY = 1200f
+                )
+            )
             .screenSafePadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(
                 onClick = onFinished,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
-                Text("Skip", fontWeight = FontWeight.Medium)
+                Text("Skip")
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(0.6f))
+        MomentumMascot(mood = MascotMood.HAPPY, modifier = Modifier.size(96.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxWidth().weight(4f)
+            modifier = Modifier.fillMaxWidth().weight(2f)
         ) { page ->
             val introPage = introPages[page]
             Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = introPage.title,
-                    style = MaterialTheme.typography.headlineLarge,
+                    text = if (page == 0) "WELCOME" else "GOAL ${page} OF ${introPages.lastIndex}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = introPage.title,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = introPage.body,
                     style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             introPages.indices.forEach { index ->
                 val isSelected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier
-                        .size(if (isSelected) 10.dp else 8.dp)
+                        .height(8.dp)
+                        .width(if (isSelected) 24.dp else 8.dp)
                         .clip(CircleShape)
                         .background(
                             if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         )
                 )
             }
@@ -116,15 +135,12 @@ fun IntroScreen(onFinished: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
 
         val isLastPage = pagerState.currentPage == introPages.lastIndex
-
-        Button(
+        PrimaryButton(
             onClick = {
                 if (isLastPage) {
                     onFinished()
                 } else {
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                    }
+                    coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                 }
             },
             modifier = Modifier.fillMaxWidth()

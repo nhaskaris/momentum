@@ -38,7 +38,8 @@ data class DailyFoodLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String,
     val foodItemId: Long,
-    val quantity: Double
+    val quantity: Double,
+    val mealSlot: MealSlot = MealSlot.UNCATEGORIZED
 )
 
 @Entity(tableName = "daily_meal_log_table")
@@ -50,7 +51,8 @@ data class DailyMealLog(
     val calories: Double,
     val protein: Double,
     val fat: Double,
-    val carbs: Double
+    val carbs: Double,
+    val mealSlot: MealSlot = MealSlot.UNCATEGORIZED
 )
 
 data class FoodLogWithItem(
@@ -65,7 +67,8 @@ data class FoodLogWithItem(
     val carbs: Double,
     val servingAmount: Double = 100.0,
     val servingUnit: String = "g",
-    val isMeal: Boolean = false
+    val isMeal: Boolean = false,
+    val mealSlot: MealSlot = MealSlot.UNCATEGORIZED
 )
 
 data class DailyNutrition(

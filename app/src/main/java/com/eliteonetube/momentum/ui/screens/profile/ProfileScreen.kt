@@ -450,8 +450,8 @@ fun ProfileScreen(
             HorizontalDivider(color = divider)
             SettingsRow(
                 icon = Icons.Default.QrCodeScanner,
-                title = "Online barcode lookup",
-                subtitle = "Search Open Food Facts when a barcode isn't saved on your phone",
+                title = "Online food lookup",
+                subtitle = "Search Open Food Facts by name or barcode. Only search words and barcodes are sent.",
                 trailing = {
                     Switch(checked = profile.useExternalApi, onCheckedChange = { onProfileUpdated(profile.copy(useExternalApi = it)) })
                 }
