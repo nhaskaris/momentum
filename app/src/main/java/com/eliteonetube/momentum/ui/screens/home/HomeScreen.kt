@@ -49,7 +49,6 @@ import com.eliteonetube.momentum.ui.screens.statistics.StatisticsScreen
 import com.eliteonetube.momentum.ui.screens.workout.PendingSet
 import com.eliteonetube.momentum.ui.screens.workout.TemplateExerciseInput
 import com.eliteonetube.momentum.ui.screens.workout.WorkoutsScreen
-import com.eliteonetube.momentum.widget.WidgetUpdater
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -65,6 +64,8 @@ fun HomeScreen(
     openWorkoutRequest: Int = 0,
     openWeightEntryRequest: Int = 0,
     openCheckInRequest: Int = 0,
+    openNutritionRequest: Int = 0,
+    addFoodRequest: Int = 0,
     onWeightSubmitted: (Double) -> Unit,
     onPastWeightSubmitted: (date: String, weight: Double) -> Unit,
     onWeightDeleted: (String) -> Unit,
@@ -131,6 +132,13 @@ fun HomeScreen(
     LaunchedEffect(openWorkoutRequest) {
         if (openWorkoutRequest > 0) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.WORKOUTS))
+        }
+    }
+
+    // Widget taps: the diary itself, or straight into Add Food (the Eat tab handles the dialog)
+    LaunchedEffect(openNutritionRequest, addFoodRequest) {
+        if (openNutritionRequest > 0 || addFoodRequest > 0) {
+            pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.NUTRITION))
         }
     }
 
@@ -298,7 +306,6 @@ fun HomeScreen(
                     onFoodLogged(item.id, multiplier, scanTarget ?: LogTarget.now())
                     itemToLogAfterScan = null
                     scanTarget = null
-                    WidgetUpdater.refresh(context)
                 }
             }
         )
@@ -354,13 +361,11 @@ fun HomeScreen(
                             delay(3000.milliseconds)
                             mascotMood =
                                 if (savedProfile.checkInDue) MascotMood.ALERT else MascotMood.IDLE
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onAdjustmentAccepted = {
                         coroutineScope.launch {
                             onAdjustmentAccepted()
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onAdjustmentDismissed = onAdjustmentDismissed,
@@ -380,19 +385,18 @@ fun HomeScreen(
                     recentWeights = data.recentWeights,
                     todayLogs = data.todayFoodLogs,
                     diaryForDate = diaryForDate,
+                    addFoodRequest = addFoodRequest,
                     allFoodItems = data.allFoodItems,
                     recentFoodIds = data.recentFoodIds,
                     allMeals = data.allMeals,
                     onLogFood = { id, qty, target ->
                         coroutineScope.launch {
                             onFoodLogged(id, qty, target)
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onLogMeal = { mealId, target ->
                         coroutineScope.launch {
                             onLogMeal(mealId, target)
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onMoveLog = { log, slot -> onFoodLogMoved(log.id, log.isMeal, slot) },
@@ -400,14 +404,12 @@ fun HomeScreen(
                     onDeleteLog = { id, isMeal ->
                         coroutineScope.launch {
                             onFoodLogDeleted(id, isMeal)
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onEditLog = { log -> logToEdit = log },
                     onQuickLog = { item, target ->
                         coroutineScope.launch {
                             onQuickLog(item, target)
-                            WidgetUpdater.refresh(context)
                         }
                     },
                     onMealCreated = onMealCreated,

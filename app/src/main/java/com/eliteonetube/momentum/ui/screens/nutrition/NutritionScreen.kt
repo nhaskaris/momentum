@@ -53,6 +53,8 @@ fun NutritionScreen(
     recentWeights: List<WeightEntry>,
     todayLogs: List<FoodLogWithItem> = emptyList(),
     diaryForDate: (String) -> Flow<List<FoodLogWithItem>> = { flowOf(emptyList()) },
+    /** Increments when the widget's "+ Food" is tapped: open Add Food for today's current meal. */
+    addFoodRequest: Int = 0,
     allFoodItems: List<FoodItem> = emptyList(),
     recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal> = emptyList(),
@@ -105,6 +107,13 @@ fun NutritionScreen(
     var addTarget by remember { mutableStateOf<LogTarget?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val collapsedSlots = remember { mutableStateListOf<MealSlot>() }
+
+    LaunchedEffect(addFoodRequest) {
+        if (addFoodRequest > 0) {
+            selectedDateText = today.toString()
+            addTarget = LogTarget.now()
+        }
+    }
 
     addTarget?.let { target ->
         AddFoodDialog(

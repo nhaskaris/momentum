@@ -1,4 +1,0 @@
-<resources>
-    <!-- Debug builds install next to the real app; the name tells them apart on the home screen -->
-    <string name="app_name">Momentum Debug</string>
-</resources>

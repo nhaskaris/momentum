@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Momentum</string>
+    <string name="widget_description">Calories left, macros, and quick buttons to log food or weigh in</string>
 </resources>

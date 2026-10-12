@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum
 
+import kotlinx.coroutines.flow.distinctUntilChanged
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
         const val ACTION_OPEN_ACTIVE_WORKOUT = "com.eliteonetube.momentum.action.OPEN_ACTIVE_WORKOUT"
         const val ACTION_OPEN_WEIGHT_ENTRY = "com.eliteonetube.momentum.action.OPEN_WEIGHT_ENTRY"
         const val ACTION_OPEN_CHECK_IN = "com.eliteonetube.momentum.action.OPEN_CHECK_IN"
+        // Home-screen widget: open the Eat tab, or open it straight into Add Food
+        const val ACTION_OPEN_NUTRITION = "com.eliteonetube.momentum.action.OPEN_NUTRITION"
+        const val ACTION_ADD_FOOD = "com.eliteonetube.momentum.action.ADD_FOOD"
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -52,6 +56,8 @@ class MainActivity : ComponentActivity() {
     private val openWorkoutRequests = MutableStateFlow(0)
     private val openWeightEntryRequests = MutableStateFlow(0)
     private val openCheckInRequests = MutableStateFlow(0)
+    private val openNutritionRequests = MutableStateFlow(0)
+    private val addFoodRequests = MutableStateFlow(0)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -64,6 +70,8 @@ class MainActivity : ComponentActivity() {
             ACTION_OPEN_ACTIVE_WORKOUT -> openWorkoutRequests.value++
             ACTION_OPEN_WEIGHT_ENTRY -> openWeightEntryRequests.value++
             ACTION_OPEN_CHECK_IN -> openCheckInRequests.value++
+            ACTION_OPEN_NUTRITION -> openNutritionRequests.value++
+            ACTION_ADD_FOOD -> addFoodRequests.value++
         }
     }
 
@@ -103,7 +111,9 @@ class MainActivity : ComponentActivity() {
                     savedProfile = savedProfile,
                     openWorkoutRequests = openWorkoutRequests,
                     openWeightEntryRequests = openWeightEntryRequests,
-                    openCheckInRequests = openCheckInRequests
+                    openCheckInRequests = openCheckInRequests,
+                    openNutritionRequests = openNutritionRequests,
+                    addFoodRequests = addFoodRequests
                 )
             }
         }
@@ -119,7 +129,9 @@ fun MomentumAppContent(
     savedProfile: UserProfile?,
     openWorkoutRequests: MutableStateFlow<Int>,
     openWeightEntryRequests: MutableStateFlow<Int>,
-    openCheckInRequests: MutableStateFlow<Int>
+    openCheckInRequests: MutableStateFlow<Int>,
+    openNutritionRequests: MutableStateFlow<Int>,
+    addFoodRequests: MutableStateFlow<Int>
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -136,6 +148,8 @@ fun MomentumAppContent(
     val openWorkoutRequest by openWorkoutRequests.collectAsState()
     val openWeightEntryRequest by openWeightEntryRequests.collectAsState()
     val openCheckInRequest by openCheckInRequests.collectAsState()
+    val openNutritionRequest by openNutritionRequests.collectAsState()
+    val addFoodRequest by addFoodRequests.collectAsState()
 
     // 2. High-Frequency Logic (Remembered/Isolated)
     var isProfileLoaded by remember { mutableStateOf(false) }
@@ -180,6 +194,8 @@ fun MomentumAppContent(
                 openWorkoutRequest = openWorkoutRequest,
                 openWeightEntryRequest = openWeightEntryRequest,
                 openCheckInRequest = openCheckInRequest,
+                openNutritionRequest = openNutritionRequest,
+                addFoodRequest = addFoodRequest,
                 onWeightSubmitted = { enteredWeight ->
                     coroutineScope.launch {
                         val now = LocalDate.now().toString()

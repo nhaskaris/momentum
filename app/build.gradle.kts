@@ -23,15 +23,18 @@ android {
     }
 
     buildTypes {
-        // Separate app ID so debug builds install next to the real app, with their own empty data
-        // (handy for testing onboarding or risky changes without touching your real diary)
-        getByName("debug") {
-            applicationIdSuffix = ".debug"
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        // Debug copy that installs next to the real app ("Momentum Sandbox"), with its own empty data,
+        // for trying onboarding or risky changes without touching your real diary. The normal debug
+        // build keeps the real app ID, so Run in Android Studio still updates your everyday app.
+        create("sandbox") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".sandbox"
+            matchingFallbacks += listOf("debug")
         }
         // Release-optimised build that can be installed locally for performance measurement.
         // Same R8/shrinking as release; signed with the debug key; never uploaded.
