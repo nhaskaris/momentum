@@ -10,6 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +34,7 @@ import com.eliteonetube.momentum.ui.components.LoadingScreen
 import com.eliteonetube.momentum.ui.screens.home.HomeScreen
 import com.eliteonetube.momentum.ui.theme.WeeklyCoachTheme
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -100,9 +103,18 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val savedProfile by weightDao.getUserProfile().collectAsState(initial = null)
-            
+            // Null means both "still loading" and "no profile yet", so track the first read separately:
+            // otherwise onboarding flashes for a frame on every launch before the profile arrives
+            var profileLoaded by remember { mutableStateOf(false) }
+            val savedProfile by remember {
+                weightDao.getUserProfile().onEach { profileLoaded = true }
+            }.collectAsState(initial = null)
+
             WeeklyCoachTheme(appTheme = savedProfile?.theme ?: AppTheme.SYSTEM) {
+                if (!profileLoaded) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    return@WeeklyCoachTheme
+                }
                 MomentumAppContent(
                     weightDao = weightDao,
                     workoutDao = workoutDao,

@@ -1,5 +1,11 @@
 package com.eliteonetube.momentum.ui.screens.profile
 
+import com.eliteonetube.momentum.logic.utils.Units
+import com.eliteonetube.momentum.data.UnitSystem
+import com.eliteonetube.momentum.data.Goal
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -36,8 +42,11 @@ import com.eliteonetube.momentum.data.CheckIn
 @Composable
 fun ProgressGalleryScreen(
     checkIns: List<CheckIn>,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
+    goal: Goal = Goal.MAINTAIN,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
     var compareMode by remember { mutableStateOf(false) }
     var fullScreenPhotoPath by remember { mutableStateOf<String?>(null) }
 
@@ -63,7 +72,14 @@ fun ProgressGalleryScreen(
         )
     }
 
+    val isDark = isSystemInDarkTheme()
     Scaffold(
+        modifier = Modifier.background(
+            Brush.verticalGradient(
+                listOf(MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.15f else 0.12f), MaterialTheme.colorScheme.background),
+                endY = 900f
+            )
+        ),
         topBar = {
             TopAppBar(
                 title = { Text(if (compareMode) "Comparison" else "Gallery", fontWeight = FontWeight.Black) },
@@ -87,21 +103,21 @@ fun ProgressGalleryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Hero Gradient Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), Color.Transparent)))
-                    .padding(bottom = 24.dp),
-                contentAlignment = Alignment.Center
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("TRANSFORMATION", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("Visual History", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
-                }
+                Text("Progress photos", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                Text(
+                    "YOUR TRANSFORMATION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             if (compareMode && photoCheckIns.size >= 2) {
@@ -111,12 +127,14 @@ fun ProgressGalleryScreen(
                     photo2 = selectedPhoto2,
                     onSelect1 = { selectedPhoto1 = it },
                     onSelect2 = { selectedPhoto2 = it },
-                    onPhotoClick = { fullScreenPhotoPath = it }
+                    onPhotoClick = { fullScreenPhotoPath = it },
+                    unitSystem = unitSystem,
+                    goal = goal
                 )
             } else if (photoCheckIns.isEmpty()) {
                 EmptyGalleryState()
             } else {
-                GalleryListLayout(photoCheckIns, onPhotoClick = { fullScreenPhotoPath = it })
+                GalleryListLayout(photoCheckIns, unitSystem, onPhotoClick = { fullScreenPhotoPath = it })
             }
         }
     }
@@ -129,7 +147,9 @@ fun ComparisonLayout(
     photo2: CheckIn?,
     onSelect1: (CheckIn) -> Unit,
     onSelect2: (CheckIn) -> Unit,
-    onPhotoClick: (String) -> Unit
+    onPhotoClick: (String) -> Unit,
+    unitSystem: UnitSystem,
+    goal: Goal
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
         Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -139,28 +159,26 @@ fun ComparisonLayout(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        val weightDiff = if (photo1 != null && photo2 != null) photo2.weight - photo1.weight else 0.0
+        // Coloured by your goal: losing is progress on a cut, gaining on a bulk
+        val color = when {
+            kotlin.math.abs(weightDiff) < 0.05 -> MaterialTheme.colorScheme.onSurfaceVariant
+            goal == Goal.CUT -> if (weightDiff < 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            goal == Goal.BULK -> if (weightDiff > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+        val shown = if (unitSystem == UnitSystem.IMPERIAL) Units.kgToLb(weightDiff) else weightDiff
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
         ) {
-            val weightDiff = if (photo1 != null && photo2 != null) photo2.weight - photo1.weight else 0.0
-            val color = if (weightDiff <= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-            
-            Row(
-                modifier = Modifier.padding(24.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text("Total Weight Change: ", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = "${if (weightDiff > 0) "+" else ""}${"%.1f".format(weightDiff)} kg",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
-                    color = color
-                )
-            }
+            Text("Weight change", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "%+.1f %s".format(shown, if (unitSystem == UnitSystem.IMPERIAL) "lb" else "kg"),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = color
+            )
         }
     }
 }
@@ -182,8 +200,7 @@ fun ComparisonColumn(
                 .fillMaxWidth()
                 .aspectRatio(0.7f)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .let { if (selected?.frontPhotoPath != null) it.clickable { onPhotoClick(selected.frontPhotoPath) } else it }
         ) {
             if (selected?.frontPhotoPath != null) {
@@ -201,8 +218,7 @@ fun ComparisonColumn(
             Surface(
                 onClick = { expanded = true },
                 shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -210,13 +226,13 @@ fun ComparisonColumn(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(selected?.date ?: "Select Date", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(selected?.date?.let { readableDate(it) } ?: "Pick a date", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     Icon(Icons.Default.ArrowDropDown, null)
                 }
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 checkIns.forEach { ci ->
-                    DropdownMenuItem(text = { Text(ci.date) }, onClick = { onSelect(ci); expanded = false })
+                    DropdownMenuItem(text = { Text(readableDate(ci.date)) }, onClick = { onSelect(ci); expanded = false })
                 }
             }
         }
@@ -224,28 +240,31 @@ fun ComparisonColumn(
 }
 
 @Composable
-fun GalleryListLayout(checkIns: List<CheckIn>, onPhotoClick: (String) -> Unit) {
+fun GalleryListLayout(checkIns: List<CheckIn>, unitSystem: UnitSystem, onPhotoClick: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 48.dp)
     ) {
-        items(checkIns) { ci ->
+        itemsIndexed(checkIns) { index, ci ->
             Column(modifier = Modifier.fillMaxWidth()) {
+                if (index > 0) HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(vertical = 20.dp)
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Text(ci.date, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("${ci.weight} kg" + (ci.bodyFatPercentage?.let { " · $it%" } ?: ""), modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
+                    Text(readableDate(ci.date), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(
+                        Units.displayWeight(ci.weight, unitSystem) + (ci.bodyFatPercentage?.let { " · $it%" } ?: ""),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -267,10 +286,13 @@ fun PhotoCard(label: String, path: String?, onClick: (String) -> Unit) {
                 .fillMaxWidth()
                 .aspectRatio(0.75f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
-                .let { if (path != null) it.clickable { onClick(path) } else it }
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .let { if (path != null) it.clickable { onClick(path) } else it },
+            contentAlignment = Alignment.Center
         ) {
+            if (path == null) {
+                Text("No photo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+            }
             if (path != null) {
                 Image(
                     painter = rememberAsyncImagePainter(path),
@@ -319,3 +341,7 @@ fun FullScreenPhotoViewer(path: String, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** "Mon 6 Oct 2026" from an ISO date. */
+private fun readableDate(iso: String): String =
+    runCatching { java.time.LocalDate.parse(iso).format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM yyyy")) }.getOrDefault(iso)

@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.components
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,7 +42,7 @@ fun WeightHistoryBottomSheet(
         AlertDialog(
             onDismissRequest = { entryPendingDelete = null },
             title = { Text("Delete entry?") },
-            text = { Text("Remove the weight logged on ${entry.date}? This can't be undone.") },
+            text = { Text("Remove the weight logged on ${readableDate(entry.date)}? This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
                     onWeightDeleted(entry.date)
@@ -64,9 +66,9 @@ fun WeightHistoryBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Weight History & Trends", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Weight history", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 TextButton(onClick = { showAddForm = !showAddForm }) {
-                    Text(if (showAddForm) "Cancel" else "+ Add past entry")
+                    Text(if (showAddForm) "Cancel" else "Add past entry")
                 }
             }
 
@@ -83,7 +85,7 @@ fun WeightHistoryBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Visual Weight Trend Chart", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SectionLabel("TREND")
 
             WeightTrendChart(
                 entries = entries,
@@ -92,7 +94,7 @@ fun WeightHistoryBottomSheet(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Logged Entries List", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SectionLabel("ENTRIES · ${entries.size}")
 
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 items(entries) { entry ->
@@ -101,7 +103,7 @@ fun WeightHistoryBottomSheet(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(entry.date, style = MaterialTheme.typography.bodyMedium)
+                        Text(readableDate(entry.date), style = MaterialTheme.typography.bodyMedium)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 Units.displayWeight(entry.weight, unitSystem),
@@ -130,6 +132,10 @@ fun WeightHistoryBottomSheet(
 }
 
 private val isoFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+private val readableFormatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy")
+
+private fun readableDate(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(readableFormatter) }.getOrDefault(iso)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,11 +163,11 @@ private fun AddPastEntryForm(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
+        SecondaryButton(
             onClick = { showDatePicker = true },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(selectedDateLabel)
+            Text(selectedDateMillis?.let { readableDate(selectedDateLabel) } ?: selectedDateLabel)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -173,20 +179,22 @@ private fun AddPastEntryForm(
             isError = weightError,
             supportingText = { if (weightError) Text("Enter a valid number") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = FieldShape,
+            colors = filledFieldColors()
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Button(
+        PrimaryButton(
             onClick = {
-                val date = selectedDateLabel.takeIf { selectedDateMillis != null } ?: return@Button
+                val date = selectedDateLabel.takeIf { selectedDateMillis != null } ?: return@PrimaryButton
                 parsedWeightKg?.let { onSubmit(date, it) }
             },
             enabled = parsedWeightKg != null && selectedDateMillis != null,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Save Entry")
+            Text("Save entry")
         }
     }
 

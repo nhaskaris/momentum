@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.onboarding
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Public
 import com.eliteonetube.momentum.ui.components.SectionLabel
@@ -577,14 +579,9 @@ private fun OnboardingField(
         singleLine = true,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        shape = RoundedCornerShape(16.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = Color.Transparent,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        modifier = modifier
+        modifier = modifier,
+        shape = FieldShape,
+        colors = filledFieldColors()
     )
 }
 

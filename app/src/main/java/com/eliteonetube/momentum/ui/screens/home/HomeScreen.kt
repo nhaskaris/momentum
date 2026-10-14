@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.home
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -239,6 +241,8 @@ fun HomeScreen(
     if (showGallery) {
         ProgressGalleryScreen(
             checkIns = data.allCheckIns,
+            unitSystem = savedProfile.unitSystem,
+            goal = savedProfile.goal,
             onBack = { showGallery = false }
         )
         return
@@ -574,8 +578,8 @@ private fun MascotAndNavigation(
                                             modifier = Modifier.weight(1f),
                                             textStyle = MaterialTheme.typography.bodySmall,
                                             singleLine = true,
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), focusedBorderColor = MaterialTheme.colorScheme.primary)
+                                            shape = FieldShape,
+                                            colors = filledFieldColors()
                                         )
                                         IconButton(onClick = onSendQuestion, enabled = userQuestion.isNotBlank()) {
                                             Icon(Icons.AutoMirrored.Filled.Send, null, tint = if (userQuestion.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))

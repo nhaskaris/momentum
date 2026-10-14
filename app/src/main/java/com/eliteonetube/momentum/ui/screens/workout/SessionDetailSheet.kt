@@ -1,10 +1,14 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
-import androidx.compose.foundation.background
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
+import com.eliteonetube.momentum.ui.components.SecondaryButton
+import com.eliteonetube.momentum.ui.components.SectionLabel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Bookmark
@@ -54,13 +58,13 @@ fun SessionDetailSheet(
                 .padding(bottom = 24.dp)
         ) {
             Text(
-                text = "Session Details",
+                text = "Workout",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = session.date,
-                style = MaterialTheme.typography.bodySmall,
+                text = readableSessionDate(session.date),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -76,27 +80,19 @@ fun SessionDetailSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     items(setsByExercise.toList()) { (exerciseId, exerciseSets) ->
                         val exercise = exerciseMap[exerciseId]
                         Column {
-                            Text(
-                                text = exercise?.name ?: "Unknown Exercise",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            exerciseSets.forEach { set ->
+                            SectionLabel((exercise?.name ?: "Unknown exercise").uppercase())
+                            Spacer(modifier = Modifier.height(4.dp))
+                            exerciseSets.forEachIndexed { index, set ->
+                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp)
+                                        .padding(vertical = 10.dp)
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -105,18 +101,19 @@ fun SessionDetailSheet(
                                         Text(
                                             "Set ${set.setNumber}",
                                             style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.width(40.dp)
                                         )
                                         Text(
                                             text = "${Units.displayWeight(set.weightKg, unitSystem)} × ${set.reps}",
                                             style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
                                     if (!set.notes.isNullOrBlank()) {
                                         Row(
-                                            modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                                            modifier = Modifier.padding(top = 4.dp, start = 52.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
@@ -147,31 +144,28 @@ fun SessionDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
+                SecondaryButton(
                     onClick = onEdit,
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.medium
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Edit / Resume")
+                    Text("Edit")
                 }
 
-                OutlinedButton(
+                SecondaryButton(
                     onClick = { showNameDialog = true },
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.medium
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Routine")
                 }
 
-                OutlinedButton(
+                SecondaryButton(
                     onClick = onDelete,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    shape = MaterialTheme.shapes.medium
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -184,15 +178,17 @@ fun SessionDetailSheet(
     if (showNameDialog) {
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            title = { Text("Save as Saved Routine") },
+            title = { Text("Save as routine") },
             text = {
                 OutlinedTextField(
                     value = routineName,
                     onValueChange = { routineName = it },
-                    label = { Text("Routine Name") },
-                    placeholder = { Text("e.g. Upper Body Focus") },
+                    label = { Text("Routine name") },
+                    placeholder = { Text("Leave blank to name it by date") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
             },
             confirmButton = {
@@ -202,7 +198,7 @@ fun SessionDetailSheet(
                         showNameDialog = false
                     }
                 ) {
-                    Text("Save Routine")
+                    Text("Save")
                 }
             },
             dismissButton = {
@@ -213,3 +209,8 @@ fun SessionDetailSheet(
         )
     }
 }
+
+private val sessionDateFormatter = DateTimeFormatter.ofPattern("EEEE d MMM yyyy")
+
+private fun readableSessionDate(iso: String): String =
+    runCatching { LocalDate.parse(iso.take(10)).format(sessionDateFormatter) }.getOrDefault(iso)

@@ -1,5 +1,11 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.theme.FatYellow
+import com.eliteonetube.momentum.ui.theme.CarbGreen
+import com.eliteonetube.momentum.ui.theme.ProteinBlue
+import com.eliteonetube.momentum.ui.components.BigStat
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -124,14 +130,9 @@ fun LogQuantityDialog(
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.primary
                         ),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                        ),
-                        singleLine = true
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
                     Text(
                         text = "${foodItem.servingUnit} eaten",
@@ -158,40 +159,27 @@ fun LogQuantityDialog(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Highlighted Result Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                )
-            ) {
+            // Result: calories and macros for the amount entered
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Column {
                 Row(
-                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(vertical = 20.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "${(foodItem.calories * multiplier).roundToInt()}",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "total calories",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
+                        BigStat("%,d".format((foodItem.calories * multiplier).roundToInt()), "kcal")
                     }
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        MacroInfoItem("Prot", "${(foodItem.protein * multiplier).format(1)}g", MaterialTheme.colorScheme.primary)
-                        MacroInfoItem("Fat", "${(foodItem.fat * multiplier).format(1)}g", MaterialTheme.colorScheme.tertiary)
-                        MacroInfoItem("Carb", "${(foodItem.carbs * multiplier).format(1)}g", MaterialTheme.colorScheme.secondary)
+                        // Same macro colours as the rest of the app
+                        MacroInfoItem("Protein", "${(foodItem.protein * multiplier).format(1)}g", ProteinBlue)
+                        MacroInfoItem("Carbs", "${(foodItem.carbs * multiplier).format(1)}g", CarbGreen)
+                        MacroInfoItem("Fat", "${(foodItem.fat * multiplier).format(1)}g", FatYellow)
                     }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             Spacer(modifier = Modifier.height(32.dp))
 

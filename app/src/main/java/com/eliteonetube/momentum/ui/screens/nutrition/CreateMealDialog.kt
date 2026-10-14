@@ -1,5 +1,8 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -86,7 +89,8 @@ fun CreateMealDialog(
                         placeholder = { Text("e.g. Protein Smoothie") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -120,14 +124,11 @@ fun CreateMealDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 24.dp)) {
-                    items(selectedItems) { (item, qty) ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                        ) {
+                    itemsIndexed(selectedItems) { index, (item, qty) ->
+                        if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Box(modifier = Modifier.fillMaxWidth()) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -142,7 +143,7 @@ fun CreateMealDialog(
                                 IconButton(onClick = { 
                                     selectedItems = selectedItems.filter { it.first.id != item.id }
                                 }) {
-                                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Delete, "Remove ${item.name}", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
                                 }
                             }
                         }

@@ -1,5 +1,9 @@
 package com.eliteonetube.momentum.ui.screens.profile
 
+import androidx.compose.ui.draw.clip
+import androidx.activity.compose.BackHandler
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
@@ -737,48 +741,41 @@ private fun ChangeGoalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Update Strategy", fontWeight = FontWeight.Black) },
+        title = { Text("Change goal", fontWeight = FontWeight.Black) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                goalOptions.forEach { option ->
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                goalOptions.forEachIndexed { index, option ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     val isSelected = selectedGoal == option.goal
-                    Card(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { selectedGoal = option.goal },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                        ),
-                        border = if (!isSelected) CardDefaults.outlinedCardBorder() else null,
-                        shape = RoundedCornerShape(16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { selectedGoal = option.goal }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = isSelected, onClick = { selectedGoal = option.goal })
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(option.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text(option.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                        RadioButton(selected = isSelected, onClick = null, modifier = Modifier.padding(top = 2.dp, end = 12.dp))
+                        Column {
+                            Text(
+                                option.label,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(option.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
 
                 if (selectedGoal != currentProfile.goal) {
-                    Card(
-                        modifier = Modifier.padding(top = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            transition.explanation,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
+                    Text(
+                        transition.explanation,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
                 }
             }
         },
@@ -842,6 +839,9 @@ private fun EditProfileForm(
 
     val allValid = parsedHeightCm != null && parsedAge != null && parsedSteps != null
 
+    // System back cancels the edit instead of leaving the app
+    BackHandler(onBack = onCancel)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -850,37 +850,47 @@ private fun EditProfileForm(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), MaterialTheme.colorScheme.background)))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (isSystemInDarkTheme()) 0.15f else 0.12f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .padding(top = 48.dp, bottom = 32.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("EDIT", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                Text("Profile", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
+                Text(
+                    "Edit profile",
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 44.sp),
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "YOUR DETAILS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
-        Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Imperial Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("lb, ft/in", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(
-                        checked = unitSystem == UnitSystem.IMPERIAL,
-                        onCheckedChange = { unitSystem = if (it) UnitSystem.IMPERIAL else UnitSystem.METRIC }
-                    )
+        Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SectionLabel("UNITS", modifier = Modifier.padding(bottom = 0.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                listOf(UnitSystem.METRIC to "Metric (kg, cm)", UnitSystem.IMPERIAL to "Imperial (lb, ft)").forEachIndexed { i, (system, label) ->
+                    SegmentedButton(
+                        selected = unitSystem == system,
+                        onClick = { unitSystem = system },
+                        shape = SegmentedButtonDefaults.itemShape(index = i, count = 2)
+                    ) { Text(label) }
                 }
             }
+
+            SectionDivider()
+            SectionLabel("BODY")
 
             if (unitSystem == UnitSystem.IMPERIAL) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -889,16 +899,18 @@ private fun EditProfileForm(
                         onValueChange = { heightFeetInput = it },
                         label = { Text("Feet") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
                     OutlinedTextField(
                         value = heightInchesInput,
                         onValueChange = { heightInchesInput = it },
                         label = { Text("Inches") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
                 }
             } else {
@@ -907,9 +919,10 @@ private fun EditProfileForm(
                     onValueChange = { heightCmInput = it },
                     label = { Text("Height (cm)") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
                     isError = heightError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
             }
 
@@ -919,39 +932,42 @@ private fun EditProfileForm(
                     onValueChange = { age = it },
                     label = { Text("Age") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
                     isError = ageError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
                 OutlinedTextField(
                     value = bodyFatInput,
                     onValueChange = { bodyFatInput = it },
                     label = { Text("Body Fat %") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
                     isError = bfError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
             }
 
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(selected = isMale, onClick = { isMale = true }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("Male") }
+                SegmentedButton(selected = !isMale, onClick = { isMale = false }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("Female") }
+            }
+
+            SectionDivider()
+            SectionLabel("ACTIVITY")
             OutlinedTextField(
                 value = stepsInput,
                 onValueChange = { stepsInput = it },
                 label = { Text("Average Daily Steps") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
                 isError = stepsError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                shape = FieldShape,
+                colors = filledFieldColors()
             )
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Biological Sex", fontWeight = FontWeight.Bold)
-                SingleChoiceSegmentedButtonRow {
-                    SegmentedButton(selected = isMale, onClick = { isMale = true }, shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)) { Text("Male") }
-                    SegmentedButton(selected = !isMale, onClick = { isMale = false }, shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)) { Text("Female") }
-                }
-            }
-
+            Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 SecondaryButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
                 PrimaryButton(
@@ -960,10 +976,10 @@ private fun EditProfileForm(
                     },
                     enabled = allValid,
                     modifier = Modifier.weight(1.5f)
-                ) { Text("Save Changes") }
+                ) { Text("Save changes") }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(bottomNavClearance()))
         }
     }
 }

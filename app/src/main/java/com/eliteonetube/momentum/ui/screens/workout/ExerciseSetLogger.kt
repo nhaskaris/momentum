@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -313,8 +315,9 @@ private fun SetInputRow(
                 placeholder = { Text("Add set notes...", style = MaterialTheme.typography.bodySmall) },
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 44.dp, end = 8.dp, bottom = 4.dp),
                 textStyle = MaterialTheme.typography.bodySmall,
-                shape = RoundedCornerShape(8.dp),
-                singleLine = true
+                singleLine = true,
+                shape = FieldShape,
+                colors = filledFieldColors()
             )
         }
     }

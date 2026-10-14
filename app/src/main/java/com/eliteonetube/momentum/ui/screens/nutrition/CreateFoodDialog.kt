@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -104,7 +106,8 @@ fun CreateFoodDialog(
                         label = { Text("Food Name") },
                         placeholder = { Text("e.g. Grandma's Apple Pie") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -114,14 +117,16 @@ fun CreateFoodDialog(
                             label = { Text("Serving Amount") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                         OutlinedTextField(
                             value = servingUnit,
                             onValueChange = { servingUnit = it },
                             label = { Text("Unit (e.g. g, ml, piece)") },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                     }
 
@@ -132,7 +137,8 @@ fun CreateFoodDialog(
                             label = { Text("Calories") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                         OutlinedTextField(
                             value = protein,
@@ -140,7 +146,8 @@ fun CreateFoodDialog(
                             label = { Text("Protein (g)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                     }
 
@@ -151,7 +158,8 @@ fun CreateFoodDialog(
                             label = { Text("Carbs (g)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                         OutlinedTextField(
                             value = fat,
@@ -159,7 +167,8 @@ fun CreateFoodDialog(
                             label = { Text("Fat (g)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
                     }
                 }

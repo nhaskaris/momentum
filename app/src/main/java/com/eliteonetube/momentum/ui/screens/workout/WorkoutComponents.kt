@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.SectionLabel
+import com.eliteonetube.momentum.ui.components.PrimaryButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,15 +33,7 @@ fun EmptyWorkoutStateCard(
     onAddExerciseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 24.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-        )
-    ) {
+    Box(modifier = modifier.fillMaxWidth().padding(vertical = 24.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -70,13 +64,11 @@ fun EmptyWorkoutStateCard(
             Text(
                 text = "Add exercises to log weight, reps, and track volume.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onAddExerciseClick,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+            PrimaryButton(onClick = onAddExerciseClick, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Add First Exercise")
@@ -129,12 +121,7 @@ fun WorkoutSummaryStep(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Logged Exercises",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                SectionLabel("LOGGED EXERCISES", modifier = Modifier.padding(top = 4.dp))
             }
 
             itemsIndexed(exercises) { index, exercise ->
@@ -178,17 +165,13 @@ private fun WorkoutStatsHeader(
     totalReps: Int,
     totalVolumeDisplay: String
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
+    // Plain row of figures — this already sits inside the summary page's card
+    Column {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp, horizontal = 12.dp),
+                .padding(vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -216,6 +199,7 @@ private fun WorkoutStatsHeader(
                 value = totalReps.toString()
             )
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     }
 }
 

@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,7 +58,7 @@ fun FoodSearchDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Search Foods", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("Add to meal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
                 }
                 
@@ -65,42 +67,39 @@ fun FoodSearchDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search...") },
+                    placeholder = { Text("Search your foods") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(Icons.Default.Search, null) },
                     trailingIcon = { if(searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    )
+                    singleLine = true,
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(filteredItems) { item ->
                         ListItem(
-                            headlineContent = { Text(item.name, fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}") },
+                            headlineContent = { Text(item.name, fontWeight = FontWeight.SemiBold) },
+                            supportingContent = { Text("${item.calories.toInt()} kcal per ${item.servingSize}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             leadingContent = {
                                 Surface(
                                     modifier = Modifier.size(40.dp),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Text(item.name.take(1).uppercase(), color = MaterialTheme.colorScheme.primary)
+                                        Text(item.name.take(1).uppercase(), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { 
                                 selectedFoodForQuantity = item
                             }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
             }

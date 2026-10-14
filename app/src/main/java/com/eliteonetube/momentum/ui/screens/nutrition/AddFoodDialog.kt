@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import com.eliteonetube.momentum.logic.api.ExternalFoodApi
@@ -237,19 +239,14 @@ fun AddFoodDialog(
                         onValueChange = { searchQuery = it },
                         placeholder = { Text("Search your foods...") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary) },
                         trailingIcon = { 
                             if(searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
                             }
                         },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        )
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -406,7 +403,7 @@ private fun FoodActionCard(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     contentColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Surface(
@@ -414,7 +411,7 @@ private fun FoodActionCard(
             .height(72.dp)
             .bounceClick(onClick),
         color = containerColor,
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

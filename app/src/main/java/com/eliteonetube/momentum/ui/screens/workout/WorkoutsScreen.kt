@@ -511,7 +511,8 @@ fun WorkoutsScreen(
                 onTemplateCreated(name, notes, exercises)
                 showCreateTemplateDialog = false
             },
-            onCreateExercise = onCreateExercise
+            onCreateExercise = onCreateExercise,
+            unitSystem = unitSystem
         )
     }
 
@@ -529,7 +530,8 @@ fun WorkoutsScreen(
             title = "Edit Routine",
             initialName = template.name,
             initialNotes = template.notes,
-            initialExercises = inputs
+            initialExercises = inputs,
+            unitSystem = unitSystem
         )
     }
 }

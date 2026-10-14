@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.dashboard
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import com.eliteonetube.momentum.ui.components.bottomNavClearance
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
@@ -186,15 +188,9 @@ fun MainDashboard(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
                             textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.Black),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                // Without a card around it, the field itself needs a fill to stand out
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
+                            shape = FieldShape,
+                            colors = filledFieldColors()
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))

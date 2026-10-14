@@ -1,5 +1,8 @@
 package com.eliteonetube.momentum.ui.screens.nutrition
 
+import com.eliteonetube.momentum.ui.components.SectionLabel
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -76,28 +79,18 @@ fun FoodReviewDialog(
                     label = { Text("Food Name") },
                     placeholder = { Text("e.g. Greek Yogurt") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
                     supportingText = { if (barcode != null) Text("Barcode: $barcode") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    )
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Nutrition Values Grid
-                Text("Nutrition Facts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
+                SectionLabel("NUTRITION FACTS · PER SERVING")
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Column {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             NutritionInput(
                                 label = "Calories",
@@ -187,15 +180,10 @@ fun NutritionInput(
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            shape = RoundedCornerShape(12.dp),
             singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = color
-            ),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+            shape = FieldShape,
+            colors = filledFieldColors()
         )
     }
 }

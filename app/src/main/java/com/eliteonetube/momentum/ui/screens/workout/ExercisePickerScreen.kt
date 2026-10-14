@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import com.eliteonetube.momentum.ui.components.SectionLabel
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.eliteonetube.momentum.data.Exercise
@@ -62,7 +66,7 @@ fun ExercisePickerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Select Exercise", fontWeight = FontWeight.Bold) },
+                title = { Text("Add exercise", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -70,7 +74,7 @@ fun ExercisePickerScreen(
                 },
                 actions = {
                     IconButton(onClick = { showCreateDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Custom Exercise")
+                        Icon(Icons.Default.Add, contentDescription = "Create exercise")
                     }
                 }
             )
@@ -87,7 +91,7 @@ fun ExercisePickerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search exercises...") },
+                placeholder = { Text("Search exercises") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -97,7 +101,8 @@ fun ExercisePickerScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = FieldShape,
+                colors = filledFieldColors()
             )
 
             if (muscleGroups.isNotEmpty()) {
@@ -150,7 +155,7 @@ fun ExercisePickerScreen(
                         TextButton(onClick = { showCreateDialog = true }) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Create standard exercise")
+                            Text("Create exercise")
                         }
                     }
                 }
@@ -172,8 +177,8 @@ fun ExercisePickerScreen(
                             },
                             leadingContent = {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
@@ -181,11 +186,12 @@ fun ExercisePickerScreen(
                                             imageVector = if (exercise.exerciseType == ExerciseType.CARDIO) Icons.AutoMirrored.Filled.DirectionsRun else Icons.Default.FitnessCenter,
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
                             },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             modifier = Modifier
                                 .clickable { onExerciseSelected(exercise) }
                                 .padding(horizontal = 8.dp)
@@ -212,25 +218,30 @@ private fun CreateExerciseDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Exercise") },
+        title = { Text("New exercise") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Exercise Name") },
+                    label = { Text("Name") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
                 OutlinedTextField(
                     value = muscleGroup,
                     onValueChange = { muscleGroup = it },
-                    label = { Text("Target Muscle Group (e.g. Chest, Legs)") },
+                    label = { Text("Muscle group") },
+                    placeholder = { Text("e.g. Chest, Legs") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = FieldShape,
+                    colors = filledFieldColors()
                 )
                 
-                Text("Exercise Type", style = MaterialTheme.typography.labelMedium)
+                SectionLabel("TYPE")
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     ExerciseType.entries.forEachIndexed { index, type ->
                         SegmentedButton(

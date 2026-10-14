@@ -1,5 +1,12 @@
 package com.eliteonetube.momentum.ui.screens.workout
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import com.eliteonetube.momentum.ui.components.SectionLabel
+import com.eliteonetube.momentum.logic.utils.Units
+import com.eliteonetube.momentum.data.UnitSystem
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +56,8 @@ fun CreateTemplateDialog(
     title: String = "New Routine",
     initialName: String = "",
     initialNotes: String? = null,
-    initialExercises: List<TemplateExerciseInput> = emptyList()
+    initialExercises: List<TemplateExerciseInput> = emptyList(),
+    unitSystem: UnitSystem = UnitSystem.METRIC
 ) {
     var templateName by remember { mutableStateOf(initialName) }
     var templateNotes by remember { mutableStateOf(initialNotes.orEmpty()) }
@@ -100,21 +108,20 @@ fun CreateTemplateDialog(
                 if (recentSessions.isEmpty()) {
                     Text("No past sessions found.")
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 400.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(recentSessions) { session ->
+                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        itemsIndexed(recentSessions) { index, session ->
+                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             var exerciseCount by remember { mutableStateOf<Int?>(null) }
                             LaunchedEffect(session.id) {
                                 val sets = getSetsForSession(session.id)
                                 exerciseCount = sets.map { it.exerciseId }.distinct().size
                             }
 
-                            Card(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .bounceClick {
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
                                         coroutineScope.launch {
                                             val sets = getSetsForSession(session.id)
                                             val exerciseMap = allExercises.associateBy { it.id }
@@ -149,17 +156,19 @@ fun CreateTemplateDialog(
                                             }
                                             showSessionPicker = false
                                         }
-                                    },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                    }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(16.dp),
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(session.date, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            runCatching { java.time.LocalDate.parse(session.date).format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM yyyy")) }.getOrDefault(session.date),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                         Text(
                                             text = if (exerciseCount == null) "Loading..." else "$exerciseCount exercises",
                                             style = MaterialTheme.typography.bodySmall,
@@ -254,12 +263,9 @@ fun CreateTemplateDialog(
                         placeholder = { Text("e.g. Upper Body Focus") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -270,10 +276,8 @@ fun CreateTemplateDialog(
                         label = { Text("Notes (Optional)") },
                         placeholder = { Text("Tips, focus points, or equipment...") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        shape = FieldShape,
+                        colors = filledFieldColors()
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -308,12 +312,7 @@ fun CreateTemplateDialog(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Text(
-                        text = "Exercises (${selectedExercises.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    SectionLabel("EXERCISES · ${selectedExercises.size}")
                 }
 
                 if (selectedExercises.isEmpty()) {
@@ -328,12 +327,13 @@ fun CreateTemplateDialog(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 64.dp)
                     ) {
                         itemsIndexed(selectedExercises, key = { _, item -> item.exercise.id }) { index, item ->
+                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             RoutineExerciseItem(
                                 item = item,
+                                unitSystem = unitSystem,
                                 onUpdate = { updated ->
                                     val newList = selectedExercises.toMutableList()
                                     newList[index] = updated
@@ -369,15 +369,12 @@ private fun ScanReviewDialog(
                 } else {
                     Text("I found ${matchedItems.size} exercises. Ready to add them to your routine?", style = MaterialTheme.typography.bodySmall)
                     
-                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(matchedItems) { item ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
+                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        itemsIndexed(matchedItems) { index, item ->
+                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            Box(modifier = Modifier.fillMaxWidth()) {
                                 Row(
-                                    modifier = Modifier.padding(16.dp),
+                                    modifier = Modifier.padding(vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
@@ -430,15 +427,15 @@ private fun CreationActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     contentColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Surface(
         modifier = modifier
-            .height(80.dp)
+            .height(72.dp)
             .bounceClick(onClick),
         color = containerColor,
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -458,82 +455,86 @@ private fun CreationActionCard(
 @Composable
 private fun RoutineExerciseItem(
     item: TemplateExerciseInput,
+    unitSystem: UnitSystem,
     onUpdate: (TemplateExerciseInput) -> Unit,
     onRemove: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(item.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(item.exercise.muscleGroup, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
-                }
+    val isImperial = unitSystem == UnitSystem.IMPERIAL
+    val shownWeight = if (isImperial) Units.kgToLb(item.targetWeightKg) else item.targetWeightKg
+    Column(modifier = Modifier.padding(vertical = 14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(item.exercise.muscleGroup, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CompactInput(
-                    label = "SETS",
-                    value = item.targetSets.toString(),
-                    onValueChange = { it.toIntOrNull()?.let { v -> onUpdate(item.copy(targetSets = v)) } },
-                    modifier = Modifier.weight(1f)
-                )
-                CompactInput(
-                    label = "REPS",
-                    value = item.targetReps.toString(),
-                    onValueChange = { it.toIntOrNull()?.let { v -> onUpdate(item.copy(targetReps = v)) } },
-                    modifier = Modifier.weight(1f)
-                )
-                CompactInput(
-                    label = "KG",
-                    value = if (item.targetWeightKg % 1.0 == 0.0) item.targetWeightKg.toInt().toString() else item.targetWeightKg.toString(),
-                    onValueChange = { it.replace(',', '.').toDoubleOrNull()?.let { v -> onUpdate(item.copy(targetWeightKg = v)) } },
-                    modifier = Modifier.weight(1.2f)
-                )
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Delete, "Remove ${item.exercise.name}", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
             }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CompactInput(
+                label = "SETS",
+                initial = item.targetSets.toString(),
+                onValueChange = { it.toIntOrNull()?.let { v -> onUpdate(item.copy(targetSets = v)) } },
+                modifier = Modifier.weight(1f)
+            )
+            CompactInput(
+                label = "REPS",
+                initial = item.targetReps.toString(),
+                onValueChange = { it.toIntOrNull()?.let { v -> onUpdate(item.copy(targetReps = v)) } },
+                modifier = Modifier.weight(1f)
+            )
+            // Typed in the user's unit; routines always store kg
+            CompactInput(
+                label = if (isImperial) "LB" else "KG",
+                initial = if (shownWeight % 1.0 == 0.0) shownWeight.toInt().toString() else "%.1f".format(shownWeight),
+                decimal = true,
+                onValueChange = {
+                    it.replace(',', '.').toDoubleOrNull()?.let { v ->
+                        onUpdate(item.copy(targetWeightKg = if (isImperial) Units.lbToKg(v) else v))
+                    }
+                },
+                modifier = Modifier.weight(1.2f)
+            )
         }
     }
 }
 
+/**
+ * Small labelled number field. Keeps its own text while typing, so "82." or an empty field don't get
+ * overwritten mid-edit by the last parsed value.
+ */
 @Composable
 private fun CompactInput(
     label: String,
-    value: String,
+    initial: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    decimal: Boolean = false
 ) {
+    var text by remember { mutableStateOf(initial) }
     Column(modifier = modifier) {
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = text,
+            onValueChange = { text = it; onValueChange(it) },
+            keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Transparent,
-                focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-            )
+            shape = FieldShape,
+            colors = filledFieldColors()
         )
     }
 }

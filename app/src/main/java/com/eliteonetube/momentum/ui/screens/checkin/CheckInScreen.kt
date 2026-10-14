@@ -1,5 +1,7 @@
 package com.eliteonetube.momentum.ui.screens.checkin
 
+import com.eliteonetube.momentum.ui.components.filledFieldColors
+import com.eliteonetube.momentum.ui.components.FieldShape
 import com.eliteonetube.momentum.ui.components.PrimaryButton
 import com.eliteonetube.momentum.ui.components.SecondaryButton
 import android.Manifest
@@ -255,14 +257,9 @@ private fun WeightStep(
             placeholder = { Text("0.0") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
             textStyle = LocalTextStyle.current.copy(fontSize = 24.sp, fontWeight = FontWeight.Black),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-            )
+            shape = FieldShape,
+            colors = filledFieldColors()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -282,13 +279,8 @@ private fun WeightStep(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-            )
+            shape = FieldShape,
+            colors = filledFieldColors()
         )
 
         Spacer(modifier = Modifier.height(32.dp))
