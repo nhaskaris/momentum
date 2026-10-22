@@ -1,6 +1,5 @@
 package com.eliteonetube.momentum.logic.parsers
 
-import android.util.Log
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.utils.Units
@@ -13,8 +12,6 @@ import java.util.Locale
 
 object WeightHistoryParser {
 
-    private const val TAG = "WeightHistoryParser"
-    
     // Prioritize numbers followed by units (kg, lb) or numbers with decimals
     private val weightWithUnitRegex = Regex("""(\d{2,3}(?:[.,]\d)?)\s*(kg|lbs?)""", RegexOption.IGNORE_CASE)
     private val weightDecimalRegex = Regex("""(\d{2,3}[.,]\d)""")
@@ -81,7 +78,6 @@ object WeightHistoryParser {
             // Sort lines by left-to-right to keep reading order
             val sortedLines = row.sortedBy { it.boundingBox?.left ?: 0 }
             val rowText = sortedLines.joinToString(" ") { it.text }
-            Log.d(TAG, "Processing row: $rowText")
             
             // 1. Find the date first so we can ignore its components when looking for weights
             val dateMatch = findDateMatch(rowText)
@@ -98,7 +94,6 @@ object WeightHistoryParser {
                 ?: extractWeightKg(rowText, defaultUnit) // Fallback to full text if cleaning failed
             
             if (weight != null) {
-                Log.d(TAG, "Found valid entry: $date -> $weight")
                 results.add(WeightEntry(date = date.toString(), weight = weight))
             }
         }

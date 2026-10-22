@@ -144,6 +144,11 @@ fun HomeScreen(
         }
     }
 
+    // Last widget Add Food request the Eat tab already opened. The tab is rebuilt whenever the
+    // scanner (or another full screen) replaces it, and without this it would reopen Add Food
+    // on top of whatever the user is doing now
+    var handledAddFoodRequest by remember { mutableIntStateOf(0) }
+
     LaunchedEffect(openWeightEntryRequest) {
         if (openWeightEntryRequest > 0) {
             pagerState.scrollToPage(AppTab.entries.indexOf(AppTab.DASHBOARD))
@@ -389,7 +394,8 @@ fun HomeScreen(
                     recentWeights = data.recentWeights,
                     todayLogs = data.todayFoodLogs,
                     diaryForDate = diaryForDate,
-                    addFoodRequest = addFoodRequest,
+                    addFoodRequest = if (addFoodRequest > handledAddFoodRequest) addFoodRequest else 0,
+                    onAddFoodRequestHandled = { handledAddFoodRequest = addFoodRequest },
                     allFoodItems = data.allFoodItems,
                     recentFoodIds = data.recentFoodIds,
                     allMeals = data.allMeals,

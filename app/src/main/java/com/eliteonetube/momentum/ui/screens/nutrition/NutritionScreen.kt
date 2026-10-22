@@ -55,6 +55,7 @@ fun NutritionScreen(
     diaryForDate: (String) -> Flow<List<FoodLogWithItem>> = { flowOf(emptyList()) },
     /** Increments when the widget's "+ Food" is tapped: open Add Food for today's current meal. */
     addFoodRequest: Int = 0,
+    onAddFoodRequestHandled: () -> Unit = {},
     allFoodItems: List<FoodItem> = emptyList(),
     recentFoodIds: List<Long> = emptyList(),
     allMeals: List<Meal> = emptyList(),
@@ -112,6 +113,7 @@ fun NutritionScreen(
         if (addFoodRequest > 0) {
             selectedDateText = today.toString()
             addTarget = LogTarget.now()
+            onAddFoodRequestHandled()
         }
     }
 

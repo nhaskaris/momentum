@@ -1,6 +1,5 @@
 package com.eliteonetube.momentum.logic.api
 
-import android.util.Log
 import com.google.mlkit.vision.text.Text
 
 data class ScannedNutrition(
@@ -53,15 +52,10 @@ object NutritionScanner {
     }
 
     fun parseText(text: Text): ScannedNutrition {
-        Log.d("NutritionScanner", "--- PARSING NEW FRAME ---")
         val allLines = text.textBlocks.flatMap { it.lines }
         
         val rows = groupIntoRows(allLines)
-        val rowTexts = rows.map { row ->
-            val txt = row.joinToString(" ") { it.text }
-            Log.d("NutritionScanner", "RECONSTRUCTED ROW: $txt")
-            txt
-        }
+        val rowTexts = rows.map { row -> row.joinToString(" ") { it.text } }
 
         // 1. First, search for "kcal" anywhere in the text as it is the most reliable anchor
         val anchorKcal = rowTexts.mapNotNull { kcalTagRegex.find(it)?.groupValues?.get(1)?.replace(",", ".")?.toDoubleOrNull() }.firstOrNull()
