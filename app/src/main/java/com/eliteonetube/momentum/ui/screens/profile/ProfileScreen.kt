@@ -51,6 +51,7 @@ import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.UserProfile
 import com.eliteonetube.momentum.data.WeightEntry
 import com.eliteonetube.momentum.logic.algorithm.CoachAlgorithm
+import com.eliteonetube.momentum.logic.algorithm.WeeklyReview
 import com.eliteonetube.momentum.logic.utils.CrashHandler
 import com.eliteonetube.momentum.logic.services.HealthConnectManager
 import com.eliteonetube.momentum.logic.utils.Units
@@ -226,6 +227,7 @@ fun ProfileScreen(
     if (showChangeGoalDialog) {
         ChangeGoalDialog(
             currentProfile = profile,
+            cutFloor = WeeklyReview.cutFloor(profile, recentWeights),
             onDismiss = { showChangeGoalDialog = false },
             onConfirm = { newGoal ->
                 onGoalChanged(newGoal)
@@ -724,6 +726,7 @@ private fun ConfirmImportDialog(
 @Composable
 private fun ChangeGoalDialog(
     currentProfile: UserProfile,
+    cutFloor: Int,
     onDismiss: () -> Unit,
     onConfirm: (Goal) -> Unit
 ) {
@@ -735,7 +738,8 @@ private fun ChangeGoalDialog(
             previousGoal = currentProfile.goal,
             newGoal = selectedGoal,
             currentCalorieTarget = currentProfile.currentCalorieTarget,
-            estimatedMaintenance = currentProfile.estimatedMaintenanceCalories
+            estimatedMaintenance = currentProfile.estimatedMaintenanceCalories,
+            cutFloor = cutFloor
         )
     }
 

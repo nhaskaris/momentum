@@ -225,25 +225,28 @@ fun MomentumAppContent(
                 onProfileUpdated = { updatedProfile ->
                     coroutineScope.launch {
                         // Without any logged weight there's nothing to recalculate from, so keep the current estimate
-                        val latestWeightKg = appData.recentWeights.firstOrNull()?.weight
-                        if (latestWeightKg == null) {
+                        val weightKg = WeeklyReview.currentWeightKg(appData.recentWeights)
+                        if (weightKg == null) {
                             weightDao.saveProfile(updatedProfile)
                             return@launch
                         }
                         val recalculated = algorithm.calculateInitialMaintenance(
-                            latestWeightKg,
+                            weightKg,
                             updatedProfile.height, updatedProfile.age, updatedProfile.isMale,
                             updatedProfile.averageDailySteps, updatedProfile.bodyFatPercentage
                         )
-                        var final = updatedProfile.copy(estimatedMaintenanceCalories = recalculated)
-                        if (final.goal == Goal.MAINTAIN) final = final.copy(currentCalorieTarget = recalculated)
-                        weightDao.saveProfile(final)
+                        // Only the estimate moves: the target changes at check-ins and goal changes, so
+                        // settings or a step sync can't undo Maintain's weekly corrections
+                        weightDao.saveProfile(updatedProfile.copy(estimatedMaintenanceCalories = recalculated))
                     }
                 },
                 onGoalChanged = { newGoal ->
                     savedProfile?.let { profile ->
                         coroutineScope.launch {
-                            val trans = algorithm.calculateGoalTransition(profile.goal, newGoal, profile.currentCalorieTarget, profile.estimatedMaintenanceCalories)
+                            val trans = algorithm.calculateGoalTransition(
+                                profile.goal, newGoal, profile.currentCalorieTarget, profile.estimatedMaintenanceCalories,
+                                cutFloor = WeeklyReview.cutFloor(profile, appData.recentWeights)
+                            )
                             weightDao.saveProfile(profile.copy(goal = newGoal, currentCalorieTarget = trans.newTarget, pendingCalorieTarget = null, pendingAdjustmentReason = null))
                         }
                     }
@@ -251,8 +254,11 @@ fun MomentumAppContent(
                 onAdjustmentAccepted = {
                     savedProfile?.let { p ->
                         coroutineScope.launch {
+                            val target = p.pendingCalorieTarget ?: p.currentCalorieTarget
                             weightDao.saveProfile(p.copy(
-                                currentCalorieTarget = p.pendingCalorieTarget ?: p.currentCalorieTarget, 
+                                // The Monday job saved this week's maintenance, so a finished reverse can hand over here too
+                                goal = algorithm.goalAfterReview(p.goal, target, p.estimatedMaintenanceCalories),
+                                currentCalorieTarget = target,
                                 pendingCalorieTarget = null, 
                                 pendingAdjustmentReason = null,
                                 checkInDue = false
@@ -264,10 +270,12 @@ fun MomentumAppContent(
                     savedProfile?.let { p ->
                         coroutineScope.launch { 
                             weightDao.saveProfile(p.copy(
-                                pendingCalorieTarget = null, 
+                                pendingCalorieTarget = null,
                                 pendingAdjustmentReason = null,
-                                checkInDue = false
-                            )) 
+                                checkInDue = false,
+                                // Counts as this week's review handled, so an overdue card doesn't reappear straight away
+                                lastCheckInDate = LocalDate.now().toString()
+                            ))
                         }
                     }
                 },
@@ -390,6 +398,7 @@ fun MomentumAppContent(
                         weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = front, backPhotoPath = back, sidePhotoPath = side, calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = review.newTarget, adjustmentReason = review.reason, bodyFatPercentage = bf))
                         weightDao.saveProfile(p.copy(
                             bodyFatPercentage = bf ?: p.bodyFatPercentage,
+                            goal = review.newGoal,
                             currentCalorieTarget = review.newTarget,
                             estimatedMaintenanceCalories = review.estimatedMaintenance,
                             pendingCalorieTarget = null, pendingAdjustmentReason = null,
@@ -506,7 +515,9 @@ fun MomentumAppContent(
                 onTemplateDeleted = { tid -> coroutineScope.launch { workoutDao.deleteTemplate(tid) } },
                 onOnboardingCompleted = { w, h, a, m, s, g, cc, us, bf, hc, onlineLookup ->
                     val main = algorithm.calculateInitialMaintenance(w, h, a, m, s, bf)
-                    val init = cc ?: when (g) { Goal.CUT -> main - 500; Goal.BULK -> main + 300; Goal.MAINTAIN -> main; Goal.REVERSE -> main - 300 }
+                    val chosen = cc ?: when (g) { Goal.CUT -> main - 500; Goal.BULK -> main + 300; Goal.MAINTAIN -> main; Goal.REVERSE -> main - 300 }
+                    // A cut never starts below the floor, typed or not; a reverse keeps a low typed intake on purpose
+                    val init = if (g == Goal.CUT) chosen.coerceAtLeast(algorithm.calculateCutFloor(algorithm.calculateBmr(w, h, a, m, bf), m)) else chosen
                     coroutineScope.launch {
                         weightDao.saveProfile(UserProfile(height = h, age = a, isMale = m, averageDailySteps = s, estimatedMaintenanceCalories = main, goal = g, currentCalorieTarget = init, unitSystem = us, bodyFatPercentage = bf, useHealthConnect = hc, useExternalApi = onlineLookup))
                         weightDao.insertWeight(WeightEntry(date = LocalDate.now().toString(), weight = w, calorieTargetAtEntry = init))

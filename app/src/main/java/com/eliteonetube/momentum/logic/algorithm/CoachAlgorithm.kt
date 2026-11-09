@@ -17,6 +17,30 @@ class CoachAlgorithm {
 
     data class GoalTransition(val newTarget: Int, val explanation: String)
 
+    /** Calories burned at complete rest. */
+    fun calculateBmr(
+        weightKg: Double,
+        heightCm: Double,
+        age: Int,
+        isMale: Boolean,
+        bodyFatPercentage: Double? = null
+    ): Double = if (bodyFatPercentage != null && bodyFatPercentage > 0) {
+        // Katch-McArdle Formula (more accurate if LBM is known)
+        val lbm = weightKg * (100 - bodyFatPercentage) / 100.0
+        370 + (21.6 * lbm)
+    } else {
+        // Mifflin-St Jeor Equation
+        val genderBonus = if (isMale) 5 else -161
+        (10 * weightKg) + (6.25 * heightCm) - (5 * age) + genderBonus
+    }
+
+    /**
+     * The lowest calorie target a cut may set: the common 1200 (women) / 1500 (men) minimum, or
+     * BMR when that's higher, so neither small nor large users are pushed too low.
+     */
+    fun calculateCutFloor(bmr: Double, isMale: Boolean): Int =
+        maxOf(if (isMale) 1500 else 1200, bmr.roundToInt())
+
     fun calculateInitialMaintenance(
         weightKg: Double,
         heightCm: Double,
@@ -25,15 +49,7 @@ class CoachAlgorithm {
         averageDailySteps: Int,
         bodyFatPercentage: Double? = null
     ): Int {
-        val bmr = if (bodyFatPercentage != null && bodyFatPercentage > 0) {
-            // Katch-McArdle Formula (more accurate if LBM is known)
-            val lbm = weightKg * (100 - bodyFatPercentage) / 100.0
-            370 + (21.6 * lbm)
-        } else {
-            // Mifflin-St Jeor Equation
-            val genderBonus = if (isMale) 5 else -161
-            (10 * weightKg) + (6.25 * heightCm) - (5 * age) + genderBonus
-        }
+        val bmr = calculateBmr(weightKg, heightCm, age, isMale, bodyFatPercentage)
 
         // Standard Sedentary Multiplier (1.2) covers ~3,000-4,000 steps.
         // We use a base multiplier of 1.15 and then add granular step calories
@@ -50,7 +66,8 @@ class CoachAlgorithm {
         previousGoal: Goal,
         newGoal: Goal,
         currentCalorieTarget: Int,
-        estimatedMaintenance: Int
+        estimatedMaintenance: Int,
+        cutFloor: Int
     ): GoalTransition {
         if (previousGoal == newGoal) {
             return GoalTransition(currentCalorieTarget, "You're already on this goal — no change.")
@@ -66,8 +83,13 @@ class CoachAlgorithm {
                 "You'll keep eating $currentCalorieTarget kcal for now — Momentum will gradually raise it back toward your estimated maintenance of $estimatedMaintenance kcal."
             )
             Goal.CUT -> {
-                val target = (currentCalorieTarget - 250).coerceAtMost(estimatedMaintenance - 100)
-                GoalTransition(target, "Starting at $target kcal — a deficit from where you are now.")
+                val deficit = (currentCalorieTarget - 250).coerceAtMost(estimatedMaintenance - 100)
+                val target = deficit.coerceAtLeast(cutFloor)
+                when {
+                    cutFloor >= estimatedMaintenance -> GoalTransition(target, notRecommendedToCut(cutFloor))
+                    target > deficit -> GoalTransition(target, "Starting at $target kcal — your minimum safe intake, so the cut won't go lower than this.")
+                    else -> GoalTransition(target, "Starting at $target kcal — a deficit from where you are now.")
+                }
             }
             Goal.BULK -> {
                 val target = currentCalorieTarget + 200
@@ -81,7 +103,7 @@ class CoachAlgorithm {
      * decides whether the calorie target needs adjusting for the goal.
      * Returns null if there isn't enough data yet (fewer than 3 entries per week).
      */
-    fun calculateWeeklyAdjustment(entries: List<WeightEntry>, currentCalories: Int, goal: Goal, estimatedMaintenance: Int): WeeklyAdjustment? {
+    fun calculateWeeklyAdjustment(entries: List<WeightEntry>, currentCalories: Int, goal: Goal, estimatedMaintenance: Int, cutFloor: Int): WeeklyAdjustment? {
         val today = LocalDate.now()
         val week1Weights = mutableListOf<Double>()
         val week2Weights = mutableListOf<Double>()
@@ -105,7 +127,12 @@ class CoachAlgorithm {
 
         val (newTarget, reason) = when (goal) {
             Goal.CUT -> when {
-                weightChange > -0.2 -> (currentCalories - 150) to "Weight loss stalled this week — cutting 150 kcal to keep the trend moving."
+                cutFloor >= estimatedMaintenance -> cutFloor to notRecommendedToCut(cutFloor)
+                // Targets set before the floor existed may sit below it
+                currentCalories < cutFloor -> cutFloor to "Raising you to your minimum safe intake of $cutFloor kcal — going lower risks muscle loss and burnout."
+                weightChange > -0.2 && currentCalories - 150 >= cutFloor -> (currentCalories - 150) to "Weight loss stalled this week — cutting 150 kcal to keep the trend moving."
+                weightChange > -0.2 && currentCalories > cutFloor -> cutFloor to "Weight loss stalled this week — lowering you to your minimum safe intake of $cutFloor kcal. I won't go below this."
+                weightChange > -0.2 -> cutFloor to "You're at your minimum safe intake of $cutFloor kcal, so I won't lower it further. Consider a break from cutting."
                 weightChange < -1.2 -> (currentCalories + 150) to "Losing faster than planned — adding 150 kcal back to keep it sustainable."
                 else -> currentCalories to "Right on track this week — no change needed."
             }
@@ -119,15 +146,13 @@ class CoachAlgorithm {
                 weightChange < -0.4 -> (currentCalories + 100) to "Trending down while maintaining — adding 100 kcal to level off."
                 else -> currentCalories to "Holding steady this week — no change needed."
             }
-            Goal.REVERSE -> {
-                if (currentCalories >= estimatedMaintenance) {
-                    currentCalories to "You've reached your estimated maintenance — consider switching your goal to Maintain."
-                } else {
-                    when {
-                        weightChange > 0.5 -> currentCalories to "Gaining a bit fast for a reverse — holding calories steady this week to let things settle."
-                        else -> (currentCalories + 100).coerceAtMost(estimatedMaintenance) to "Reverse dieting — adding 100 kcal to keep gradually rebuilding your intake."
-                    }
-                }
+            Goal.REVERSE -> when {
+                weightChange > 0.5 && currentCalories < estimatedMaintenance ->
+                    currentCalories to "Gaining a bit fast for a reverse — holding calories steady this week to let things settle."
+                // Reaching maintenance ends the reverse: the target lands exactly on it and the goal becomes Maintain
+                currentCalories + 100 >= estimatedMaintenance ->
+                    estimatedMaintenance to "Reverse complete — you've reached your estimated maintenance of $estimatedMaintenance kcal, so your goal is now Maintain."
+                else -> (currentCalories + 100) to "Reverse dieting — adding 100 kcal to keep gradually rebuilding your intake."
             }
         }
 
@@ -138,4 +163,14 @@ class CoachAlgorithm {
             reason = reason
         )
     }
+
+    /**
+     * The goal to hold after a weekly review settles on [newTarget]. A reverse diet hands over to
+     * Maintain once its target reaches maintenance, so weight drift gets corrected from then on.
+     */
+    fun goalAfterReview(goal: Goal, newTarget: Int, estimatedMaintenance: Int): Goal =
+        if (goal == Goal.REVERSE && newTarget >= estimatedMaintenance) Goal.MAINTAIN else goal
+
+    private fun notRecommendedToCut(cutFloor: Int) =
+        "Your minimum safe intake of $cutFloor kcal is at or above your estimated maintenance, so cutting isn't recommended right now — consider switching your goal to Maintain."
 }
