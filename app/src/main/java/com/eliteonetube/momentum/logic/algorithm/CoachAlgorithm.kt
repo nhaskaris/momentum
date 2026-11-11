@@ -10,7 +10,9 @@ data class WeeklyAdjustment(
     val newTarget: Int,
     val deltaCalories: Int,
     val weekChangeKg: Double,
-    val reason: String
+    val reason: String,
+    /** True when the cut's calorie floor decided the verdict (raised, lowered to, held at, or blocking a cut). */
+    val hitCutFloor: Boolean = false
 )
 
 class CoachAlgorithm {
@@ -160,7 +162,10 @@ class CoachAlgorithm {
             newTarget = newTarget,
             deltaCalories = newTarget - currentCalories,
             weekChangeKg = weightChange,
-            reason = reason
+            reason = reason,
+            // Same conditions as the floor branches of the CUT verdict above
+            hitCutFloor = goal == Goal.CUT && (cutFloor >= estimatedMaintenance || currentCalories < cutFloor ||
+                (weightChange > -0.2 && currentCalories - 150 < cutFloor))
         )
     }
 

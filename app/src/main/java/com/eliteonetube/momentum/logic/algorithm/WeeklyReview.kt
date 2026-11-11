@@ -14,7 +14,9 @@ data class WeeklyReviewResult(
     /** False when there weren't enough weigh-ins to judge, so the target is left alone. */
     val hadEnoughData: Boolean,
     /** Usually the profile's goal; Maintain once a reverse diet reaches maintenance. */
-    val newGoal: Goal
+    val newGoal: Goal,
+    /** True when the cut's calorie floor decided the verdict. */
+    val hitCutFloor: Boolean = false
 )
 
 /**
@@ -64,7 +66,8 @@ object WeeklyReview {
         return if (adjustment != null) {
             WeeklyReviewResult(
                 adjustment.newTarget, adjustment.reason, maintenance, hadEnoughData = true,
-                newGoal = algorithm.goalAfterReview(profile.goal, adjustment.newTarget, maintenance)
+                newGoal = algorithm.goalAfterReview(profile.goal, adjustment.newTarget, maintenance),
+                hitCutFloor = adjustment.hitCutFloor
             )
         } else {
             WeeklyReviewResult(

@@ -2,6 +2,7 @@ package com.eliteonetube.momentum
 
 import kotlinx.coroutines.flow.distinctUntilChanged
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
@@ -38,6 +39,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -150,6 +152,23 @@ fun MomentumAppContent(
     // Keeps active-workout saves and clears in call order so a late save cannot revive a finished workout
     val activeWorkoutMutex = remember { Mutex() }
 
+    // Saves a weigh-in and says whether it took the weigh-in streak to exactly 7 days
+    suspend fun saveWeighIn(entry: WeightEntry): Boolean {
+        val datesBefore = weightDao.getAllWeightDates().first()
+        weightDao.insertWeight(entry)
+        return ReviewPolicy.reachedStreakMilestone(
+            StreakCalculator.currentStreak(datesBefore),
+            StreakCalculator.currentStreak(datesBefore + entry.date)
+        )
+    }
+    // ReviewPrompter enforces the 120-day gap and the lifetime cap
+    fun askForReview(delayMs: Long = 0) {
+        coroutineScope.launch {
+            delay(delayMs)
+            (context as? Activity)?.let { ReviewPrompter(it).maybeAsk() }
+        }
+    }
+
     // 1. Data: collected once; each screen reads only what it shows, so a change redraws just those
     // Stays current past midnight, so "today" queries roll over instead of freezing at app start
     val currentDate by rememberCurrentDate()
@@ -211,14 +230,16 @@ fun MomentumAppContent(
                 onWeightSubmitted = { enteredWeight ->
                     coroutineScope.launch {
                         val now = LocalDate.now().toString()
-                        weightDao.insertWeight(WeightEntry(date = now, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
+                        val hitStreak = saveWeighIn(WeightEntry(date = now, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
                         NotificationHelper.cancelWeighInReminder(context.applicationContext)
+                        if (hitStreak) askForReview()
                     }
                 },
                 onPastWeightSubmitted = { date, enteredWeight ->
                     coroutineScope.launch {
-                        weightDao.insertWeight(WeightEntry(date = date, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
+                        val hitStreak = saveWeighIn(WeightEntry(date = date, weight = enteredWeight, calorieTargetAtEntry = currentCalorieTarget))
                         if (date == LocalDate.now().toString()) NotificationHelper.cancelWeighInReminder(context.applicationContext)
+                        if (hitStreak) askForReview()
                     }
                 },
                 onWeightDeleted = { date -> coroutineScope.launch { weightDao.deleteWeight(date) } },
@@ -393,7 +414,7 @@ fun MomentumAppContent(
                         val (front, back, side) = listOf("front", "back", "side").mapIndexed { i, label ->
                             ph.getOrNull(i)?.let { MediaUtils.persistProgressPhoto(context.applicationContext, it, label) }
                         }
-                        weightDao.insertWeight(WeightEntry(date = now, weight = w, calorieTargetAtEntry = review.newTarget))
+                        val hitStreak = saveWeighIn(WeightEntry(date = now, weight = w, calorieTargetAtEntry = review.newTarget))
                         // Saves exactly the verdict the summary showed (computed with this check-in's weight)
                         weightDao.insertCheckIn(CheckIn(date = now, weight = w, frontPhotoPath = front, backPhotoPath = back, sidePhotoPath = side, calorieTargetBefore = p.currentCalorieTarget, calorieTargetAfter = review.newTarget, adjustmentReason = review.reason, bodyFatPercentage = bf))
                         weightDao.saveProfile(p.copy(
@@ -405,6 +426,8 @@ fun MomentumAppContent(
                             checkInDue = false, lastCheckInDate = now
                         ))
                         NotificationHelper.cancelWeighInReminder(context.applicationContext)
+                        // The check-in screen has closed by now; the pause lets Home settle before the dialog
+                        if (hitStreak || ReviewPolicy.isGoodCheckIn(review, previousTarget = p.currentCalorieTarget)) askForReview(delayMs = 1000)
                     }
                 },
                 getSetsForSession = { sid -> workoutDao.getSetsForSession(sid).first() },

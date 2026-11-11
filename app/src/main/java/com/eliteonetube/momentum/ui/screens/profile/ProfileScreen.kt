@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.HealthConnectClient
+import com.eliteonetube.momentum.logic.services.ReviewPrompter
 import com.eliteonetube.momentum.logic.services.WorkScheduler
 import com.eliteonetube.momentum.ui.components.BigStat
 import com.eliteonetube.momentum.ui.components.SectionDivider
@@ -507,6 +508,15 @@ fun ProfileScreen(
                     }
                 )
             }
+
+            SectionDivider()
+            SettingsRow(
+                icon = Icons.Default.Star,
+                title = "Rate Momentum",
+                subtitle = "Enjoying it? A review on Google Play helps others find it",
+                onClick = { ReviewPrompter.openStoreListing(context) },
+                trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            )
 
             Spacer(modifier = Modifier.height(bottomNavClearance()))
         }

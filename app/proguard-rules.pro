@@ -26,3 +26,6 @@
 # Keep the ComponentRegistrars which are used for discovery
 -keep class * implements com.google.firebase.components.ComponentRegistrar
 -keep class * implements com.google.mlkit.common.sdkinternal.ModelResource
+
+# Play In-App Review (review-ktx) refers to this Play Services annotation, which is never needed at runtime
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite

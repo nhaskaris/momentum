@@ -16,8 +16,8 @@ android {
         applicationId = "com.eliteonetube.momentum"
         minSdk = 26
         targetSdk = 37
-        versionCode = 37
-        versionName = "1.0.1"
+        versionCode = 38
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -88,6 +88,7 @@ dependencies {
     // ML Kit
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.play.review.ktx)
 
     //CameraX
     implementation(libs.androidx.camera.core)
