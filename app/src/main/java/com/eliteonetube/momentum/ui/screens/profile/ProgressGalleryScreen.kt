@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.screens.profile
 
+import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.logic.utils.Units
 import com.eliteonetube.momentum.data.UnitSystem
 import com.eliteonetube.momentum.data.Goal
@@ -50,8 +51,17 @@ fun ProgressGalleryScreen(
     var compareMode by remember { mutableStateOf(false) }
     var fullScreenPhotoPath by remember { mutableStateOf<String?>(null) }
 
-    val photoCheckIns = checkIns.filter { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }
-        .sortedByDescending { it.date }
+    // Photos whose file is gone (e.g. after a restore that left photos out) are dropped rather than shown broken
+    val photoCheckIns = remember(checkIns) {
+        checkIns.map { checkIn ->
+            checkIn.copy(
+                frontPhotoPath = checkIn.frontPhotoPath.takeIf(MediaUtils::photoExists),
+                backPhotoPath = checkIn.backPhotoPath.takeIf(MediaUtils::photoExists),
+                sidePhotoPath = checkIn.sidePhotoPath.takeIf(MediaUtils::photoExists)
+            )
+        }.filter { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }
+            .sortedByDescending { it.date }
+    }
 
     var selectedPhoto1 by remember { mutableStateOf<CheckIn?>(null) }
     var selectedPhoto2 by remember { mutableStateOf<CheckIn?>(null) }

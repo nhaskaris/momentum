@@ -1,5 +1,6 @@
 package com.eliteonetube.momentum.ui.screens.onboarding
 
+import com.eliteonetube.momentum.ui.components.BackupImporter
 import com.eliteonetube.momentum.ui.screens.dashboard.MomentumMascot
 import com.eliteonetube.momentum.ui.screens.dashboard.MascotMood
 import com.eliteonetube.momentum.ui.components.PrimaryButton
@@ -149,6 +150,17 @@ fun IntroScreen(onFinished: () -> Unit) {
             if (!isLastPage) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+            }
+        }
+
+        // Only on the welcome page; the space is kept on the others so the button doesn't jump
+        Box(modifier = Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+            if (pagerState.currentPage == 0) {
+                BackupImporter(confirmReplace = false) { startImport, isWorking ->
+                    TextButton(onClick = startImport, enabled = !isWorking) {
+                        Text(if (isWorking) "Restoring…" else "Restore from a backup")
+                    }
+                }
             }
         }
     }

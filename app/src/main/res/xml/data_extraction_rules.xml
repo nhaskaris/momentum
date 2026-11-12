@@ -1,19 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Backup rules for Android 12 and higher.
+   Cloud backups are capped at 25 MB, and going over stops the whole backup, so progress photos stay
+   out of them (Export my data covers photos). A direct phone-to-phone transfer has no cap and
+   carries everything.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="progress_photos/" />
+        <exclude domain="file" path="backup_work/" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="backup_work/" />
     </device-transfer>
-    -->
 </data-extraction-rules>

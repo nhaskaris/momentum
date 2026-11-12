@@ -24,7 +24,7 @@ import androidx.room3.RoomDatabase
         DailyMealLog::class,
         TemplateSet::class
     ],
-    version = 36
+    version = WeightDatabase.SCHEMA_VERSION
 )
 @TypeConverters(Converters::class)
 abstract class WeightDatabase : RoomDatabase() {
@@ -33,6 +33,11 @@ abstract class WeightDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
 
     companion object {
+        const val SCHEMA_VERSION = 36
+        /** The oldest schema the migrations below can upgrade from. */
+        const val OLDEST_MIGRATABLE_VERSION = 12
+        const val NAME = "weight_tracker_db"
+
         @Volatile
         private var INSTANCE: WeightDatabase? = null
 
@@ -41,7 +46,7 @@ abstract class WeightDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     WeightDatabase::class.java,
-                    "weight_tracker_db"
+                    NAME
                 ).addMigrations(
                     MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                     MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,

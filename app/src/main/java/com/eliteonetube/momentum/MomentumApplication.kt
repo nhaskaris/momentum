@@ -1,11 +1,14 @@
 package com.eliteonetube.momentum
 
 import android.app.Application
+import com.eliteonetube.momentum.logic.backup.DataBackup
 import com.eliteonetube.momentum.logic.utils.CrashHandler
+import com.eliteonetube.momentum.logic.utils.MediaUtils
 import com.eliteonetube.momentum.widget.WidgetSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MomentumApplication : Application() {
     // Lives as long as the process: background work that isn't tied to any screen
@@ -15,5 +18,9 @@ class MomentumApplication : Application() {
         super.onCreate()
         CrashHandler.initialize(this)
         WidgetSync.start(this, appScope)
+        appScope.launch {
+            DataBackup.clearWorkFiles(this@MomentumApplication)
+            MediaUtils.shrinkExistingPhotos(this@MomentumApplication)
+        }
     }
 }

@@ -40,7 +40,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.HealthConnectClient
+import com.eliteonetube.momentum.logic.backup.DataBackup
 import com.eliteonetube.momentum.logic.services.ReviewPrompter
+import com.eliteonetube.momentum.logic.utils.MediaUtils
+import com.eliteonetube.momentum.ui.components.BackupImporter
+import com.eliteonetube.momentum.ui.components.ExportDataDialog
+import com.eliteonetube.momentum.ui.components.formatBackupDate
 import com.eliteonetube.momentum.logic.services.WorkScheduler
 import com.eliteonetube.momentum.ui.components.BigStat
 import com.eliteonetube.momentum.ui.components.SectionDivider
@@ -98,6 +103,19 @@ fun ProfileScreen(
     var isProcessingImage by remember { mutableStateOf(false) }
     var crashReport by remember { mutableStateOf(CrashHandler.getCrashReport(context)) }
     var editingReminder by remember { mutableStateOf<WorkScheduler.ReminderSlot?>(null) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var lastExport by remember { mutableStateOf(DataBackup.lastExportDate(context)) }
+    // Photos can be missing after a restore that left them out
+    val hasProgressPhotos = remember(allCheckIns) {
+        allCheckIns.any { checkIn -> listOf(checkIn.frontPhotoPath, checkIn.backPhotoPath, checkIn.sidePhotoPath).any(MediaUtils::photoExists) }
+    }
+
+    if (showExportDialog) {
+        ExportDataDialog(
+            onDismiss = { showExportDialog = false },
+            onExported = { lastExport = DataBackup.lastExportDate(context) }
+        )
+    }
 
     // Reconcile in case the user revoked access from Health Connect settings directly
     LaunchedEffect(Unit) {
@@ -402,7 +420,7 @@ fun ProfileScreen(
                     else Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             )
-            if (allCheckIns.any { (it.frontPhotoPath != null) || (it.backPhotoPath != null) || (it.sidePhotoPath != null) }) {
+            if (hasProgressPhotos) {
                 HorizontalDivider(color = divider)
                 SettingsRow(
                     icon = Icons.Default.PhotoLibrary,
@@ -410,6 +428,27 @@ fun ProfileScreen(
                     subtitle = "View and compare your check-in photos",
                     onClick = onViewGallery,
                     trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                )
+            }
+            HorizontalDivider(color = divider)
+            SettingsRow(
+                icon = Icons.Default.Upload,
+                title = "Export my data",
+                subtitle = "Last export: " + (lastExport?.let { formatBackupDate(it) } ?: "never"),
+                onClick = { showExportDialog = true },
+                trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            )
+            HorizontalDivider(color = divider)
+            BackupImporter(confirmReplace = true) { startImport, isWorking ->
+                SettingsRow(
+                    icon = Icons.Default.Download,
+                    title = "Import my data",
+                    subtitle = "Replace everything here with a backup file",
+                    onClick = if (isWorking) null else startImport,
+                    trailing = {
+                        if (isWorking) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 )
             }
 
