@@ -4,11 +4,14 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.eliteonetube.momentum.data.FoodDao
 import com.eliteonetube.momentum.data.WeightDao
 import com.eliteonetube.momentum.data.WeightDatabase
+import com.eliteonetube.momentum.logic.algorithm.IntakeCheck
 import com.eliteonetube.momentum.logic.algorithm.WeeklyReview
 import com.eliteonetube.momentum.logic.algorithm.WeeklyAdjustment
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
 
 class WeeklyRecalculationWorker(
     context: Context,
@@ -16,9 +19,10 @@ class WeeklyRecalculationWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val dao = WeightDatabase.getInstance(applicationContext).weightDao()
+        val database = WeightDatabase.getInstance(applicationContext)
+        val dao = database.weightDao()
         try {
-            recalculate(dao)
+            recalculate(dao, database.foodDao())
         } catch (e: Exception) {
             // No retry: a retried run would queue a second "next Monday" check-in
             Log.e("WeeklyRecalculation", "Weekly check-in failed", e)
@@ -32,7 +36,7 @@ class WeeklyRecalculationWorker(
         return Result.success()
     }
 
-    private suspend fun recalculate(dao: WeightDao) {
+    private suspend fun recalculate(dao: WeightDao, foodDao: FoodDao) {
         val profile = dao.getUserProfile().first() ?: return
         val entries = dao.getLastTwoWeeks().first()
 
@@ -45,7 +49,14 @@ class WeeklyRecalculationWorker(
             }
         }
 
-        val review = WeeklyReview.run(profile, entries, averageDailySteps = effectiveAverageSteps)
+        // Same food data the check-in screen uses, so the notification's preview matches its verdict
+        val weekAgo = LocalDate.now().minusDays(7).toString()
+        val dailyCalories = IntakeCheck.dailyCalories(
+            foodDao.getRecentFoodLogs(weekAgo).first(),
+            foodDao.getRecentMealLogs(weekAgo).first()
+        )
+
+        val review = WeeklyReview.run(profile, entries, averageDailySteps = effectiveAverageSteps, dailyCalories = dailyCalories)
 
         dao.saveProfile(
             profile.copy(

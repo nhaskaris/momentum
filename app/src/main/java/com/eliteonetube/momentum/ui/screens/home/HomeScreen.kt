@@ -223,7 +223,8 @@ fun HomeScreen(
                 WeeklyReview.run(
                     profile = savedProfile,
                     entries = data.recentWeights.filter { it.date != today } + WeightEntry(today, weightKg),
-                    bodyFatPercentage = bodyFat ?: savedProfile.bodyFatPercentage
+                    bodyFatPercentage = bodyFat ?: savedProfile.bodyFatPercentage,
+                    dailyCalories = data.recentNutrition.associate { it.date to it.totalCalories }
                 )
             },
             onComplete = { weight, bodyFat, photos, review ->

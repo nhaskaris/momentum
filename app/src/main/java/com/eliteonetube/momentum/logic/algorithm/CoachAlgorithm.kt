@@ -12,7 +12,9 @@ data class WeeklyAdjustment(
     val weekChangeKg: Double,
     val reason: String,
     /** True when the cut's calorie floor decided the verdict (raised, lowered to, held at, or blocking a cut). */
-    val hitCutFloor: Boolean = false
+    val hitCutFloor: Boolean = false,
+    /** True when the target was left alone because the week's eating, not the target, explains the result. */
+    val heldForIntake: Boolean = false
 )
 
 class CoachAlgorithm {
@@ -104,8 +106,18 @@ class CoachAlgorithm {
      * Weekly check: compares the last 7 days against the 7 before that and
      * decides whether the calorie target needs adjusting for the goal.
      * Returns null if there isn't enough data yet (fewer than 3 entries per week).
+     *
+     * With an [intake] for the week, a target that wasn't being followed is held rather than
+     * adjusted: the eating explains the result, so changing the target would chase the wrong cause.
      */
-    fun calculateWeeklyAdjustment(entries: List<WeightEntry>, currentCalories: Int, goal: Goal, estimatedMaintenance: Int, cutFloor: Int): WeeklyAdjustment? {
+    fun calculateWeeklyAdjustment(
+        entries: List<WeightEntry>,
+        currentCalories: Int,
+        goal: Goal,
+        estimatedMaintenance: Int,
+        cutFloor: Int,
+        intake: WeekIntake? = null
+    ): WeeklyAdjustment? {
         val today = LocalDate.now()
         val week1Weights = mutableListOf<Double>()
         val week2Weights = mutableListOf<Double>()
@@ -118,7 +130,7 @@ class CoachAlgorithm {
             }
             val daysAgo = ChronoUnit.DAYS.between(entryDate, today)
             if (daysAgo in 0..6) week2Weights.add(entry.weight)
-            else if (daysAgo in 7..14) week1Weights.add(entry.weight)
+            else if (daysAgo in 7..13) week1Weights.add(entry.weight)
         }
 
         if (week1Weights.size < 3 || week2Weights.size < 3) return null
@@ -158,15 +170,41 @@ class CoachAlgorithm {
             }
         }
 
+        // Same conditions as the floor branches of the CUT verdict above
+        val hitCutFloor = goal == Goal.CUT && (cutFloor >= estimatedMaintenance || currentCalories < cutFloor ||
+            (weightChange > -0.2 && currentCalories - 150 < cutFloor))
+
+        // Floor verdicts are about safety and stand whatever was eaten
+        val holdReason = if (intake != null && !hitCutFloor) intakeHoldReason(intake, currentCalories, newTarget, goal) else null
+
         return WeeklyAdjustment(
-            newTarget = newTarget,
-            deltaCalories = newTarget - currentCalories,
+            newTarget = if (holdReason != null) currentCalories else newTarget,
+            deltaCalories = if (holdReason != null) 0 else newTarget - currentCalories,
             weekChangeKg = weightChange,
-            reason = reason,
-            // Same conditions as the floor branches of the CUT verdict above
-            hitCutFloor = goal == Goal.CUT && (cutFloor >= estimatedMaintenance || currentCalories < cutFloor ||
-                (weightChange > -0.2 && currentCalories - 150 < cutFloor))
+            reason = holdReason ?: reason,
+            hitCutFloor = hitCutFloor,
+            heldForIntake = holdReason != null
         )
+    }
+
+    /**
+     * Why the target should stay put despite the weight verdict, or null to let the verdict stand.
+     * Only when the eating explains the result: over target when calories would drop, or under
+     * target when they would rise. A reverse only holds for eating under, since it only ever adds.
+     */
+    private fun intakeHoldReason(intake: WeekIntake, currentCalories: Int, verdictTarget: Int, goal: Goal): String? {
+        val averaged = "You averaged ${intake.averageCalories} kcal against a $currentCalories kcal target"
+        return when {
+            goal == Goal.REVERSE ->
+                if (IntakeCheck.ateUnderTarget(intake, currentCalories) && verdictTarget > currentCalories)
+                    "$averaged — get up to your current target first, then I'll add more."
+                else null
+            IntakeCheck.ateOverTarget(intake, currentCalories) && verdictTarget < currentCalories ->
+                "$averaged, so the plan stays as it is. Hit the target this week before I lower it."
+            IntakeCheck.ateUnderTarget(intake, currentCalories) && verdictTarget > currentCalories ->
+                "$averaged, so the plan stays as it is. Eat up to your target first, then I'll adjust."
+            else -> null
+        }
     }
 
     /**

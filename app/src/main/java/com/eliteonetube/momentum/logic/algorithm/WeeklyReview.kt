@@ -16,7 +16,11 @@ data class WeeklyReviewResult(
     /** Usually the profile's goal; Maintain once a reverse diet reaches maintenance. */
     val newGoal: Goal,
     /** True when the cut's calorie floor decided the verdict. */
-    val hitCutFloor: Boolean = false
+    val hitCutFloor: Boolean = false,
+    /** The week's eating, when enough days were logged to judge it. */
+    val intake: WeekIntake? = null,
+    /** True when the target was left alone because the eating, not the target, explains the result. */
+    val heldForIntake: Boolean = false
 )
 
 /**
@@ -32,13 +36,15 @@ object WeeklyReview {
         entries: List<WeightEntry>,
         averageDailySteps: Int = profile.averageDailySteps,
         bodyFatPercentage: Double? = profile.bodyFatPercentage,
+        /** Calories eaten per day (ISO date); see [IntakeCheck.dailyCalories]. Empty leaves food out. */
+        dailyCalories: Map<String, Double> = emptyMap(),
         today: LocalDate = LocalDate.now()
     ): WeeklyReviewResult {
         val algorithm = CoachAlgorithm()
 
-        // Same windows as CoachAlgorithm.calculateWeeklyAdjustment: days 0–6 vs 7–14 ago
+        // Same windows as CoachAlgorithm.calculateWeeklyAdjustment: days 0–6 vs 7–13 ago
         val thisWeek = entries.filter { daysAgo(it, today) in 0..6 }
-        val lastWeekCount = entries.count { daysAgo(it, today) in 7..14 }
+        val lastWeekCount = entries.count { daysAgo(it, today) in 7..13 }
 
         // Maintenance follows this week's average weight once there's enough of it
         val maintenance = if (thisWeek.size >= MIN_WEIGH_INS_PER_WEEK) {
@@ -54,20 +60,27 @@ object WeeklyReview {
             profile.estimatedMaintenanceCalories
         }
 
+        // A week eaten against two different targets can't be judged, so food is left out of it
+        val intake = if (IntakeCheck.targetChangedDuringWeek(entries, profile.currentCalorieTarget, today)) null
+        else IntakeCheck.weekIntake(dailyCalories, profile.currentCalorieTarget, today)
+
         val adjustment = algorithm.calculateWeeklyAdjustment(
             entries = entries,
             currentCalories = profile.currentCalorieTarget,
             goal = profile.goal,
             estimatedMaintenance = maintenance,
             // An adjustment needs 3+ weigh-ins this week, so the floor follows this week's average too
-            cutFloor = currentWeightKg(entries, today)?.let { cutFloor(profile, it, bodyFatPercentage) } ?: 0
+            cutFloor = currentWeightKg(entries, today)?.let { cutFloor(profile, it, bodyFatPercentage) } ?: 0,
+            intake = intake
         )
 
         return if (adjustment != null) {
             WeeklyReviewResult(
                 adjustment.newTarget, adjustment.reason, maintenance, hadEnoughData = true,
                 newGoal = algorithm.goalAfterReview(profile.goal, adjustment.newTarget, maintenance),
-                hitCutFloor = adjustment.hitCutFloor
+                hitCutFloor = adjustment.hitCutFloor,
+                intake = intake,
+                heldForIntake = adjustment.heldForIntake
             )
         } else {
             WeeklyReviewResult(

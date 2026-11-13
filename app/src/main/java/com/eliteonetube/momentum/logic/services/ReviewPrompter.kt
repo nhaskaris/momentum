@@ -27,9 +27,9 @@ object ReviewPolicy {
     fun canAsk(lastAsked: LocalDate?, askCount: Int, today: LocalDate): Boolean =
         askCount < MAX_ASKS && (lastAsked == null || ChronoUnit.DAYS.between(lastAsked, today) >= MIN_DAYS_BETWEEN_ASKS)
 
-    /** Good news worth asking after: enough data to judge, calories up or held, and not a floor verdict. */
+    /** Good news worth asking after: enough data to judge, calories up or held, and neither a floor verdict nor an off-plan week. */
     fun isGoodCheckIn(review: WeeklyReviewResult, previousTarget: Int): Boolean =
-        review.hadEnoughData && review.newTarget >= previousTarget && !review.hitCutFloor
+        review.hadEnoughData && review.newTarget >= previousTarget && !review.hitCutFloor && !review.heldForIntake
 
     /** True when a weigh-in took the streak to exactly the milestone; longer streaks don't count again. */
     fun reachedStreakMilestone(streakBefore: Int, streakAfter: Int): Boolean =

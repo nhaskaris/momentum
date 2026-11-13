@@ -489,6 +489,14 @@ private fun SummaryStep(
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionLabel("THE VERDICT")
             Text(review.reason, style = MaterialTheme.typography.bodyLarge)
+            review.intake?.let { intake ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Average intake: %,d kcal (%d days logged)".format(intake.averageCalories, intake.daysLogged),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
 
             if (review.newTarget != profile.currentCalorieTarget) {
